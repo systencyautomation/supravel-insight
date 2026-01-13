@@ -14,16 +14,267 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      installments: {
+        Row: {
+          created_at: string | null
+          due_date: string | null
+          id: string
+          installment_number: number
+          organization_id: string
+          paid_at: string | null
+          sale_id: string
+          status: string | null
+          value: number
+        }
+        Insert: {
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          installment_number: number
+          organization_id: string
+          paid_at?: string | null
+          sale_id: string
+          status?: string | null
+          value: number
+        }
+        Update: {
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          installment_number?: number
+          organization_id?: string
+          paid_at?: string | null
+          sale_id?: string
+          status?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory: {
+        Row: {
+          base_commission_pct: number | null
+          base_price: number | null
+          created_at: string | null
+          id: string
+          internal_code: string | null
+          model_name: string
+          organization_id: string
+          quantity: number | null
+        }
+        Insert: {
+          base_commission_pct?: number | null
+          base_price?: number | null
+          created_at?: string | null
+          id?: string
+          internal_code?: string | null
+          model_name: string
+          organization_id: string
+          quantity?: number | null
+        }
+        Update: {
+          base_commission_pct?: number | null
+          base_price?: number | null
+          created_at?: string | null
+          id?: string
+          internal_code?: string | null
+          model_name?: string
+          organization_id?: string
+          quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      sales: {
+        Row: {
+          client_cnpj: string | null
+          client_name: string | null
+          commission_calculated: number | null
+          created_at: string | null
+          emission_date: string | null
+          icms: number | null
+          id: string
+          internal_seller_id: string | null
+          ir_csll: number | null
+          nfe_number: string | null
+          organization_id: string
+          over_price: number | null
+          payment_method: string | null
+          pis_cofins: number | null
+          representative_id: string | null
+          status: string | null
+          table_value: number | null
+          total_value: number | null
+          uf_destiny: string | null
+        }
+        Insert: {
+          client_cnpj?: string | null
+          client_name?: string | null
+          commission_calculated?: number | null
+          created_at?: string | null
+          emission_date?: string | null
+          icms?: number | null
+          id?: string
+          internal_seller_id?: string | null
+          ir_csll?: number | null
+          nfe_number?: string | null
+          organization_id: string
+          over_price?: number | null
+          payment_method?: string | null
+          pis_cofins?: number | null
+          representative_id?: string | null
+          status?: string | null
+          table_value?: number | null
+          total_value?: number | null
+          uf_destiny?: string | null
+        }
+        Update: {
+          client_cnpj?: string | null
+          client_name?: string | null
+          commission_calculated?: number | null
+          created_at?: string | null
+          emission_date?: string | null
+          icms?: number | null
+          id?: string
+          internal_seller_id?: string | null
+          ir_csll?: number | null
+          nfe_number?: string | null
+          organization_id?: string
+          over_price?: number | null
+          payment_method?: string | null
+          pis_cofins?: number | null
+          representative_id?: string | null
+          status?: string | null
+          table_value?: number | null
+          total_value?: number | null
+          uf_destiny?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          organization_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          organization_id?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "super_admin"
+        | "admin"
+        | "manager"
+        | "seller"
+        | "representative"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +401,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "admin", "manager", "seller", "representative"],
+    },
   },
 } as const
