@@ -10,24 +10,42 @@ import { RepresentativeCommissions } from '@/components/tabs/RepresentativeCommi
 import { StockManagement } from '@/components/tabs/StockManagement';
 import { CashFlow } from '@/components/tabs/CashFlow';
 import { mockSales } from '@/data/mockData';
-import { Building2, Users, Briefcase, Package, Wallet, Loader2, LogOut, Settings } from 'lucide-react';
+import { Building2, Users, Briefcase, Package, Wallet, Loader2, LogOut, Settings, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('empresa');
-  const { user, loading: authLoading, signOut, isSuperAdmin } = useAuth();
+  const { 
+    user, 
+    loading: authLoading, 
+    signOut, 
+    isMasterAdmin, 
+    impersonatedOrgName, 
+    setImpersonatedOrg 
+  } = useAuth();
   const { sales, inventory, installments, loading: dataLoading } = useOrganizationData();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
+      return;
     }
-  }, [user, authLoading, navigate]);
+
+    // Redirect Master Admin to master dashboard if not impersonating
+    if (!authLoading && user && isMasterAdmin && !impersonatedOrgName) {
+      navigate('/master');
+    }
+  }, [user, authLoading, isMasterAdmin, impersonatedOrgName, navigate]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleExitImpersonation = () => {
+    setImpersonatedOrg(null, null);
+    navigate('/master');
   };
 
   if (authLoading) {
@@ -61,19 +79,34 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <DashboardHeader />
       
-      <div className="container mx-auto px-6 py-2 flex items-center justify-end gap-2">
-        {isSuperAdmin && (
-          <Link to="/admin">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Admin
+      <div className="container mx-auto px-6 py-2 flex items-center justify-between">
+        <div>
+          {impersonatedOrgName && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExitImpersonation}
+              className="gap-2 text-xs"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Sair de {impersonatedOrgName}
             </Button>
-          </Link>
-        )}
-        <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
-          <LogOut className="h-4 w-4" />
-          Sair
-        </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {isMasterAdmin && (
+            <Link to="/master">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Master
+              </Button>
+            </Link>
+          )}
+          <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
+            <LogOut className="h-4 w-4" />
+            Sair
+          </Button>
+        </div>
       </div>
       
       <main className="container mx-auto px-6 py-6">
