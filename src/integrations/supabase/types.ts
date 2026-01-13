@@ -106,6 +106,36 @@ export type Database = {
           },
         ]
       }
+      invitations: {
+        Row: {
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          organization_name: string | null
+          status: string | null
+          token: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          organization_name?: string | null
+          status?: string | null
+          token?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          organization_name?: string | null
+          status?: string | null
+          token?: string | null
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           active: boolean | null
