@@ -10,7 +10,7 @@ interface SummaryCardProps {
 export function SummaryCard({ title, value, subtitle, variant = 'default' }: SummaryCardProps) {
   return (
     <div className={cn(
-      'border border-border p-4',
+      'rounded border border-border p-4',
       variant === 'primary' && 'border-l-4 border-l-primary',
       variant === 'success' && 'border-l-4 border-l-[hsl(var(--success))]'
     )}>
