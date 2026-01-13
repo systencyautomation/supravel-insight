@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 type AppRole = 'super_admin' | 'admin' | 'manager' | 'seller' | 'representative';
 
+const MASTER_EMAIL = 'systency.automation@gmail.com';
+
 interface UserRole {
   role: AppRole;
   organization_id: string | null;
@@ -16,6 +18,11 @@ interface AuthContextType {
   userRoles: UserRole[];
   organizationId: string | null;
   isSuperAdmin: boolean;
+  isMasterAdmin: boolean;
+  impersonatedOrgId: string | null;
+  impersonatedOrgName: string | null;
+  effectiveOrgId: string | null;
+  setImpersonatedOrg: (orgId: string | null, orgName: string | null) => void;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -29,9 +36,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [impersonatedOrgId, setImpersonatedOrgId] = useState<string | null>(null);
+  const [impersonatedOrgName, setImpersonatedOrgName] = useState<string | null>(null);
 
   const organizationId = userRoles.find(r => r.organization_id)?.organization_id ?? null;
   const isSuperAdmin = userRoles.some(r => r.role === 'super_admin');
+  const isMasterAdmin = user?.email === MASTER_EMAIL;
+  
+  // Effective org is impersonated org if set, otherwise user's actual org
+  const effectiveOrgId = impersonatedOrgId ?? organizationId;
+
+  const setImpersonatedOrg = (orgId: string | null, orgName: string | null) => {
+    setImpersonatedOrgId(orgId);
+    setImpersonatedOrgName(orgName);
+  };
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -63,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 0);
         } else {
           setUserRoles([]);
+          setImpersonatedOrgId(null);
+          setImpersonatedOrgName(null);
         }
       }
     );
@@ -101,6 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUserRoles([]);
+    setImpersonatedOrgId(null);
+    setImpersonatedOrgName(null);
   };
 
   return (
@@ -111,6 +133,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userRoles,
       organizationId,
       isSuperAdmin,
+      isMasterAdmin,
+      impersonatedOrgId,
+      impersonatedOrgName,
+      effectiveOrgId,
+      setImpersonatedOrg,
       signIn,
       signUp,
       signOut,
