@@ -118,7 +118,23 @@ export default function Onboarding() {
     setSubmitting(true);
 
     try {
-      // 1. Create organization
+      // 1. Create user account FIRST (so we're authenticated for subsequent operations)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: invitation.email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: { 
+            full_name: companyName,
+            cnpj: cnpj.replace(/\D/g, '')
+          }
+        }
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Falha ao criar usuário');
+
+      // 2. Create organization (now we're authenticated, RLS will pass)
       const slug = companyName.toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -135,33 +151,16 @@ export default function Onboarding() {
 
       if (orgError) throw orgError;
 
-      // 2. Create user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: invitation.email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: { 
-            full_name: companyName,
-            cnpj: cnpj.replace(/\D/g, '')
-          }
-        }
-      });
-
-      if (authError) throw authError;
-
       // 3. Assign admin role
-      if (authData.user) {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: authData.user.id,
-            role: 'admin',
-            organization_id: org.id
-          });
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: authData.user.id,
+          role: 'admin',
+          organization_id: org.id
+        });
 
-        if (roleError) throw roleError;
-      }
+      if (roleError) throw roleError;
 
       // 4. Update invitation status
       await supabase
