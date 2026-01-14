@@ -22,7 +22,8 @@ import {
   XCircle,
   ArrowLeft,
   RefreshCw,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { z } from 'zod';
@@ -83,6 +84,7 @@ export default function MasterDashboard() {
   const [inviteOrgName, setInviteOrgName] = useState('');
   const [sending, setSending] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -396,6 +398,33 @@ export default function MasterDashboard() {
     }
   };
 
+  const deleteInvite = async (invite: Invitation) => {
+    setDeletingId(invite.id);
+    try {
+      const { error } = await supabase
+        .from('invitations')
+        .delete()
+        .eq('id', invite.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Convite removido',
+        description: `O convite para ${invite.email} foi removido.`,
+      });
+
+      fetchInvitations();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao remover',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading || loadingData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -691,29 +720,51 @@ export default function MasterDashboard() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {invite.status === 'pendente' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => resendInvite(invite)}
-                                disabled={!canResend || isResending}
-                                className="text-xs"
-                              >
-                                {isResending ? (
-                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="h-3 w-3 mr-1" />
-                                )}
-                                {cooldown > 0 ? `${cooldown} min` : 'Reenviar'}
-                              </Button>
-                            </TooltipTrigger>
-                            {cooldown > 0 && (
+                          <div className="flex items-center justify-end gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => resendInvite(invite)}
+                                  disabled={!canResend || isResending}
+                                  className="text-xs"
+                                >
+                                  {isResending ? (
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                  )}
+                                  {cooldown > 0 ? `${cooldown} min` : 'Reenviar'}
+                                </Button>
+                              </TooltipTrigger>
+                              {cooldown > 0 && (
+                                <TooltipContent>
+                                  <p>Aguarde {cooldown} minuto(s) para reenviar</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteInvite(invite)}
+                                  disabled={deletingId === invite.id}
+                                  className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  {deletingId === invite.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
                               <TooltipContent>
-                                <p>Aguarde {cooldown} minuto(s) para reenviar</p>
+                                <p>Remover convite</p>
                               </TooltipContent>
-                            )}
-                          </Tooltip>
+                            </Tooltip>
+                          </div>
                         )}
                       </td>
                     </tr>
