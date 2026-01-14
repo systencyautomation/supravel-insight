@@ -72,12 +72,25 @@ export function useOrganizationSettings(): UseOrganizationSettingsReturn {
 
     try {
       setSaving(true);
-      const { error } = await supabase
+      
+      console.log('Salvando configurações IMAP:', { effectiveOrgId, newSettings });
+      
+      const { data, error } = await supabase
         .from('organizations')
         .update(newSettings)
-        .eq('id', effectiveOrgId);
+        .eq('id', effectiveOrgId)
+        .select()
+        .single();
+
+      console.log('Resultado do UPDATE:', { data, error });
 
       if (error) throw error;
+      
+      if (!data) {
+        console.error('UPDATE não retornou dados - possível problema de permissão RLS');
+        toast.error('Erro: configurações não foram salvas. Verifique suas permissões.');
+        return false;
+      }
 
       setSettings(prev => prev ? { ...prev, ...newSettings } : null);
       toast.success('Configurações salvas com sucesso');
