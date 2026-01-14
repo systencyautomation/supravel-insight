@@ -9,6 +9,7 @@ export interface OrganizationSettings {
   imap_user: string;
   imap_password: string;
   automation_active: boolean;
+  imap_allowed_emails: string[];
 }
 
 interface UseOrganizationSettingsReturn {
@@ -39,7 +40,7 @@ export function useOrganizationSettings(): UseOrganizationSettingsReturn {
       setLoading(true);
       const { data, error } = await supabase
         .from('organizations')
-        .select('imap_host, imap_port, imap_user, imap_password, automation_active')
+        .select('imap_host, imap_port, imap_user, imap_password, automation_active, imap_allowed_emails')
         .eq('id', effectiveOrgId)
         .single();
 
@@ -51,6 +52,7 @@ export function useOrganizationSettings(): UseOrganizationSettingsReturn {
         imap_user: data.imap_user || '',
         imap_password: data.imap_password || '',
         automation_active: data.automation_active || false,
+        imap_allowed_emails: data.imap_allowed_emails || [],
       });
     } catch (error) {
       console.error('Error fetching organization settings:', error);
