@@ -392,6 +392,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
       cleanup_expired_verification_codes: { Args: never; Returns: undefined }
       create_organization_for_user: {
         Args: { p_name: string; p_slug: string }
