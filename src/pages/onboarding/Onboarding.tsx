@@ -177,57 +177,24 @@ export default function Onboarding() {
         await waitForSession();
       }
 
-      // 2. Check if user already has an organization
-      const { data: existingRole } = await supabase
-        .from('user_roles')
-        .select('organization_id')
-        .eq('user_id', userId)
-        .single();
-
-      if (existingRole?.organization_id) {
-        // User already completed onboarding, just update invitation
-        await supabase
-          .from('invitations')
-          .update({ status: 'aceito' })
-          .eq('id', invitation.id);
-        
-        setSuccess(true);
-        toast({
-          title: 'Bem-vindo de volta!',
-          description: 'Sua conta já estava configurada. Você será redirecionado.',
-        });
-        return;
-      }
-
-      // 3. Create organization (now we're authenticated, RLS will pass)
+      // 2. Create organization using Security Definer function
+      // This bypasses RLS race condition issues
       const slug = companyName.toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
         .substring(0, 50);
 
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ 
-          name: companyName, 
-          slug: slug + '-' + Date.now().toString(36)
-        })
-        .select()
-        .single();
+      const { data: orgId, error: rpcError } = await supabase.rpc(
+        'create_organization_for_user',
+        {
+          p_name: companyName,
+          p_slug: slug + '-' + Date.now().toString(36)
+        }
+      );
 
-      if (orgError) throw orgError;
+      if (rpcError) throw rpcError;
 
-      // 4. Assign admin role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          role: 'admin',
-          organization_id: org.id
-        });
-
-      if (roleError) throw roleError;
-
-      // 4. Update invitation status
+      // 3. Update invitation status
       await supabase
         .from('invitations')
         .update({ status: 'aceito' })
