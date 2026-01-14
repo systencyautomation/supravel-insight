@@ -347,11 +347,20 @@ export type Database = {
           commission_calculated: number | null
           created_at: string | null
           emission_date: string | null
+          emitente_cnpj: string | null
+          emitente_nome: string | null
+          emitente_uf: string | null
           icms: number | null
           id: string
           internal_seller_id: string | null
           ir_csll: number | null
+          nfe_email_from: string | null
+          nfe_filename: string | null
+          nfe_key: string | null
+          nfe_model: string | null
           nfe_number: string | null
+          nfe_processed_at: string | null
+          nfe_series: string | null
           organization_id: string
           over_price: number | null
           payment_method: string | null
@@ -359,6 +368,8 @@ export type Database = {
           representative_id: string | null
           status: string | null
           table_value: number | null
+          total_ipi: number | null
+          total_produtos: number | null
           total_value: number | null
           uf_destiny: string | null
         }
@@ -368,11 +379,20 @@ export type Database = {
           commission_calculated?: number | null
           created_at?: string | null
           emission_date?: string | null
+          emitente_cnpj?: string | null
+          emitente_nome?: string | null
+          emitente_uf?: string | null
           icms?: number | null
           id?: string
           internal_seller_id?: string | null
           ir_csll?: number | null
+          nfe_email_from?: string | null
+          nfe_filename?: string | null
+          nfe_key?: string | null
+          nfe_model?: string | null
           nfe_number?: string | null
+          nfe_processed_at?: string | null
+          nfe_series?: string | null
           organization_id: string
           over_price?: number | null
           payment_method?: string | null
@@ -380,6 +400,8 @@ export type Database = {
           representative_id?: string | null
           status?: string | null
           table_value?: number | null
+          total_ipi?: number | null
+          total_produtos?: number | null
           total_value?: number | null
           uf_destiny?: string | null
         }
@@ -389,11 +411,20 @@ export type Database = {
           commission_calculated?: number | null
           created_at?: string | null
           emission_date?: string | null
+          emitente_cnpj?: string | null
+          emitente_nome?: string | null
+          emitente_uf?: string | null
           icms?: number | null
           id?: string
           internal_seller_id?: string | null
           ir_csll?: number | null
+          nfe_email_from?: string | null
+          nfe_filename?: string | null
+          nfe_key?: string | null
+          nfe_model?: string | null
           nfe_number?: string | null
+          nfe_processed_at?: string | null
+          nfe_series?: string | null
           organization_id?: string
           over_price?: number | null
           payment_method?: string | null
@@ -401,6 +432,8 @@ export type Database = {
           representative_id?: string | null
           status?: string | null
           table_value?: number | null
+          total_ipi?: number | null
+          total_produtos?: number | null
           total_value?: number | null
           uf_destiny?: string | null
         }
