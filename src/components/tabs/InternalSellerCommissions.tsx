@@ -2,7 +2,6 @@ import { Sale } from '@/types/commission';
 import { calculateCommission } from '@/types/commission';
 import { SummaryCard } from '@/components/SummaryCard';
 import { formatCurrency } from '@/lib/utils';
-import { vendedoresInternos } from '@/data/mockData';
 import {
   Table,
   TableBody,
@@ -20,6 +19,9 @@ interface InternalSellerCommissionsProps {
 export function InternalSellerCommissions({ sales }: InternalSellerCommissionsProps) {
   // Internal sellers get 30% of the net commission as bonus
   const BONUS_PERCENTAGE = 0.30;
+
+  // Get unique sellers from sales data
+  const vendedoresInternos = [...new Set(sales.map(s => s.vendedorInterno).filter(Boolean))];
 
   const sellerData = vendedoresInternos.map(vendedor => {
     const vendorSales = sales.filter(s => s.vendedorInterno === vendedor);

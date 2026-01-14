@@ -1,15 +1,58 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StockItem } from '@/types/commission';
 import { StockTable } from '@/components/StockTable';
 import { SummaryCard } from '@/components/SummaryCard';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { Upload, FileSpreadsheet } from 'lucide-react';
-import { mockStock } from '@/data/mockData';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function StockManagement() {
-  const [stock, setStock] = useState<StockItem[]>(mockStock);
+  const [stock, setStock] = useState<StockItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('organization_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!userRoles?.organization_id) return;
+
+        const { data, error } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('organization_id', userRoles.organization_id);
+
+        if (error) throw error;
+
+        const mappedStock: StockItem[] = (data || []).map(item => ({
+          id: item.id,
+          modelo: item.model_name,
+          codInterno: item.internal_code || '',
+          valorTabela: item.base_price || 0,
+          percentualComissao: item.base_commission_pct || 10,
+          quantidade: item.quantity || 0,
+        }));
+
+        setStock(mappedStock);
+      } catch (error) {
+        console.error('Error fetching inventory:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInventory();
+  }, [user]);
 
   const totalEstoque = stock.reduce((acc, item) => acc + (item.valorTabela * item.quantidade), 0);
   const totalItens = stock.reduce((acc, item) => acc + item.quantidade, 0);
@@ -73,7 +116,18 @@ export function StockManagement() {
 
       <div>
         <h3 className="text-sm font-semibold mb-4">Estoque de Empilhadeiras</h3>
-        <StockTable stock={stock} onUpdate={handleUpdate} />
+        {loading ? (
+          <div className="border border-border p-8 text-center">
+            <p className="text-muted-foreground">Carregando...</p>
+          </div>
+        ) : stock.length > 0 ? (
+          <StockTable stock={stock} onUpdate={handleUpdate} />
+        ) : (
+          <div className="border border-border p-8 text-center">
+            <p className="text-muted-foreground">Nenhum item em estoque</p>
+            <p className="text-xs text-muted-foreground mt-2">Importe uma planilha para cadastrar itens</p>
+          </div>
+        )}
       </div>
 
       <div className="p-4 bg-muted/30 border border-border">

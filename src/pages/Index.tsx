@@ -10,7 +10,6 @@ import { RepresentativeCommissions } from '@/components/tabs/RepresentativeCommi
 import { StockManagement } from '@/components/tabs/StockManagement';
 import { CashFlow } from '@/components/tabs/CashFlow';
 import { Integrations } from '@/components/tabs/Integrations';
-import { mockSales } from '@/data/mockData';
 import { Building2, Users, Briefcase, Package, Wallet, Loader2, LogOut, Settings, ArrowLeft, Plug, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -61,8 +60,8 @@ const Index = () => {
     return null;
   }
 
-  // Use mock data for now if no real data from database
-  const displaySales = sales.length > 0 ? sales.map(s => ({
+  // Map real data from database
+  const displaySales = sales.map(s => ({
     id: s.id,
     cliente: s.client_name || '',
     nfe: s.nfe_number || '',
@@ -74,7 +73,7 @@ const Index = () => {
     dataEmissao: s.emission_date || new Date().toISOString(),
     vendedorInterno: '',
     representante: '',
-  })) : mockSales;
+  }));
 
   return (
     <div className="min-h-screen bg-background">

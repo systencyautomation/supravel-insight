@@ -54,7 +54,14 @@ export function CompanyCommissions({ sales }: CompanyCommissionsProps) {
             Fonte: n8n/XML
           </p>
         </div>
-        <CommissionTable sales={sales} />
+        {sales.length > 0 ? (
+          <CommissionTable sales={sales} />
+        ) : (
+          <div className="border border-border p-8 text-center">
+            <p className="text-muted-foreground">Nenhuma venda encontrada</p>
+            <p className="text-xs text-muted-foreground mt-2">Configure a automação n8n para processar NFes automaticamente</p>
+          </div>
+        )}
       </div>
 
       <div className="p-4 bg-muted/30 border border-border">
