@@ -177,6 +177,53 @@ export type Database = {
         }
         Relationships: []
       }
+      member_invitations: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          guest_name: string | null
+          id: string
+          invited_by: string
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          guest_name?: string | null
+          id?: string
+          invited_by: string
+          organization_id: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          guest_name?: string | null
+          id?: string
+          invited_by?: string
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           active: boolean | null
