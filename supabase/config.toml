@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.test-imap-connection]
 verify_jwt = false
+
+[functions.send-verification-code]
+verify_jwt = false
+
+[functions.verify-email-code]
+verify_jwt = false

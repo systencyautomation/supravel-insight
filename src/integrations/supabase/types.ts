@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      email_verification_codes: {
+        Row: {
+          code: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invitation_id: string | null
+          used: boolean
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invitation_id?: string | null
+          used?: boolean
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invitation_id?: string | null
+          used?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_verification_codes_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "invitations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       installments: {
         Row: {
           created_at: string | null
@@ -307,6 +345,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_verification_codes: { Args: never; Returns: undefined }
       create_organization_for_user: {
         Args: { p_name: string; p_slug: string }
         Returns: string
