@@ -307,6 +307,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_organization_for_user: {
+        Args: { p_name: string; p_slug: string }
+        Returns: string
+      }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
