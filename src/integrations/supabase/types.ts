@@ -139,22 +139,37 @@ export type Database = {
       organizations: {
         Row: {
           active: boolean | null
+          automation_active: boolean | null
           created_at: string | null
           id: string
+          imap_host: string | null
+          imap_password: string | null
+          imap_port: number | null
+          imap_user: string | null
           name: string
           slug: string
         }
         Insert: {
           active?: boolean | null
+          automation_active?: boolean | null
           created_at?: string | null
           id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_user?: string | null
           name: string
           slug: string
         }
         Update: {
           active?: boolean | null
+          automation_active?: boolean | null
           created_at?: string | null
           id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_user?: string | null
           name?: string
           slug?: string
         }

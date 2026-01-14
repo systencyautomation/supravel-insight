@@ -1,1 +1,7 @@
 project_id = "mussjfjktgltgvnvafdu"
+
+[functions.send-invitation]
+verify_jwt = false
+
+[functions.test-imap-connection]
+verify_jwt = false
