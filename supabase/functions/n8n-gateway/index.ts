@@ -38,7 +38,6 @@ interface FetchEmailsOptions {
   search?: string;
   limit?: number;
   mark_as_read?: boolean;
-  allowed_domains?: string[];
   save_log?: boolean;
 }
 
@@ -77,23 +76,36 @@ function extractEmailAddress(email: string): string {
   return addr;
 }
 
-function isDomainAllowed(email: string, allowedDomains: string[]): boolean {
-  if (!allowedDomains || allowedDomains.length === 0) return true;
+// Verifica se o domínio do remetente é igual ao domínio do imap_user
+function isDomainAllowed(senderEmail: string, imapUser: string): boolean {
+  const allowedDomain = extractEmailDomain(imapUser);
+  if (!allowedDomain) {
+    console.log('fetch_emails: Não foi possível extrair domínio do imap_user, aceitando todos');
+    return true;
+  }
   
-  const domain = extractEmailDomain(email);
-  if (!domain) return false;
+  const senderDomain = extractEmailDomain(senderEmail);
+  if (!senderDomain) {
+    console.log(`fetch_emails: Não foi possível extrair domínio do remetente: ${senderEmail}`);
+    return false;
+  }
   
-  return allowedDomains.some(d => {
-    const allowed = d.toLowerCase().trim();
-    return domain === allowed || domain.endsWith('.' + allowed);
-  });
+  const allowed = senderDomain === allowedDomain;
+  if (!allowed) {
+    console.log(`fetch_emails: Domínio não permitido - remetente: ${senderDomain}, permitido: ${allowedDomain}`);
+  }
+  return allowed;
 }
 
 function isEmailAllowed(email: string, allowedEmails: string[]): boolean {
   if (!allowedEmails || allowedEmails.length === 0) return true;
   
   const addr = extractEmailAddress(email);
-  return allowedEmails.some(e => e.toLowerCase().trim() === addr);
+  const allowed = allowedEmails.some(e => e.toLowerCase().trim() === addr);
+  if (!allowed) {
+    console.log(`fetch_emails: Email não está na lista de permitidos: ${addr}`);
+  }
+  return allowed;
 }
 
 function decodeBase64(encoded: string): string {
@@ -318,7 +330,6 @@ interface OrganizationImap {
   imap_port: number | null;
   imap_user: string | null;
   imap_password: string | null;
-  imap_allowed_domains: string[] | null;
   imap_allowed_emails: string[] | null;
 }
 
@@ -339,7 +350,6 @@ async function handleFetchEmails(
     search = 'UNSEEN',
     limit = 50,
     mark_as_read = true,
-    allowed_domains,
     save_log = true
   } = options;
 
@@ -349,7 +359,7 @@ async function handleFetchEmails(
   // 1. Buscar credenciais da organização
   const { data: orgData, error: orgError } = await supabase
     .from('organizations')
-    .select('id, name, imap_host, imap_port, imap_user, imap_password, imap_allowed_domains, imap_allowed_emails')
+    .select('id, name, imap_host, imap_port, imap_user, imap_password, imap_allowed_emails')
     .eq('id', organizationId)
     .single();
 
@@ -375,12 +385,13 @@ async function handleFetchEmails(
     };
   }
 
-  // Usar domínios permitidos do request ou do banco
-  const effectiveAllowedDomains = allowed_domains || org.imap_allowed_domains || [];
+  // Extrair domínio permitido automaticamente do imap_user
+  const allowedDomain = extractEmailDomain(org.imap_user);
   const effectiveAllowedEmails = org.imap_allowed_emails || [];
 
   console.log(`fetch_emails: Connecting to ${org.imap_host}:${org.imap_port} for org ${org.name}`);
-  console.log(`fetch_emails: Allowed domains: ${effectiveAllowedDomains.length}, Allowed emails: ${effectiveAllowedEmails.length}`);
+  console.log(`fetch_emails: Domínio permitido (extraído de imap_user): ${allowedDomain}`);
+  console.log(`fetch_emails: Emails específicos permitidos: ${effectiveAllowedEmails.length > 0 ? effectiveAllowedEmails.join(', ') : 'todos do domínio'}`);
 
   let conn: Deno.TlsConn | null = null;
 
@@ -468,8 +479,8 @@ async function handleFetchEmails(
         emailResult.subject = subjectMatch ? subjectMatch[1].trim() : '';
         emailResult.date = dateMatch ? dateMatch[1].trim() : '';
 
-        // Verificar domínio
-        if (!isDomainAllowed(emailResult.from, effectiveAllowedDomains)) {
+        // Verificar domínio (baseado no imap_user)
+        if (!isDomainAllowed(emailResult.from, org.imap_user)) {
           emailResult.status = 'skipped';
           emailResult.reason = 'domain_not_allowed';
           emails.push(emailResult);
