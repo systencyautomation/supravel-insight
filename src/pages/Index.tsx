@@ -11,7 +11,7 @@ import { StockManagement } from '@/components/tabs/StockManagement';
 import { CashFlow } from '@/components/tabs/CashFlow';
 import { Integrations } from '@/components/tabs/Integrations';
 import { mockSales } from '@/data/mockData';
-import { Building2, Users, Briefcase, Package, Wallet, Loader2, LogOut, Settings, ArrowLeft, Plug } from 'lucide-react';
+import { Building2, Users, Briefcase, Package, Wallet, Loader2, LogOut, Settings, ArrowLeft, Plug, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -95,6 +95,12 @@ const Index = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Link to="/profile">
+            <Button variant="outline" size="sm" className="gap-2">
+              <User className="h-4 w-4" />
+              Meu Perfil
+            </Button>
+          </Link>
           {isMasterAdmin && (
             <Link to="/master">
               <Button variant="outline" size="sm" className="gap-2">
