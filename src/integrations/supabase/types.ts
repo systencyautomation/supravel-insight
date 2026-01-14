@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      email_processing_log: {
+        Row: {
+          created_at: string | null
+          email_from: string | null
+          email_subject: string | null
+          email_uid: string
+          id: string
+          nfe_keys: string[] | null
+          organization_id: string
+          processed_at: string | null
+          reason: string | null
+          status: string
+          xmls_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_from?: string | null
+          email_subject?: string | null
+          email_uid: string
+          id?: string
+          nfe_keys?: string[] | null
+          organization_id: string
+          processed_at?: string | null
+          reason?: string | null
+          status: string
+          xmls_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          email_from?: string | null
+          email_subject?: string | null
+          email_uid?: string
+          id?: string
+          nfe_keys?: string[] | null
+          organization_id?: string
+          processed_at?: string | null
+          reason?: string | null
+          status?: string
+          xmls_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_processing_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_verification_codes: {
         Row: {
           code: string
@@ -230,6 +280,7 @@ export type Database = {
           automation_active: boolean | null
           created_at: string | null
           id: string
+          imap_allowed_domains: string[] | null
           imap_host: string | null
           imap_password: string | null
           imap_port: number | null
@@ -242,6 +293,7 @@ export type Database = {
           automation_active?: boolean | null
           created_at?: string | null
           id?: string
+          imap_allowed_domains?: string[] | null
           imap_host?: string | null
           imap_password?: string | null
           imap_port?: number | null
@@ -254,6 +306,7 @@ export type Database = {
           automation_active?: boolean | null
           created_at?: string | null
           id?: string
+          imap_allowed_domains?: string[] | null
           imap_host?: string | null
           imap_password?: string | null
           imap_port?: number | null
