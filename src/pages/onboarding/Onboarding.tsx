@@ -5,7 +5,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { Building2, Lock, CheckCircle, AlertCircle, ArrowLeft, Mail, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 
 interface Invitation {
@@ -31,6 +32,8 @@ const onboardingSchema = z.object({
   path: ['confirmPassword']
 });
 
+type Step = 'form' | 'verification' | 'success';
+
 export default function Onboarding() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -40,13 +43,20 @@ export default function Onboarding() {
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [invalidToken, setInvalidToken] = useState(false);
 
+  // Form state
   const [companyName, setCompanyName] = useState('');
   const [cnpj, setCnpj] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+
+  // Verification state
+  const [step, setStep] = useState<Step>('form');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [expiresIn, setExpiresIn] = useState(600); // 10 minutes in seconds
 
   const token = searchParams.get('token');
 
@@ -59,6 +69,22 @@ export default function Onboarding() {
 
     fetchInvitation(token);
   }, [token]);
+
+  // Cooldown timer for resend button
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  // Expiration timer
+  useEffect(() => {
+    if (step === 'verification' && expiresIn > 0) {
+      const timer = setTimeout(() => setExpiresIn(expiresIn - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [step, expiresIn]);
 
   const fetchInvitation = async (token: string) => {
     const { data, error } = await supabase
@@ -93,7 +119,50 @@ export default function Onboarding() {
     return value;
   };
 
-  const handleSubmit = async () => {
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const sendVerificationCode = async () => {
+    if (!invitation) return;
+
+    try {
+      const response = await supabase.functions.invoke('send-verification-code', {
+        body: {
+          email: invitation.email,
+          invitation_id: invitation.id
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao enviar código');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      toast({
+        title: 'Código Enviado',
+        description: `Um código de verificação foi enviado para ${invitation.email}`,
+      });
+
+      setExpiresIn(600); // Reset expiration timer
+      setResendCooldown(60); // 60 seconds cooldown
+      return true;
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive'
+      });
+      return false;
+    }
+  };
+
+  const handleFormSubmit = async () => {
     if (!invitation) return;
 
     const validation = onboardingSchema.safeParse({
@@ -116,6 +185,62 @@ export default function Onboarding() {
 
     setErrors({});
     setSubmitting(true);
+
+    try {
+      const success = await sendVerificationCode();
+      if (success) {
+        setStep('verification');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyCode = async (code: string) => {
+    if (!invitation || code.length !== 6) return;
+
+    setVerifying(true);
+
+    try {
+      // Verify the code
+      const response = await supabase.functions.invoke('verify-email-code', {
+        body: {
+          email: invitation.email,
+          code,
+          invitation_id: invitation.id
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao verificar código');
+      }
+
+      if (!response.data?.valid) {
+        toast({
+          title: 'Código Inválido',
+          description: response.data?.error || 'O código inserido é inválido ou expirou.',
+          variant: 'destructive'
+        });
+        setVerificationCode('');
+        return;
+      }
+
+      // Code is valid, proceed with account creation
+      await createAccount();
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message,
+        variant: 'destructive'
+      });
+      setVerificationCode('');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const createAccount = async () => {
+    if (!invitation) return;
 
     try {
       // 1. Create user account or sign in if already exists
@@ -178,7 +303,6 @@ export default function Onboarding() {
       }
 
       // 2. Create organization using Security Definer function
-      // This bypasses RLS race condition issues
       const slug = companyName.toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -200,10 +324,10 @@ export default function Onboarding() {
         .update({ status: 'aceito' })
         .eq('id', invitation.id);
 
-      setSuccess(true);
+      setStep('success');
       toast({
         title: 'Cadastro Concluído',
-        description: 'Verifique seu email para confirmar a conta.',
+        description: 'Sua conta foi criada com sucesso!',
       });
 
     } catch (error: any) {
@@ -212,9 +336,17 @@ export default function Onboarding() {
         description: error.message,
         variant: 'destructive'
       });
-    } finally {
-      setSubmitting(false);
     }
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    await sendVerificationCode();
+  };
+
+  const handleBackToForm = () => {
+    setStep('form');
+    setVerificationCode('');
   };
 
   if (loading) {
@@ -242,18 +374,114 @@ export default function Onboarding() {
     );
   }
 
-  if (success) {
+  if (step === 'success') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="bg-card border border-border p-8 max-w-md w-full text-center">
           <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
           <h1 className="text-lg font-medium text-foreground mb-2">Cadastro Realizado!</h1>
           <p className="text-sm text-muted-foreground mb-6">
-            Um email de confirmação foi enviado para <strong className="text-foreground">{invitation?.email}</strong>.
-            Verifique sua caixa de entrada para ativar sua conta.
+            Sua conta foi criada com sucesso para <strong className="text-foreground">{invitation?.email}</strong>.
           </p>
           <Button onClick={() => navigate('/auth')} className="text-sm">
             Ir para Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'verification') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-card border border-border p-8 max-w-md w-full">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-6">
+            <Mail className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-lg font-medium text-foreground">Verificar Email</h1>
+              <p className="text-xs text-muted-foreground">Insira o código enviado para seu email</p>
+            </div>
+          </div>
+
+          {/* Email info */}
+          <div className="bg-muted/50 border border-border rounded-lg p-4 mb-6 text-center">
+            <p className="text-sm text-muted-foreground mb-1">Código enviado para</p>
+            <p className="text-sm font-mono text-foreground">{invitation?.email}</p>
+          </div>
+
+          {/* OTP Input */}
+          <div className="flex justify-center mb-4">
+            <InputOTP 
+              maxLength={6} 
+              value={verificationCode}
+              onChange={(value) => {
+                setVerificationCode(value);
+                if (value.length === 6) {
+                  handleVerifyCode(value);
+                }
+              }}
+              disabled={verifying}
+            >
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+
+          {/* Expiration timer */}
+          {expiresIn > 0 ? (
+            <p className="text-xs text-center text-muted-foreground mb-4">
+              Código expira em <span className="font-mono text-foreground">{formatTime(expiresIn)}</span>
+            </p>
+          ) : (
+            <p className="text-xs text-center text-destructive mb-4">
+              Código expirado. Solicite um novo código.
+            </p>
+          )}
+
+          {/* Verifying state */}
+          {verifying && (
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Verificando...</span>
+            </div>
+          )}
+
+          {/* Resend button */}
+          <div className="flex justify-center mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResendCode}
+              disabled={resendCooldown > 0}
+              className="text-xs"
+            >
+              {resendCooldown > 0 ? (
+                <>Reenviar código em {resendCooldown}s</>
+              ) : (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Reenviar código
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Back button */}
+          <Button
+            variant="outline"
+            onClick={handleBackToForm}
+            className="w-full text-sm"
+            disabled={verifying}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar e editar dados
           </Button>
         </div>
       </div>
@@ -340,11 +568,11 @@ export default function Onboarding() {
 
         {/* Submit */}
         <Button 
-          onClick={handleSubmit}
+          onClick={handleFormSubmit}
           disabled={submitting}
           className="w-full text-sm"
         >
-          {submitting ? 'Cadastrando...' : 'Criar Conta'}
+          {submitting ? 'Enviando código...' : 'Continuar'}
         </Button>
 
         <p className="text-xs text-center text-muted-foreground mt-4">
