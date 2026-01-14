@@ -281,6 +281,7 @@ export type Database = {
           created_at: string | null
           id: string
           imap_allowed_domains: string[] | null
+          imap_allowed_emails: string[] | null
           imap_host: string | null
           imap_password: string | null
           imap_port: number | null
@@ -294,6 +295,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           imap_allowed_domains?: string[] | null
+          imap_allowed_emails?: string[] | null
           imap_host?: string | null
           imap_password?: string | null
           imap_port?: number | null
@@ -307,6 +309,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           imap_allowed_domains?: string[] | null
+          imap_allowed_emails?: string[] | null
           imap_host?: string | null
           imap_password?: string | null
           imap_port?: number | null

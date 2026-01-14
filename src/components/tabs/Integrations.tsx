@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Mail, Plug, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { Loader2, Mail, Plug, CheckCircle2, AlertCircle, Info, X, Plus, Users } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function Integrations() {
   const { settings, loading, saving, testing, updateSettings, testConnection } = useOrganizationSettings();
@@ -17,9 +18,51 @@ export function Integrations() {
     imap_user: '',
     imap_password: '',
     automation_active: false,
+    imap_allowed_emails: [],
   });
 
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [newEmail, setNewEmail] = useState('');
+
+  const isValidEmail = (email: string): boolean => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toLowerCase().trim());
+  };
+
+  const handleAddEmail = async () => {
+    const email = newEmail.toLowerCase().trim();
+    
+    if (!isValidEmail(email)) {
+      toast.error('Formato de email inválido');
+      return;
+    }
+
+    if (formData.imap_allowed_emails.includes(email)) {
+      toast.error('Este email já está na lista');
+      return;
+    }
+
+    const updatedEmails = [...formData.imap_allowed_emails, email];
+    setFormData(prev => ({ ...prev, imap_allowed_emails: updatedEmails }));
+    
+    const success = await updateSettings({ imap_allowed_emails: updatedEmails });
+    if (success) {
+      setNewEmail('');
+    } else {
+      // Reverter em caso de erro
+      setFormData(prev => ({ ...prev, imap_allowed_emails: formData.imap_allowed_emails }));
+    }
+  };
+
+  const handleRemoveEmail = async (emailToRemove: string) => {
+    const updatedEmails = formData.imap_allowed_emails.filter(e => e !== emailToRemove);
+    setFormData(prev => ({ ...prev, imap_allowed_emails: updatedEmails }));
+    
+    const success = await updateSettings({ imap_allowed_emails: updatedEmails });
+    if (!success) {
+      // Reverter em caso de erro
+      setFormData(prev => ({ ...prev, imap_allowed_emails: formData.imap_allowed_emails }));
+    }
+  };
 
   useEffect(() => {
     if (settings) {
@@ -194,7 +237,82 @@ export function Integrations() {
         </CardContent>
       </Card>
 
-      {/* How it Works */}
+      {/* Remetentes Permitidos */}
+      <Card className="rounded-none border-border">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <CardTitle className="text-base font-medium">Remetentes Permitidos</CardTitle>
+              <CardDescription>
+                Apenas emails destes remetentes serão processados pela automação
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Lista de emails */}
+          {formData.imap_allowed_emails.length > 0 ? (
+            <div className="space-y-2">
+              {formData.imap_allowed_emails.map((email) => (
+                <div
+                  key={email}
+                  className="flex items-center justify-between py-2 px-3 bg-muted/50 border border-border"
+                >
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{email}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveEmail(email)}
+                    disabled={saving}
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">
+              Nenhum remetente cadastrado. Todos os emails serão processados.
+            </p>
+          )}
+
+          {/* Adicionar novo email */}
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="email@exemplo.com"
+              className="rounded-none flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddEmail();
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              onClick={handleAddEmail}
+              disabled={saving || !newEmail.trim()}
+              className="rounded-none gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar
+            </Button>
+          </div>
+
+          {/* Info */}
+          <p className="text-xs text-muted-foreground">
+            Se a lista estiver vazia, todos os emails serão processados (respeitando o filtro de domínios).
+          </p>
+        </CardContent>
+      </Card>
       <Card className="rounded-none border-border bg-muted/30">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">

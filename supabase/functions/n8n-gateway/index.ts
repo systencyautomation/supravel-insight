@@ -71,6 +71,12 @@ function extractEmailDomain(email: string): string {
   return domain || '';
 }
 
+function extractEmailAddress(email: string): string {
+  const match = email.match(/<([^>]+)>/) || [null, email];
+  const addr = (match[1] || email).toLowerCase().trim();
+  return addr;
+}
+
 function isDomainAllowed(email: string, allowedDomains: string[]): boolean {
   if (!allowedDomains || allowedDomains.length === 0) return true;
   
@@ -81,6 +87,13 @@ function isDomainAllowed(email: string, allowedDomains: string[]): boolean {
     const allowed = d.toLowerCase().trim();
     return domain === allowed || domain.endsWith('.' + allowed);
   });
+}
+
+function isEmailAllowed(email: string, allowedEmails: string[]): boolean {
+  if (!allowedEmails || allowedEmails.length === 0) return true;
+  
+  const addr = extractEmailAddress(email);
+  return allowedEmails.some(e => e.toLowerCase().trim() === addr);
 }
 
 function decodeBase64(encoded: string): string {
@@ -306,6 +319,7 @@ interface OrganizationImap {
   imap_user: string | null;
   imap_password: string | null;
   imap_allowed_domains: string[] | null;
+  imap_allowed_emails: string[] | null;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -335,7 +349,7 @@ async function handleFetchEmails(
   // 1. Buscar credenciais da organização
   const { data: orgData, error: orgError } = await supabase
     .from('organizations')
-    .select('id, name, imap_host, imap_port, imap_user, imap_password, imap_allowed_domains')
+    .select('id, name, imap_host, imap_port, imap_user, imap_password, imap_allowed_domains, imap_allowed_emails')
     .eq('id', organizationId)
     .single();
 
@@ -363,8 +377,10 @@ async function handleFetchEmails(
 
   // Usar domínios permitidos do request ou do banco
   const effectiveAllowedDomains = allowed_domains || org.imap_allowed_domains || [];
+  const effectiveAllowedEmails = org.imap_allowed_emails || [];
 
   console.log(`fetch_emails: Connecting to ${org.imap_host}:${org.imap_port} for org ${org.name}`);
+  console.log(`fetch_emails: Allowed domains: ${effectiveAllowedDomains.length}, Allowed emails: ${effectiveAllowedEmails.length}`);
 
   let conn: Deno.TlsConn | null = null;
 
@@ -467,6 +483,26 @@ async function handleFetchEmails(
               email_subject: emailResult.subject,
               status: 'skipped',
               reason: 'domain_not_allowed'
+            });
+          }
+          continue;
+        }
+
+        // Verificar email específico
+        if (!isEmailAllowed(emailResult.from, effectiveAllowedEmails)) {
+          emailResult.status = 'skipped';
+          emailResult.reason = 'email_not_allowed';
+          emails.push(emailResult);
+          summary.skipped++;
+
+          if (save_log) {
+            await supabase.from('email_processing_log').insert({
+              organization_id: organizationId,
+              email_uid: uid,
+              email_from: emailResult.from,
+              email_subject: emailResult.subject,
+              status: 'skipped',
+              reason: 'email_not_allowed'
             });
           }
           continue;
