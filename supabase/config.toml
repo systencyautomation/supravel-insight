@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.send-member-invitation]
 verify_jwt = false
+
+[functions.n8n-gateway]
+verify_jwt = false
