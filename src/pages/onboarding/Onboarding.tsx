@@ -133,6 +133,20 @@ export default function Onboarding() {
         }
       });
 
+      // Helper to wait for session to be properly set
+      const waitForSession = async (): Promise<void> => {
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        while (attempts < maxAttempts) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) return;
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        throw new Error('Sessão não foi estabelecida. Tente novamente.');
+      };
+
       // Handle "User already registered" error
       if (authError) {
         if (authError.message.includes('already registered') || 
@@ -149,12 +163,18 @@ export default function Onboarding() {
           
           if (!signInData.user) throw new Error('Falha na autenticação');
           userId = signInData.user.id;
+          
+          // Wait for session to be established
+          await waitForSession();
         } else {
           throw authError;
         }
       } else {
         if (!authData.user) throw new Error('Falha ao criar usuário');
         userId = authData.user.id;
+        
+        // Wait for session to be established
+        await waitForSession();
       }
 
       // 2. Check if user already has an organization
