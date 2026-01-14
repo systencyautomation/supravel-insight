@@ -84,7 +84,20 @@ export function Integrations() {
     await updateSettings(formData);
   };
 
+  const isImapConfigured = (): boolean => {
+    return (
+      formData.imap_host.trim() !== '' &&
+      formData.imap_user.trim() !== '' &&
+      formData.imap_password.trim() !== '' &&
+      formData.imap_port > 0
+    );
+  };
+
   const handleToggleAutomation = async (checked: boolean) => {
+    if (checked && !isImapConfigured()) {
+      toast.error('Configure as credenciais IMAP antes de ativar a automação');
+      return;
+    }
     handleInputChange('automation_active', checked);
     await updateSettings({ automation_active: checked });
   };
@@ -111,13 +124,18 @@ export function Integrations() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {!isImapConfigured() && !formData.automation_active && (
+                <span className="text-xs text-amber-600">
+                  Preencha as configurações IMAP primeiro
+                </span>
+              )}
               <span className="text-sm text-muted-foreground">
                 {formData.automation_active ? 'Ativo' : 'Inativo'}
               </span>
               <Switch
                 checked={formData.automation_active}
                 onCheckedChange={handleToggleAutomation}
-                disabled={saving}
+                disabled={saving || (!formData.automation_active && !isImapConfigured())}
               />
             </div>
           </div>
