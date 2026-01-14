@@ -318,11 +318,10 @@ export default function Onboarding() {
 
       if (rpcError) throw rpcError;
 
-      // 3. Update invitation status
-      await supabase
-        .from('invitations')
-        .update({ status: 'aceito' })
-        .eq('id', invitation.id);
+      // 3. Update invitation status using RPC (bypasses RLS)
+      await supabase.rpc('accept_invitation', {
+        p_invitation_id: invitation.id
+      });
 
       setStep('success');
       toast({
