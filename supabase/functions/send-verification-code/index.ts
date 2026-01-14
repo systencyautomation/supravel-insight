@@ -86,7 +86,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email with code
     const emailResponse = await resend.emails.send({
-      from: "Gestão de Comissões <onboarding@resend.dev>",
+      from: "Gestão de Comissões <noreply@dash.supravel.com.br>",
       to: [email],
       subject: "Seu código de verificação",
       html: `
