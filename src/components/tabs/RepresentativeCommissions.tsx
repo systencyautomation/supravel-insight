@@ -2,7 +2,6 @@ import { Sale } from '@/types/commission';
 import { calculateCommission } from '@/types/commission';
 import { SummaryCard } from '@/components/SummaryCard';
 import { formatCurrency } from '@/lib/utils';
-import { representantes } from '@/data/mockData';
 import {
   Table,
   TableBody,
@@ -20,6 +19,9 @@ interface RepresentativeCommissionsProps {
 export function RepresentativeCommissions({ sales }: RepresentativeCommissionsProps) {
   // Representatives get 50% of the net commission
   const REP_PERCENTAGE = 0.50;
+
+  // Get unique representatives from sales data
+  const representantes = [...new Set(sales.map(s => s.representante).filter(Boolean))];
 
   const repData = representantes.map(rep => {
     const repSales = sales.filter(s => s.representante === rep);
