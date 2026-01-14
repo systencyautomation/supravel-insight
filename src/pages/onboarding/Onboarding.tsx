@@ -118,7 +118,9 @@ export default function Onboarding() {
     setSubmitting(true);
 
     try {
-      // 1. Create user account FIRST (so we're authenticated for subsequent operations)
+      // 1. Create user account or sign in if already exists
+      let userId: string;
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: invitation.email,
         password,
@@ -131,10 +133,53 @@ export default function Onboarding() {
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Falha ao criar usuário');
+      // Handle "User already registered" error
+      if (authError) {
+        if (authError.message.includes('already registered') || 
+            authError.status === 422) {
+          // Try to sign in with the provided password
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: invitation.email,
+            password
+          });
+          
+          if (signInError) {
+            throw new Error('Este email já está cadastrado. Verifique sua senha ou use a opção de recuperar senha.');
+          }
+          
+          if (!signInData.user) throw new Error('Falha na autenticação');
+          userId = signInData.user.id;
+        } else {
+          throw authError;
+        }
+      } else {
+        if (!authData.user) throw new Error('Falha ao criar usuário');
+        userId = authData.user.id;
+      }
 
-      // 2. Create organization (now we're authenticated, RLS will pass)
+      // 2. Check if user already has an organization
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (existingRole?.organization_id) {
+        // User already completed onboarding, just update invitation
+        await supabase
+          .from('invitations')
+          .update({ status: 'aceito' })
+          .eq('id', invitation.id);
+        
+        setSuccess(true);
+        toast({
+          title: 'Bem-vindo de volta!',
+          description: 'Sua conta já estava configurada. Você será redirecionado.',
+        });
+        return;
+      }
+
+      // 3. Create organization (now we're authenticated, RLS will pass)
       const slug = companyName.toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -151,11 +196,11 @@ export default function Onboarding() {
 
       if (orgError) throw orgError;
 
-      // 3. Assign admin role
+      // 4. Assign admin role
       const { error: roleError } = await supabase
         .from('user_roles')
         .insert({
-          user_id: authData.user.id,
+          user_id: userId,
           role: 'admin',
           organization_id: org.id
         });
