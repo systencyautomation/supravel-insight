@@ -20,8 +20,11 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { z } from 'zod';
 
 interface Organization {
@@ -39,6 +42,7 @@ interface Invitation {
   status: string;
   created_at: string;
   token: string;
+  last_sent_at: string;
 }
 
 const orgSchema = z.object({
@@ -78,6 +82,7 @@ export default function MasterDashboard() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteOrgName, setInviteOrgName] = useState('');
   const [sending, setSending] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -330,6 +335,64 @@ export default function MasterDashboard() {
         return <XCircle className="h-4 w-4 text-destructive" />;
       default:
         return <Clock className="h-4 w-4 text-warning" />;
+    }
+  };
+
+  const getResendCooldown = (lastSentAt: string): number => {
+    const lastSent = new Date(lastSentAt);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastSent.getTime()) / (1000 * 60);
+    return Math.max(0, Math.ceil(3 - diffMinutes));
+  };
+
+  const resendInvite = async (invite: Invitation) => {
+    const cooldown = getResendCooldown(invite.last_sent_at);
+    
+    if (cooldown > 0) {
+      toast({
+        title: 'Aguarde',
+        description: `Você pode reenviar em ${cooldown} minuto(s)`,
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setResendingId(invite.id);
+    
+    try {
+      const inviteLink = `${window.location.origin}/onboarding?token=${invite.token}`;
+      
+      const { error: emailError } = await supabase.functions.invoke('send-invitation', {
+        body: { 
+          email: invite.email, 
+          inviteLink, 
+          organizationName: invite.organization_name 
+        }
+      });
+
+      if (emailError) {
+        throw emailError;
+      }
+      
+      await supabase
+        .from('invitations')
+        .update({ last_sent_at: new Date().toISOString() })
+        .eq('id', invite.id);
+      
+      toast({
+        title: 'Convite Reenviado',
+        description: `Email enviado para ${invite.email}`
+      });
+      
+      fetchInvitations();
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao reenviar convite',
+        variant: 'destructive'
+      });
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -593,44 +656,80 @@ export default function MasterDashboard() {
           <h2 className="text-sm font-medium text-foreground uppercase tracking-wide">Convites</h2>
         </div>
 
-        <div className="bg-card border border-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Empresa</th>
-                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Enviado em</th>
-                <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invitations.map((invite) => (
-                <tr key={invite.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-3 font-mono text-foreground text-xs">{invite.email}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {invite.organization_name || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">
-                    {new Date(invite.created_at).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1">
-                      {getStatusIcon(invite.status || 'pendente')}
-                      <span className="text-xs capitalize">{invite.status}</span>
-                    </div>
-                  </td>
+        <TooltipProvider>
+          <div className="bg-card border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Email</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Empresa</th>
+                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Enviado em</th>
+                  <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Status</th>
+                  <th className="text-right px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Ações</th>
                 </tr>
-              ))}
-              {invitations.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                    Nenhum convite enviado
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {invitations.map((invite) => {
+                  const cooldown = getResendCooldown(invite.last_sent_at);
+                  const isResending = resendingId === invite.id;
+                  const canResend = invite.status === 'pendente' && cooldown === 0;
+                  
+                  return (
+                    <tr key={invite.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                      <td className="px-4 py-3 font-mono text-foreground text-xs">{invite.email}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {invite.organization_name || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {new Date(invite.created_at).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          {getStatusIcon(invite.status || 'pendente')}
+                          <span className="text-xs capitalize">{invite.status}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {invite.status === 'pendente' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => resendInvite(invite)}
+                                disabled={!canResend || isResending}
+                                className="text-xs"
+                              >
+                                {isResending ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-3 w-3 mr-1" />
+                                )}
+                                {cooldown > 0 ? `${cooldown} min` : 'Reenviar'}
+                              </Button>
+                            </TooltipTrigger>
+                            {cooldown > 0 && (
+                              <TooltipContent>
+                                <p>Aguarde {cooldown} minuto(s) para reenviar</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {invitations.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      Nenhum convite enviado
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TooltipProvider>
       </main>
     </div>
   );

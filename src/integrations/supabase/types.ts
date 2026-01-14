@@ -112,6 +112,7 @@ export type Database = {
           email: string
           expires_at: string | null
           id: string
+          last_sent_at: string | null
           organization_name: string | null
           status: string | null
           token: string | null
@@ -121,6 +122,7 @@ export type Database = {
           email: string
           expires_at?: string | null
           id?: string
+          last_sent_at?: string | null
           organization_name?: string | null
           status?: string | null
           token?: string | null
@@ -130,6 +132,7 @@ export type Database = {
           email?: string
           expires_at?: string | null
           id?: string
+          last_sent_at?: string | null
           organization_name?: string | null
           status?: string | null
           token?: string | null
