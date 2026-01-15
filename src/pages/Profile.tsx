@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, Save, User, Building2, Shield, Eye } from 'lucide-react';
+import { Loader2, Save, User, Building2, Eye, Menu } from 'lucide-react';
 import { TeamMembersList } from '@/components/TeamMembersList';
 import { InviteMemberDialog } from '@/components/InviteMemberDialog';
+import { ProfileHero } from '@/components/profile/ProfileHero';
+import { ProfileSidebar } from '@/components/profile/ProfileSidebar';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 
 interface Profile {
   id: string;
@@ -30,7 +32,6 @@ const Profile = () => {
     user, 
     loading: authLoading, 
     userRoles, 
-    organizationId,
     effectiveOrgId,
     impersonatedOrgName,
     isMasterAdmin
@@ -43,6 +44,7 @@ const Profile = () => {
   const [fullName, setFullName] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeSection, setActiveSection] = useState('profile-section');
 
   const userRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
   const canInvite = isMasterAdmin || userRole === 'admin' || userRole === 'manager';
@@ -62,7 +64,6 @@ const Profile = () => {
     if (!user) return;
 
     try {
-      // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -76,7 +77,6 @@ const Profile = () => {
         setFullName(profileData.full_name || '');
       }
 
-      // Fetch organization if user has one (or is impersonating)
       if (effectiveOrgId) {
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
@@ -129,15 +129,12 @@ const Profile = () => {
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    const labels: Record<string, string> = {
-      super_admin: 'Super Administrador',
-      admin: 'Administrador',
-      manager: 'Gerente',
-      seller: 'Vendedor',
-      representative: 'Representante',
-    };
-    return labels[role] || role;
+  const handleSectionClick = (sectionId: string) => {
+    setActiveSection(sectionId);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   if (authLoading || loading) {
@@ -156,131 +153,151 @@ const Profile = () => {
     <div className="min-h-screen bg-background">
       <DashboardHeader />
       
-      <div className="container mx-auto px-6 py-4">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => navigate('/')}
-          className="gap-2 mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar ao Dashboard
-        </Button>
+      <SidebarProvider>
+        <div className="flex min-h-[calc(100vh-64px)] w-full">
+          {/* Sidebar - hidden on mobile */}
+          <div className="hidden lg:block">
+            <ProfileSidebar
+              showTeamSection={Boolean(organization && canInvite)}
+              activeSection={activeSection}
+              onSectionClick={handleSectionClick}
+            />
+          </div>
 
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Profile Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Meu Perfil</CardTitle>
-                  <CardDescription>Gerencie suas informações pessoais</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Nome completo</Label>
-                  <Input
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Seu nome completo"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    value={user.email || ''}
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-              </div>
-              <Button onClick={handleSaveProfile} disabled={saving} className="gap-2">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Salvar alterações
-              </Button>
-            </CardContent>
-          </Card>
+          {/* Main Content */}
+          <main className="flex-1 overflow-auto">
+            {/* Mobile sidebar trigger */}
+            <div className="lg:hidden p-4 border-b border-border">
+              <SidebarTrigger>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Menu className="h-4 w-4" />
+                  Menu
+                </Button>
+              </SidebarTrigger>
+            </div>
 
-          {/* Organization Card */}
-          {organization && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle>Minha Organização</CardTitle>
-                    <CardDescription>Informações da sua empresa</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-            <CardContent className="space-y-4">
-              {impersonatedOrgName && (
-                <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-md">
-                  <Eye className="h-4 w-4 text-warning" />
-                  <span className="text-sm text-warning">
-                    Visualizando como: {impersonatedOrgName}
-                  </span>
-                </div>
-              )}
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Nome da empresa</Label>
-                  <Input value={organization.name} disabled className="bg-muted" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Identificador</Label>
-                  <Input value={organization.slug} disabled className="bg-muted" />
-                </div>
-              </div>
-              
-              {userRole && !isMasterAdmin && (
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Seu cargo:</span>
-                  <span className="text-sm font-medium">{getRoleLabel(userRole)}</span>
-                </div>
-              )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Team Section - Only for admins/managers */}
-          {organization && canInvite && (
-            <>
-              <Separator />
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold">Equipe da Organização</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Gerencie os membros da sua equipe
-                    </p>
-                  </div>
-                  <InviteMemberDialog 
-                    organizationId={organization.id} 
-                    organizationName={organization.name}
-                  />
-                </div>
-                <TeamMembersList 
-                  organizationId={organization.id} 
-                  organizationName={organization.name}
+            <div className="container max-w-4xl mx-auto px-4 sm:px-6 py-6">
+              {/* Hero Section */}
+              <Card className="mb-8">
+                <ProfileHero
+                  fullName={fullName || profile?.full_name}
+                  email={user.email}
+                  role={userRole}
+                  isMasterAdmin={isMasterAdmin}
                 />
-              </div>
-            </>
-          )}
+              </Card>
+
+              {/* Profile Section */}
+              <Card id="profile-section" className="mb-8 scroll-mt-24">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Informações Pessoais</CardTitle>
+                      <CardDescription>Gerencie suas informações de conta</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Nome completo</Label>
+                      <Input
+                        id="fullName"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Seu nome completo"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        value={user.email || ''}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleSaveProfile} disabled={saving} className="gap-2">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Salvar alterações
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Organization Section */}
+              {organization && (
+                <Card id="org-section" className="mb-8 scroll-mt-24">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle>Minha Organização</CardTitle>
+                        <CardDescription>Informações da sua empresa</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {impersonatedOrgName && (
+                      <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-md">
+                        <Eye className="h-4 w-4 text-warning" />
+                        <span className="text-sm text-warning">
+                          Visualizando como: {impersonatedOrgName}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="grid gap-6 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Nome da empresa</Label>
+                        <Input value={organization.name} disabled className="bg-muted" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Identificador</Label>
+                        <Input value={organization.slug} disabled className="bg-muted" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Team Section - Only for admins/managers */}
+              {organization && canInvite && (
+                <Card id="team-section" className="scroll-mt-24">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle>Equipe da Organização</CardTitle>
+                          <CardDescription>Gerencie os membros da sua equipe</CardDescription>
+                        </div>
+                      </div>
+                      <InviteMemberDialog 
+                        organizationId={organization.id} 
+                        organizationName={organization.name}
+                      />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <TeamMembersList 
+                      organizationId={organization.id} 
+                      organizationName={organization.name}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </main>
         </div>
-      </div>
+      </SidebarProvider>
     </div>
   );
 };
