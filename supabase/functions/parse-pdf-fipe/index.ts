@@ -1,0 +1,165 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { pdfBase64 } = await req.json();
+    
+    if (!pdfBase64) {
+      return new Response(
+        JSON.stringify({ error: 'PDF base64 é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    console.log("Sending PDF to AI for parsing...");
+
+    const prompt = `Analise esta imagem/documento PDF de uma tabela FIPE de empilhadeiras ou equipamentos industriais.
+
+TAREFA: Extraia TODOS os itens da tabela e retorne um JSON com um array de objetos.
+
+Cada objeto deve ter os seguintes campos (use null se não encontrar):
+- cod: código interno do equipamento (string)
+- classe_tipo: classe ou tipo do equipamento (string)
+- marca: fabricante/marca (string)
+- modelo: nome do modelo (string)
+- capacidade: capacidade de carga (string, ex: "2500kg")
+- mastro: tipo de mastro (string)
+- bateria: especificação da bateria (string)
+- carregador: especificação do carregador (string)
+- acessorios: acessórios inclusos (string)
+- pneus: tipo de pneus (string)
+- garfos: especificação dos garfos (string)
+- cor: cor do equipamento (string)
+- valor_cliente: preço para cliente (número, sem formatação)
+- comissao_pct: percentual de comissão (número, apenas o valor numérico)
+- valor_icms_12: valor com ICMS 12% (número)
+- valor_icms_7: valor com ICMS 7% (número)
+- valor_icms_4: valor com ICMS 4% (número)
+- qtd_total: quantidade total disponível (número)
+- qtd_reservado: quantidade reservada (número)
+- qtd_dealer: quantidade dealer (número)
+- qtd_demo: quantidade demo (número)
+- qtd_patio: quantidade no pátio (número)
+- disponibilidade: data de disponibilidade (string)
+- moeda: moeda (string, ex: "BRL", "USD")
+
+IMPORTANTE:
+1. Extraia TODOS os itens da tabela, não apenas alguns
+2. Para valores monetários, remova R$, pontos de milhar e converta vírgula para ponto
+3. Para percentuais, extraia apenas o número (ex: "5%" -> 5)
+4. Se um campo não existir na tabela, use null
+5. Retorne APENAS o JSON válido, sem markdown, sem explicações
+
+Formato de resposta esperado:
+{"items": [...]}`;
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-pro',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:application/pdf;base64,${pdfBase64}`,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 16000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('AI gateway error:', response.status, errorText);
+      
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Limite de requisições excedido. Tente novamente em alguns minutos.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'Créditos insuficientes. Por favor, adicione créditos ao workspace.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      throw new Error(`AI gateway error: ${response.status}`);
+    }
+
+    const aiResponse = await response.json();
+    const content = aiResponse.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('Resposta vazia da IA');
+    }
+
+    console.log("AI response received, parsing JSON...");
+
+    // Try to parse the JSON from the response
+    let parsedItems;
+    try {
+      // Remove potential markdown code blocks
+      const cleanContent = content
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+      
+      parsedItems = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', content);
+      throw new Error('Não foi possível interpretar a resposta da IA. Verifique se o PDF contém uma tabela válida.');
+    }
+
+    const items = parsedItems.items || parsedItems;
+    
+    if (!Array.isArray(items)) {
+      throw new Error('Resposta inválida: esperado um array de itens');
+    }
+
+    console.log(`Successfully parsed ${items.length} items from PDF`);
+
+    return new Response(
+      JSON.stringify({ items, count: items.length }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error in parse-pdf-fipe:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Erro desconhecido' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
