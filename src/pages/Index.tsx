@@ -10,7 +10,7 @@ import { RepresentativeCommissions } from '@/components/tabs/RepresentativeCommi
 import { StockManagement } from '@/components/tabs/StockManagement';
 import { CashFlow } from '@/components/tabs/CashFlow';
 import { Integrations } from '@/components/tabs/Integrations';
-import { Building2, Users, Briefcase, Package, Wallet, Loader2, LogOut, Settings, ArrowLeft, Plug, User } from 'lucide-react';
+import { Building2, Users, Briefcase, Package, Wallet, Loader2, Settings, ArrowLeft, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -18,7 +18,6 @@ const Index = () => {
   const { 
     user, 
     loading: authLoading, 
-    signOut, 
     isMasterAdmin, 
     impersonatedOrgName, 
     setImpersonatedOrg 
@@ -37,11 +36,6 @@ const Index = () => {
       navigate('/master');
     }
   }, [user, authLoading, isMasterAdmin, impersonatedOrgName, navigate]);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/auth');
-  };
 
   const handleExitImpersonation = () => {
     setImpersonatedOrg(null, null);
@@ -79,27 +73,21 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <DashboardHeader />
       
-      <div className="container mx-auto px-6 py-2 flex items-center justify-between">
-        <div>
-          {impersonatedOrgName && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleExitImpersonation}
-              className="gap-2 text-xs"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              Sair de {impersonatedOrgName}
-            </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Link to="/profile">
-            <Button variant="outline" size="sm" className="gap-2">
-              <User className="h-4 w-4" />
-              Meu Perfil
-            </Button>
-          </Link>
+      {(impersonatedOrgName || isMasterAdmin) && (
+        <div className="container mx-auto px-6 py-2 flex items-center justify-between">
+          <div>
+            {impersonatedOrgName && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExitImpersonation}
+                className="gap-2 text-xs"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                Sair de {impersonatedOrgName}
+              </Button>
+            )}
+          </div>
           {isMasterAdmin && (
             <Link to="/master">
               <Button variant="outline" size="sm" className="gap-2">
@@ -108,12 +96,8 @@ const Index = () => {
               </Button>
             </Link>
           )}
-          <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Sair
-          </Button>
         </div>
-      </div>
+      )}
       
       <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
