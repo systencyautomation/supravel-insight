@@ -12,7 +12,7 @@ import { ColumnMapper } from './ColumnMapper';
 import { ImportResult } from './ImportResult';
 import { useInventoryImport, type ImportResult as ImportResultType } from '@/hooks/useInventoryImport';
 import { toast } from 'sonner';
-import { Loader2, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ImportDialogProps {
   open: boolean;
@@ -87,44 +87,6 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     }
   };
 
-  const handleDownloadTemplate = () => {
-    // Create a simple CSV template
-    const headers = [
-      'COD',
-      'CLASSE/TIPO',
-      'MARCA',
-      'MODELO',
-      'CAPACIDADE',
-      'MASTRO',
-      'BATERIA',
-      'CARREGADOR',
-      'ACESSÓRIOS',
-      'PNEUS',
-      'GARFOS',
-      'COR',
-      'VALOR CLIENTE',
-      '% COMISSÃO',
-      'VENDA 12%',
-      'VENDA 7%',
-      'VENDA 4%',
-      'QTD TOTAL',
-      'QTD RESERV',
-      'QTD DEALER',
-      'QTD DEMO',
-      'QTD PÁTIO',
-      'DISPONIBILIDADE',
-      'MOEDA',
-    ];
-    
-    const csv = headers.join(';') + '\n';
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'template_fipe.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -165,18 +127,9 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
               {!isParsing && (
                 <div className="bg-muted/50 rounded-lg p-4">
                   <h4 className="text-sm font-medium mb-2">💡 Dica</h4>
-                  <p className="text-xs text-muted-foreground mb-3">
+                  <p className="text-xs text-muted-foreground">
                     Agora você pode importar diretamente arquivos PDF! A IA vai extrair os dados automaticamente.
                   </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleDownloadTemplate}
-                    className="gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Baixar Template CSV
-                  </Button>
                 </div>
               )}
             </div>
