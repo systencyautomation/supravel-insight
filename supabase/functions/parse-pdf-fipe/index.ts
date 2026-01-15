@@ -126,19 +126,37 @@ Formato de resposta esperado:
     }
 
     console.log("AI response received, parsing JSON...");
+    console.log("Raw AI response length:", content.length);
+    console.log("Raw AI response start:", content.substring(0, 200));
 
     // Try to parse the JSON from the response
     let parsedItems;
     try {
-      // Remove potential markdown code blocks
-      const cleanContent = content
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
+      let cleanContent = content;
+      
+      // Remove markdown code blocks more aggressively
+      // Handle: ```json, ``` json, ```JSON, etc.
+      cleanContent = cleanContent.replace(/^[\s\S]*?```(?:json|JSON)?\s*\n?/m, '');
+      cleanContent = cleanContent.replace(/\n?```[\s\S]*$/m, '');
+      
+      // Fallback: find first { and last } to extract pure JSON
+      const firstBrace = cleanContent.indexOf('{');
+      const lastBrace = cleanContent.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleanContent = cleanContent.substring(firstBrace, lastBrace + 1);
+      }
+      
+      cleanContent = cleanContent.trim();
+      
+      console.log("Cleaned content length:", cleanContent.length);
+      console.log("Cleaned content start:", cleanContent.substring(0, 200));
       
       parsedItems = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content);
+      console.error('JSON parse error:', parseError);
+      console.error('Failed to parse AI response (first 500 chars):', content.substring(0, 500));
+      console.error('Failed to parse AI response (last 500 chars):', content.substring(content.length - 500));
       throw new Error('Não foi possível interpretar a resposta da IA. Verifique se o PDF contém uma tabela válida.');
     }
 
