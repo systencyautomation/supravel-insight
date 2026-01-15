@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Sale } from '@/types/commission';
 import { calculateCommission, calculateICMSRate } from '@/types/commission';
 import { StatusBadge } from './StatusBadge';
@@ -17,6 +18,8 @@ interface CommissionTableProps {
 }
 
 export function CommissionTable({ sales, showDetails = true }: CommissionTableProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="border border-border">
       <Table>
@@ -71,7 +74,10 @@ export function CommissionTable({ sales, showDetails = true }: CommissionTablePr
                   </span>
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={sale.status} />
+                  <StatusBadge 
+                    status={sale.status} 
+                    onClick={sale.status === 'pendente' ? () => navigate(`/aprovacao?saleId=${sale.id}`) : undefined}
+                  />
                 </TableCell>
               </TableRow>
             );
