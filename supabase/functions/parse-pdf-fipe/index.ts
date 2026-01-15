@@ -64,6 +64,7 @@ IMPORTANTE:
 3. Para percentuais, extraia apenas o número (ex: "5%" -> 5)
 4. Se um campo não existir na tabela, use null
 5. Retorne APENAS o JSON válido, sem markdown, sem explicações
+6. Retorne o JSON em formato COMPACTO (minificado, sem indentação) para economizar espaço
 
 Formato de resposta esperado:
 {"items": [...]}`;
@@ -93,7 +94,7 @@ Formato de resposta esperado:
             ],
           },
         ],
-        max_tokens: 16000,
+        max_tokens: 64000,
       }),
     });
 
@@ -131,33 +132,89 @@ Formato de resposta esperado:
 
     // Try to parse the JSON from the response
     let parsedItems;
+    let cleanContent = content;
+    
+    // Remove markdown code blocks more aggressively
+    // Handle: ```json, ``` json, ```JSON, etc.
+    cleanContent = cleanContent.replace(/^[\s\S]*?```(?:json|JSON)?\s*\n?/m, '');
+    cleanContent = cleanContent.replace(/\n?```[\s\S]*$/m, '');
+    
+    // Fallback: find first { and last } to extract pure JSON
+    const firstBrace = cleanContent.indexOf('{');
+    const lastBrace = cleanContent.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleanContent = cleanContent.substring(firstBrace, lastBrace + 1);
+    }
+    
+    cleanContent = cleanContent.trim();
+    
+    console.log("Cleaned content length:", cleanContent.length);
+    console.log("Cleaned content start:", cleanContent.substring(0, 200));
+    
     try {
-      let cleanContent = content;
-      
-      // Remove markdown code blocks more aggressively
-      // Handle: ```json, ``` json, ```JSON, etc.
-      cleanContent = cleanContent.replace(/^[\s\S]*?```(?:json|JSON)?\s*\n?/m, '');
-      cleanContent = cleanContent.replace(/\n?```[\s\S]*$/m, '');
-      
-      // Fallback: find first { and last } to extract pure JSON
-      const firstBrace = cleanContent.indexOf('{');
-      const lastBrace = cleanContent.lastIndexOf('}');
-      
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        cleanContent = cleanContent.substring(firstBrace, lastBrace + 1);
-      }
-      
-      cleanContent = cleanContent.trim();
-      
-      console.log("Cleaned content length:", cleanContent.length);
-      console.log("Cleaned content start:", cleanContent.substring(0, 200));
-      
       parsedItems = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Failed to parse AI response (first 500 chars):', content.substring(0, 500));
-      console.error('Failed to parse AI response (last 500 chars):', content.substring(content.length - 500));
-      throw new Error('Não foi possível interpretar a resposta da IA. Verifique se o PDF contém uma tabela válida.');
+      console.log('Initial JSON parse failed, attempting to repair truncated JSON...');
+      console.log('Parse error:', parseError);
+      
+      // Try to repair truncated JSON
+      let repairedContent = cleanContent;
+      
+      // Count open/close brackets and braces
+      const openBraces = (repairedContent.match(/{/g) || []).length;
+      const openBrackets = (repairedContent.match(/\[/g) || []).length;
+      
+      // Find the last complete object (ends with },)
+      const lastCompleteObject = repairedContent.lastIndexOf('},');
+      if (lastCompleteObject > 0) {
+        // Cut off incomplete item and keep everything up to the last complete object
+        repairedContent = repairedContent.substring(0, lastCompleteObject + 1);
+        console.log('Trimmed to last complete object at position:', lastCompleteObject);
+      } else {
+        // Try finding last complete object without comma (might be the last item)
+        const lastObjectEnd = repairedContent.lastIndexOf('}');
+        const lastObjectStart = repairedContent.lastIndexOf('{"');
+        if (lastObjectEnd > lastObjectStart && lastObjectStart > 0) {
+          // Check if this object is incomplete
+          const possibleObject = repairedContent.substring(lastObjectStart, lastObjectEnd + 1);
+          try {
+            JSON.parse(possibleObject);
+            // Object is complete, keep it
+          } catch {
+            // Object is incomplete, remove it
+            repairedContent = repairedContent.substring(0, lastObjectStart);
+            // Remove trailing comma if present
+            repairedContent = repairedContent.replace(/,\s*$/, '');
+            console.log('Removed incomplete last object');
+          }
+        }
+      }
+      
+      // Count remaining brackets/braces after trimming
+      const remainingOpenBrackets = (repairedContent.match(/\[/g) || []).length;
+      const remainingCloseBrackets = (repairedContent.match(/\]/g) || []).length;
+      const remainingOpenBraces = (repairedContent.match(/{/g) || []).length;
+      const remainingCloseBraces = (repairedContent.match(/}/g) || []).length;
+      
+      // Add missing closing brackets and braces
+      const missingBrackets = remainingOpenBrackets - remainingCloseBrackets;
+      const missingBraces = remainingOpenBraces - remainingCloseBraces;
+      
+      repairedContent += ']'.repeat(Math.max(0, missingBrackets));
+      repairedContent += '}'.repeat(Math.max(0, missingBraces));
+      
+      console.log(`Added ${Math.max(0, missingBrackets)} closing brackets and ${Math.max(0, missingBraces)} closing braces`);
+      
+      try {
+        parsedItems = JSON.parse(repairedContent);
+        console.log('JSON repair successful! Recovered items.');
+      } catch (repairError) {
+        console.error('JSON repair also failed:', repairError);
+        console.error('Failed to parse AI response (first 500 chars):', content.substring(0, 500));
+        console.error('Failed to parse AI response (last 500 chars):', content.substring(content.length - 500));
+        throw new Error('Não foi possível interpretar a resposta da IA. Verifique se o PDF contém uma tabela válida.');
+      }
     }
 
     const items = parsedItems.items || parsedItems;
