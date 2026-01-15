@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { StockItem } from '@/types/commission';
 import { StockTable } from '@/components/StockTable';
 import { SummaryCard } from '@/components/SummaryCard';
@@ -8,46 +8,48 @@ import { Upload, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { ImportDialog } from '@/components/stock/ImportDialog';
 
 export function StockManagement() {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const { effectiveOrgId } = useAuth();
 
-  useEffect(() => {
-    const fetchInventory = async () => {
-      if (!effectiveOrgId) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        const { data, error } = await supabase
-          .from('inventory')
-          .select('*')
-          .eq('organization_id', effectiveOrgId);
+  const fetchInventory = useCallback(async () => {
+    if (!effectiveOrgId) {
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('organization_id', effectiveOrgId);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const mappedStock: StockItem[] = (data || []).map(item => ({
-          id: item.id,
-          modelo: item.model_name,
-          codInterno: item.internal_code || '',
-          valorTabela: item.base_price || 0,
-          percentualComissao: item.base_commission_pct || 10,
-          quantidade: item.quantity || 0,
-        }));
+      const mappedStock: StockItem[] = (data || []).map(item => ({
+        id: item.id,
+        modelo: item.model_name,
+        codInterno: item.internal_code || '',
+        valorTabela: item.base_price || 0,
+        percentualComissao: item.base_commission_pct || 10,
+        quantidade: item.quantity || 0,
+      }));
 
-        setStock(mappedStock);
-      } catch (error) {
-        console.error('Error fetching inventory:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInventory();
+      setStock(mappedStock);
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [effectiveOrgId]);
+
+  useEffect(() => {
+    fetchInventory();
+  }, [fetchInventory]);
 
   const totalEstoque = stock.reduce((acc, item) => acc + (item.valorTabela * item.quantidade), 0);
   const totalItens = stock.reduce((acc, item) => acc + item.quantidade, 0);
@@ -59,8 +61,8 @@ export function StockManagement() {
     toast.success('Item atualizado com sucesso');
   };
 
-  const handleImport = () => {
-    toast.info('Função de importação será conectada ao sistema');
+  const handleImportSuccess = () => {
+    fetchInventory();
   };
 
   return (
@@ -73,7 +75,12 @@ export function StockManagement() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setImportDialogOpen(true)} 
+            className="gap-2"
+          >
             <Upload className="h-4 w-4" />
             Importar Planilha
           </Button>
@@ -133,6 +140,12 @@ export function StockManagement() {
           <li>• Clique no ícone de edição para alterar valores</li>
         </ul>
       </div>
+
+      <ImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onSuccess={handleImportSuccess}
+      />
     </div>
   );
 }
