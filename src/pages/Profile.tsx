@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, User, Building2, Eye, Menu } from 'lucide-react';
+import { Loader2, Save, User, Building2, Eye, Menu, Users } from 'lucide-react';
 import { TeamMembersList } from '@/components/TeamMembersList';
 import { InviteMemberDialog } from '@/components/InviteMemberDialog';
 import { ProfileHero } from '@/components/profile/ProfileHero';
@@ -140,7 +140,12 @@ const Profile = () => {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20 animate-pulse">
+            <span className="text-primary-foreground font-bold text-xl">S</span>
+          </div>
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
       </div>
     );
   }
@@ -150,7 +155,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <DashboardHeader />
       
       <SidebarProvider>
@@ -167,35 +172,35 @@ const Profile = () => {
           {/* Main Content */}
           <main className="flex-1 overflow-auto">
             {/* Mobile sidebar trigger */}
-            <div className="lg:hidden p-4 border-b border-border">
+            <div className="lg:hidden p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
               <SidebarTrigger>
-                <Button variant="ghost" size="sm" className="gap-2">
+                <Button variant="ghost" size="sm" className="gap-2 rounded-xl">
                   <Menu className="h-4 w-4" />
                   Menu
                 </Button>
               </SidebarTrigger>
             </div>
 
-            <div className="container max-w-4xl mx-auto px-4 sm:px-6 py-6">
+            <div className="container max-w-4xl mx-auto px-4 sm:px-6 py-8 stagger-children">
               {/* Hero Section */}
-              <Card className="mb-8">
+              <div className="mb-8">
                 <ProfileHero
                   fullName={fullName || profile?.full_name}
                   email={user.email}
                   role={userRole}
                   isMasterAdmin={isMasterAdmin}
                 />
-              </Card>
+              </div>
 
               {/* Profile Section */}
-              <Card id="profile-section" className="mb-8 scroll-mt-24">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <User className="h-5 w-5 text-primary" />
+              <Card id="profile-section" className="mb-8 scroll-mt-24 hover-lift">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                      <User className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <CardTitle>Informações Pessoais</CardTitle>
+                      <CardTitle className="text-lg">Informações Pessoais</CardTitle>
                       <CardDescription>Gerencie suas informações de conta</CardDescription>
                     </div>
                   </div>
@@ -203,25 +208,26 @@ const Profile = () => {
                 <CardContent className="space-y-6">
                   <div className="grid gap-6 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="fullName">Nome completo</Label>
+                      <Label htmlFor="fullName" className="text-sm font-medium">Nome completo</Label>
                       <Input
                         id="fullName"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="Seu nome completo"
+                        className="h-11 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
+                      <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                       <Input
                         id="email"
                         value={user.email || ''}
                         disabled
-                        className="bg-muted"
+                        className="h-11 rounded-xl bg-muted/50"
                       />
                     </div>
                   </div>
-                  <Button onClick={handleSaveProfile} disabled={saving} className="gap-2">
+                  <Button onClick={handleSaveProfile} disabled={saving} className="gap-2 rounded-xl">
                     {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Salvar alterações
                   </Button>
@@ -230,23 +236,23 @@ const Profile = () => {
 
               {/* Organization Section */}
               {organization && (
-                <Card id="org-section" className="mb-8 scroll-mt-24">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-primary" />
+                <Card id="org-section" className="mb-8 scroll-mt-24 hover-lift">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                        <Building2 className="h-6 w-6 text-primary" />
                       </div>
                       <div>
-                        <CardTitle>Minha Organização</CardTitle>
+                        <CardTitle className="text-lg">Minha Organização</CardTitle>
                         <CardDescription>Informações da sua empresa</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {impersonatedOrgName && (
-                      <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-md">
-                        <Eye className="h-4 w-4 text-warning" />
-                        <span className="text-sm text-warning">
+                      <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-xl">
+                        <Eye className="h-5 w-5 text-warning" />
+                        <span className="text-sm font-medium text-warning">
                           Visualizando como: {impersonatedOrgName}
                         </span>
                       </div>
@@ -254,12 +260,12 @@ const Profile = () => {
                     
                     <div className="grid gap-6 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Nome da empresa</Label>
-                        <Input value={organization.name} disabled className="bg-muted" />
+                        <Label className="text-sm font-medium">Nome da empresa</Label>
+                        <Input value={organization.name} disabled className="h-11 rounded-xl bg-muted/50" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Identificador</Label>
-                        <Input value={organization.slug} disabled className="bg-muted" />
+                        <Label className="text-sm font-medium">Identificador</Label>
+                        <Input value={organization.slug} disabled className="h-11 rounded-xl bg-muted/50" />
                       </div>
                     </div>
                   </CardContent>
@@ -268,15 +274,15 @@ const Profile = () => {
 
               {/* Team Section - Only for admins/managers */}
               {organization && canInvite && (
-                <Card id="team-section" className="scroll-mt-24">
-                  <CardHeader>
+                <Card id="team-section" className="scroll-mt-24 hover-lift">
+                  <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <User className="h-5 w-5 text-primary" />
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                          <Users className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                          <CardTitle>Equipe da Organização</CardTitle>
+                          <CardTitle className="text-lg">Equipe da Organização</CardTitle>
                           <CardDescription>Gerencie os membros da sua equipe</CardDescription>
                         </div>
                       </div>

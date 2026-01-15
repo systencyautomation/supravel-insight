@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Sparkles } from 'lucide-react';
 
 interface ProfileHeroProps {
   fullName: string | null;
@@ -29,30 +30,47 @@ const getInitials = (name: string | null) => {
 
 export const ProfileHero = ({ fullName, email, role, isMasterAdmin }: ProfileHeroProps) => {
   return (
-    <div className="flex flex-col items-center text-center py-8 px-4">
-      <Avatar className="h-24 w-24 mb-4 border-4 border-primary/20">
-        <AvatarFallback className="text-2xl font-semibold bg-primary/10 text-primary">
-          {getInitials(fullName)}
-        </AvatarFallback>
-      </Avatar>
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-background to-muted/30 p-8">
+      {/* Background decorations */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl" />
       
-      <h1 className="text-2xl font-bold text-foreground mb-1">
-        {fullName || 'Usuário'}
-      </h1>
-      
-      <p className="text-muted-foreground mb-3">
-        {email}
-      </p>
-      
-      {isMasterAdmin ? (
-        <Badge variant="default" className="bg-primary text-primary-foreground">
-          Master Admin
-        </Badge>
-      ) : role ? (
-        <Badge variant="secondary">
-          {getRoleLabel(role)}
-        </Badge>
-      ) : null}
+      <div className="relative flex flex-col items-center text-center">
+        {/* Avatar with gradient ring */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-primary/50 blur-md opacity-50" />
+          <Avatar className="relative h-28 w-28 border-4 border-background shadow-xl">
+            <AvatarFallback className="text-3xl font-bold bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
+              {getInitials(fullName)}
+            </AvatarFallback>
+          </Avatar>
+          
+          {/* Online indicator */}
+          <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-success border-2 border-background" />
+        </div>
+        
+        <div className="flex items-center gap-2 mb-2">
+          <h1 className="text-2xl font-bold text-foreground">
+            {fullName || 'Usuário'}
+          </h1>
+          <Sparkles className="h-5 w-5 text-primary" />
+        </div>
+        
+        <p className="text-muted-foreground mb-4">
+          {email}
+        </p>
+        
+        {isMasterAdmin ? (
+          <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground border-0 shadow-md shadow-primary/20 px-4 py-1">
+            <Sparkles className="h-3 w-3 mr-1" />
+            Master Admin
+          </Badge>
+        ) : role ? (
+          <Badge variant="secondary" className="px-4 py-1 font-medium">
+            {getRoleLabel(role)}
+          </Badge>
+        ) : null}
+      </div>
     </div>
   );
 };

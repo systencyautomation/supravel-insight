@@ -1,4 +1,4 @@
-import { User, Building2, Users, ArrowLeft } from 'lucide-react';
+import { User, Building2, Users, ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sidebar,
@@ -31,21 +31,23 @@ export const ProfileSidebar = ({
   ];
 
   return (
-    <Sidebar className="border-r border-border">
-      <SidebarContent className="pt-4">
+    <Sidebar className="border-r border-border/50 bg-card/50 backdrop-blur-sm">
+      <SidebarContent className="pt-6 px-3">
         <SidebarGroup>
-          <SidebarGroupLabel>Navegação</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-3 mb-2">
+            Navegação
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => onSectionClick(item.id)}
                     isActive={activeSection === item.id}
-                    className="cursor-pointer"
+                    className="cursor-pointer rounded-xl h-11 px-4 transition-all duration-200 hover:bg-accent/80 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-md"
                   >
                     <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
+                    <span className="font-medium">{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -53,16 +55,16 @@ export const ProfileSidebar = ({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="mt-auto">
+        <SidebarGroup className="mt-auto pb-6">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={() => navigate('/')}
-                  className="cursor-pointer"
+                  className="cursor-pointer rounded-xl h-11 px-4 transition-all duration-200 hover:bg-accent/80"
                 >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Voltar ao Dashboard</span>
+                  <Home className="h-4 w-4" />
+                  <span className="font-medium">Voltar ao Dashboard</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
