@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PendingSalesNotification } from '@/components/PendingSalesNotification';
 
 export function DashboardHeader() {
   const { theme, toggleTheme } = useTheme();
@@ -47,6 +48,8 @@ export function DashboardHeader() {
         </div>
         
         <div className="flex items-center gap-2">
+          <PendingSalesNotification />
+
           <Button 
             variant="ghost" 
             size="icon" 

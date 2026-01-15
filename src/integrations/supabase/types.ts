@@ -165,34 +165,94 @@ export type Database = {
       }
       inventory: {
         Row: {
+          acessorios: string | null
           base_commission_pct: number | null
           base_price: number | null
+          bateria: string | null
+          capacidade: string | null
+          carregador: string | null
+          classe_tipo: string | null
+          cor: string | null
           created_at: string | null
+          disponibilidade_data: string | null
+          garfos: string | null
           id: string
           internal_code: string | null
+          marca: string | null
+          mastro: string | null
           model_name: string
+          moeda: string | null
           organization_id: string
+          pneus: string | null
+          qtd_dealer: number | null
+          qtd_demo: number | null
+          qtd_patio: number | null
+          qtd_reservado: number | null
           quantity: number | null
+          updated_at: string | null
+          valor_icms_12: number | null
+          valor_icms_4: number | null
+          valor_icms_7: number | null
         }
         Insert: {
+          acessorios?: string | null
           base_commission_pct?: number | null
           base_price?: number | null
+          bateria?: string | null
+          capacidade?: string | null
+          carregador?: string | null
+          classe_tipo?: string | null
+          cor?: string | null
           created_at?: string | null
+          disponibilidade_data?: string | null
+          garfos?: string | null
           id?: string
           internal_code?: string | null
+          marca?: string | null
+          mastro?: string | null
           model_name: string
+          moeda?: string | null
           organization_id: string
+          pneus?: string | null
+          qtd_dealer?: number | null
+          qtd_demo?: number | null
+          qtd_patio?: number | null
+          qtd_reservado?: number | null
           quantity?: number | null
+          updated_at?: string | null
+          valor_icms_12?: number | null
+          valor_icms_4?: number | null
+          valor_icms_7?: number | null
         }
         Update: {
+          acessorios?: string | null
           base_commission_pct?: number | null
           base_price?: number | null
+          bateria?: string | null
+          capacidade?: string | null
+          carregador?: string | null
+          classe_tipo?: string | null
+          cor?: string | null
           created_at?: string | null
+          disponibilidade_data?: string | null
+          garfos?: string | null
           id?: string
           internal_code?: string | null
+          marca?: string | null
+          mastro?: string | null
           model_name?: string
+          moeda?: string | null
           organization_id?: string
+          pneus?: string | null
+          qtd_dealer?: number | null
+          qtd_demo?: number | null
+          qtd_patio?: number | null
+          qtd_reservado?: number | null
           quantity?: number | null
+          updated_at?: string | null
+          valor_icms_12?: number | null
+          valor_icms_4?: number | null
+          valor_icms_7?: number | null
         }
         Relationships: [
           {
@@ -355,6 +415,8 @@ export type Database = {
       }
       sales: {
         Row: {
+          aprovado_em: string | null
+          aprovado_por: string | null
           client_cnpj: string | null
           client_name: string | null
           commission_calculated: number | null
@@ -367,6 +429,7 @@ export type Database = {
           id: string
           internal_seller_id: string | null
           ir_csll: number | null
+          motivo_rejeicao: string | null
           nfe_email_from: string | null
           nfe_filename: string | null
           nfe_key: string | null
@@ -374,10 +437,16 @@ export type Database = {
           nfe_number: string | null
           nfe_processed_at: string | null
           nfe_series: string | null
+          observacoes: string | null
           organization_id: string
           over_price: number | null
+          over_price_liquido: number | null
           payment_method: string | null
+          percentual_comissao: number | null
+          percentual_icms: number | null
           pis_cofins: number | null
+          produto_codigo: string | null
+          produto_descricao: string | null
           representative_id: string | null
           status: string | null
           table_value: number | null
@@ -385,8 +454,11 @@ export type Database = {
           total_produtos: number | null
           total_value: number | null
           uf_destiny: string | null
+          valor_entrada: number | null
         }
         Insert: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
           client_cnpj?: string | null
           client_name?: string | null
           commission_calculated?: number | null
@@ -399,6 +471,7 @@ export type Database = {
           id?: string
           internal_seller_id?: string | null
           ir_csll?: number | null
+          motivo_rejeicao?: string | null
           nfe_email_from?: string | null
           nfe_filename?: string | null
           nfe_key?: string | null
@@ -406,10 +479,16 @@ export type Database = {
           nfe_number?: string | null
           nfe_processed_at?: string | null
           nfe_series?: string | null
+          observacoes?: string | null
           organization_id: string
           over_price?: number | null
+          over_price_liquido?: number | null
           payment_method?: string | null
+          percentual_comissao?: number | null
+          percentual_icms?: number | null
           pis_cofins?: number | null
+          produto_codigo?: string | null
+          produto_descricao?: string | null
           representative_id?: string | null
           status?: string | null
           table_value?: number | null
@@ -417,8 +496,11 @@ export type Database = {
           total_produtos?: number | null
           total_value?: number | null
           uf_destiny?: string | null
+          valor_entrada?: number | null
         }
         Update: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
           client_cnpj?: string | null
           client_name?: string | null
           commission_calculated?: number | null
@@ -431,6 +513,7 @@ export type Database = {
           id?: string
           internal_seller_id?: string | null
           ir_csll?: number | null
+          motivo_rejeicao?: string | null
           nfe_email_from?: string | null
           nfe_filename?: string | null
           nfe_key?: string | null
@@ -438,10 +521,16 @@ export type Database = {
           nfe_number?: string | null
           nfe_processed_at?: string | null
           nfe_series?: string | null
+          observacoes?: string | null
           organization_id?: string
           over_price?: number | null
+          over_price_liquido?: number | null
           payment_method?: string | null
+          percentual_comissao?: number | null
+          percentual_icms?: number | null
           pis_cofins?: number | null
+          produto_codigo?: string | null
+          produto_descricao?: string | null
           representative_id?: string | null
           status?: string | null
           table_value?: number | null
@@ -449,8 +538,16 @@ export type Database = {
           total_produtos?: number | null
           total_value?: number | null
           uf_destiny?: string | null
+          valor_entrada?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_organization_id_fkey"
             columns: ["organization_id"]
