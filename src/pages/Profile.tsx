@@ -8,12 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, User, Building2, Eye, Menu, Users } from 'lucide-react';
+import { Loader2, Save, User, Building2, Eye, Users } from 'lucide-react';
 import { TeamMembersList } from '@/components/TeamMembersList';
 import { InviteMemberDialog } from '@/components/InviteMemberDialog';
 import { ProfileHero } from '@/components/profile/ProfileHero';
-import { ProfileSidebar } from '@/components/profile/ProfileSidebar';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 
 interface Profile {
   id: string;
@@ -44,7 +42,6 @@ const Profile = () => {
   const [fullName, setFullName] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState('profile-section');
 
   const userRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
   const canInvite = isMasterAdmin || userRole === 'admin' || userRole === 'manager';
@@ -129,14 +126,6 @@ const Profile = () => {
     }
   };
 
-  const handleSectionClick = (sectionId: string) => {
-    setActiveSection(sectionId);
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -158,152 +147,126 @@ const Profile = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <DashboardHeader />
       
-      <SidebarProvider>
-        <div className="flex min-h-[calc(100vh-64px)] w-full">
-          {/* Sidebar - hidden on mobile */}
-          <div className="hidden lg:block">
-            <ProfileSidebar
-              showTeamSection={Boolean(organization && canInvite)}
-              activeSection={activeSection}
-              onSectionClick={handleSectionClick}
-            />
-          </div>
+      <main className="container max-w-4xl mx-auto px-4 sm:px-6 py-8 stagger-children">
+        {/* Hero Section */}
+        <div className="mb-8">
+          <ProfileHero
+            fullName={fullName || profile?.full_name}
+            email={user.email}
+            role={userRole}
+            isMasterAdmin={isMasterAdmin}
+          />
+        </div>
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-auto">
-            {/* Mobile sidebar trigger */}
-            <div className="lg:hidden p-4 border-b border-border/50 bg-card/50 backdrop-blur-sm">
-              <SidebarTrigger>
-                <Button variant="ghost" size="sm" className="gap-2 rounded-xl">
-                  <Menu className="h-4 w-4" />
-                  Menu
-                </Button>
-              </SidebarTrigger>
+        {/* Profile Section */}
+        <Card id="profile-section" className="mb-8 scroll-mt-24 hover-lift">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <User className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Informações Pessoais</CardTitle>
+                <CardDescription>Gerencie suas informações de conta</CardDescription>
+              </div>
             </div>
-
-            <div className="container max-w-4xl mx-auto px-4 sm:px-6 py-8 stagger-children">
-              {/* Hero Section */}
-              <div className="mb-8">
-                <ProfileHero
-                  fullName={fullName || profile?.full_name}
-                  email={user.email}
-                  role={userRole}
-                  isMasterAdmin={isMasterAdmin}
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="text-sm font-medium">Nome completo</Label>
+                <Input
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Seu nome completo"
+                  className="h-11 rounded-xl"
                 />
               </div>
-
-              {/* Profile Section */}
-              <Card id="profile-section" className="mb-8 scroll-mt-24 hover-lift">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">Informações Pessoais</CardTitle>
-                      <CardDescription>Gerencie suas informações de conta</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid gap-6 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName" className="text-sm font-medium">Nome completo</Label>
-                      <Input
-                        id="fullName"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Seu nome completo"
-                        className="h-11 rounded-xl"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-                      <Input
-                        id="email"
-                        value={user.email || ''}
-                        disabled
-                        className="h-11 rounded-xl bg-muted/50"
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={handleSaveProfile} disabled={saving} className="gap-2 rounded-xl">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Salvar alterações
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Organization Section */}
-              {organization && (
-                <Card id="org-section" className="mb-8 scroll-mt-24 hover-lift">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                        <Building2 className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">Minha Organização</CardTitle>
-                        <CardDescription>Informações da sua empresa</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {impersonatedOrgName && (
-                      <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-xl">
-                        <Eye className="h-5 w-5 text-warning" />
-                        <span className="text-sm font-medium text-warning">
-                          Visualizando como: {impersonatedOrgName}
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="grid gap-6 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Nome da empresa</Label>
-                        <Input value={organization.name} disabled className="h-11 rounded-xl bg-muted/50" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Identificador</Label>
-                        <Input value={organization.slug} disabled className="h-11 rounded-xl bg-muted/50" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Team Section - Only for admins/managers */}
-              {organization && canInvite && (
-                <Card id="team-section" className="scroll-mt-24 hover-lift">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                          <Users className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">Equipe da Organização</CardTitle>
-                          <CardDescription>Gerencie os membros da sua equipe</CardDescription>
-                        </div>
-                      </div>
-                      <InviteMemberDialog 
-                        organizationId={organization.id} 
-                        organizationName={organization.name}
-                      />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <TeamMembersList 
-                      organizationId={organization.id} 
-                      organizationName={organization.name}
-                    />
-                  </CardContent>
-                </Card>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                <Input
+                  id="email"
+                  value={user.email || ''}
+                  disabled
+                  className="h-11 rounded-xl bg-muted/50"
+                />
+              </div>
             </div>
-          </main>
-        </div>
-      </SidebarProvider>
+            <Button onClick={handleSaveProfile} disabled={saving} className="gap-2 rounded-xl">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar alterações
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Organization Section */}
+        {organization && (
+          <Card id="org-section" className="mb-8 scroll-mt-24 hover-lift">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                  <Building2 className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Minha Organização</CardTitle>
+                  <CardDescription>Informações da sua empresa</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {impersonatedOrgName && (
+                <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-xl">
+                  <Eye className="h-5 w-5 text-warning" />
+                  <span className="text-sm font-medium text-warning">
+                    Visualizando como: {impersonatedOrgName}
+                  </span>
+                </div>
+              )}
+              
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Nome da empresa</Label>
+                  <Input value={organization.name} disabled className="h-11 rounded-xl bg-muted/50" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Identificador</Label>
+                  <Input value={organization.slug} disabled className="h-11 rounded-xl bg-muted/50" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Team Section - Only for admins/managers */}
+        {organization && canInvite && (
+          <Card id="team-section" className="scroll-mt-24 hover-lift">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Equipe da Organização</CardTitle>
+                    <CardDescription>Gerencie os membros da sua equipe</CardDescription>
+                  </div>
+                </div>
+                <InviteMemberDialog 
+                  organizationId={organization.id} 
+                  organizationName={organization.name}
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <TeamMembersList 
+                organizationId={organization.id} 
+                organizationName={organization.name}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </main>
     </div>
   );
 };
