@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Building2, Users } from 'lucide-react';
+import { ArrowLeft, User, Building2, Users, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ const menuItems = [
   { path: '/settings/profile', label: 'Meu Perfil', icon: User },
   { path: '/settings/organization', label: 'Empresa', icon: Building2 },
   { path: '/settings/team', label: 'Equipe', icon: Users },
+  { path: '/settings/integrations', label: 'Integrações', icon: Plug },
 ];
 
 export function SettingsSidebar() {
@@ -22,6 +23,7 @@ export function SettingsSidebar() {
   const filteredItems = menuItems.filter(item => {
     if (item.path === '/settings/team') return canAccessTeam && hasOrganization;
     if (item.path === '/settings/organization') return hasOrganization;
+    if (item.path === '/settings/integrations') return canAccessTeam && hasOrganization;
     return true;
   });
 
