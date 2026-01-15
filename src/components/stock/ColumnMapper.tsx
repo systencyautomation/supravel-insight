@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,31 +16,32 @@ function autoDetectMapping(headers: string[]): Record<string, string> {
   const mapping: Record<string, string> = {};
   const normalizedHeaders = headers.map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
   
+  // Patterns include both human-readable headers AND technical field names (for PDF imports)
   const patterns: Record<string, RegExp[]> = {
-    internal_code: [/^cod/, /codigo.*interno/, /cod.*int/, /^id$/],
-    model_name: [/modelo/, /model/],
-    marca: [/marca/, /brand/],
-    classe_tipo: [/classe/, /tipo/, /class/],
-    capacidade: [/capacidade/, /capacity/, /cap\./],
-    mastro: [/mastro/, /mast/],
-    bateria: [/bateria/, /battery/],
-    carregador: [/carregador/, /charger/],
-    acessorios: [/acessorio/, /accessory/],
-    pneus: [/pneu/, /tire/],
-    garfos: [/garfo/, /fork/],
+    internal_code: [/^cod/, /codigo.*interno/, /cod.*int/, /^id$/, /^internal_code$/],
+    model_name: [/modelo/, /model/, /^model_name$/],
+    marca: [/marca/, /brand/, /^marca$/],
+    classe_tipo: [/classe/, /tipo/, /class/, /^classe_tipo$/],
+    capacidade: [/capacidade/, /capacity/, /cap\./, /^capacidade$/],
+    mastro: [/mastro/, /mast/, /^mastro$/],
+    bateria: [/bateria/, /battery/, /^bateria$/],
+    carregador: [/carregador/, /charger/, /^carregador$/],
+    acessorios: [/acessorio/, /accessory/, /^acessorios$/],
+    pneus: [/pneu/, /tire/, /^pneus$/],
+    garfos: [/garfo/, /fork/, /^garfos$/],
     cor: [/^cor$/, /color/],
-    base_price: [/valor.*cliente/, /preco/, /price/, /valor.*tabela/],
-    base_commission_pct: [/comiss/, /%.*com/, /commission/],
-    valor_icms_12: [/icms.*12/, /12.*%/],
-    valor_icms_7: [/icms.*7/, /7.*%/],
-    valor_icms_4: [/icms.*4/, /4.*%/],
-    quantity: [/qtd.*total/, /quantidade/, /qty/, /total/],
-    qtd_reservado: [/reserv/],
-    qtd_dealer: [/dealer/],
-    qtd_demo: [/demo/],
-    qtd_patio: [/patio/],
-    disponibilidade_data: [/disponib/, /data/],
-    moeda: [/moeda/, /currency/],
+    base_price: [/valor.*cliente/, /preco/, /price/, /valor.*tabela/, /^base_price$/],
+    base_commission_pct: [/comiss/, /%.*com/, /commission/, /^base_commission_pct$/],
+    valor_icms_12: [/icms.*12/, /12.*%/, /^valor_icms_12$/],
+    valor_icms_7: [/icms.*7/, /7.*%/, /^valor_icms_7$/],
+    valor_icms_4: [/icms.*4/, /4.*%/, /^valor_icms_4$/],
+    quantity: [/qtd.*total/, /quantidade/, /qty/, /^quantity$/],
+    qtd_reservado: [/reserv/, /^qtd_reservado$/],
+    qtd_dealer: [/dealer/, /^qtd_dealer$/],
+    qtd_demo: [/demo/, /^qtd_demo$/],
+    qtd_patio: [/patio/, /^qtd_patio$/],
+    disponibilidade_data: [/disponib/, /data/, /^disponibilidade_data$/],
+    moeda: [/moeda/, /currency/, /^moeda$/],
   };
   
   Object.entries(patterns).forEach(([field, regexes]) => {
@@ -58,9 +59,26 @@ function autoDetectMapping(headers: string[]): Record<string, string> {
 
 export function ColumnMapper({ headers, rows, mapping, onMappingChange }: ColumnMapperProps) {
   const [localMapping, setLocalMapping] = useState<Record<string, string>>(() => {
+    // If parent already has mapping (from PDF processing), use it
     if (Object.keys(mapping).length > 0) return mapping;
+    // Otherwise, auto-detect from headers
     return autoDetectMapping(headers);
   });
+  
+  // Sync initial mapping with parent on mount
+  useEffect(() => {
+    if (Object.keys(localMapping).length > 0) {
+      onMappingChange(localMapping);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+  
+  // Update local mapping if parent mapping changes (e.g., from PDF processing)
+  useEffect(() => {
+    if (Object.keys(mapping).length > 0 && JSON.stringify(mapping) !== JSON.stringify(localMapping)) {
+      setLocalMapping(mapping);
+    }
+  }, [mapping]);
   
   const handleChange = (field: string, value: string) => {
     const newMapping = { ...localMapping, [field]: value === '__none__' ? '' : value };
