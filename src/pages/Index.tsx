@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationData } from '@/hooks/useOrganizationData';
 import { DashboardHeader } from '@/components/DashboardHeader';
@@ -9,7 +9,7 @@ import { InternalSellerCommissions } from '@/components/tabs/InternalSellerCommi
 import { RepresentativeCommissions } from '@/components/tabs/RepresentativeCommissions';
 import { StockManagement } from '@/components/tabs/StockManagement';
 import { CashFlow } from '@/components/tabs/CashFlow';
-import { Building2, Users, Briefcase, Package, Wallet, Loader2, Settings, ArrowLeft } from 'lucide-react';
+import { Building2, Users, Briefcase, Package, Wallet, Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -72,29 +72,17 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <DashboardHeader />
       
-      {(impersonatedOrgName || isMasterAdmin) && (
-        <div className="container mx-auto px-6 py-2 flex items-center justify-between">
-          <div>
-            {impersonatedOrgName && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleExitImpersonation}
-                className="gap-2 text-xs"
-              >
-                <ArrowLeft className="h-3 w-3" />
-                Sair de {impersonatedOrgName}
-              </Button>
-            )}
-          </div>
-          {isMasterAdmin && (
-            <Link to="/master">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Master
-              </Button>
-            </Link>
-          )}
+      {impersonatedOrgName && (
+        <div className="container mx-auto px-6 py-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExitImpersonation}
+            className="gap-2 text-xs"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            Sair de {impersonatedOrgName}
+          </Button>
         </div>
       )}
       
