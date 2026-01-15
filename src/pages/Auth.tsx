@@ -4,8 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, LogIn, UserPlus } from 'lucide-react';
+import { Loader2, LogIn, UserPlus, Mail, Lock, User, Sparkles } from 'lucide-react';
 import { z } from 'zod';
 
 const emailSchema = z.string().email('Email inválido');
@@ -90,109 +91,145 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="border border-border bg-card p-6">
-          <div className="mb-6 text-center">
-            <h1 className="text-xl font-bold tracking-tight uppercase">
-              Gestão de Comissões
-            </h1>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1">
-              {isLogin ? 'Acesse sua conta' : 'Crie sua conta'}
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 flex items-center justify-center px-4 py-8">
+      {/* Background decorative elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
+      </div>
+      
+      <div className="w-full max-w-md relative z-10 animate-fade-up">
+        {/* Logo Section */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 shadow-xl shadow-primary/20 mb-4">
+            <span className="text-primary-foreground font-bold text-2xl">S</span>
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-xs uppercase tracking-wide">
-                  Nome Completo
-                </Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Seu nome"
-                  className="h-10"
-                />
-                {errors.fullName && (
-                  <p className="text-xs text-destructive">{errors.fullName}</p>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs uppercase tracking-wide">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                className="h-10"
-              />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-xs uppercase tracking-wide">
-                Senha
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="h-10"
-              />
-              {errors.password && (
-                <p className="text-xs text-destructive">{errors.password}</p>
-              )}
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-10 uppercase tracking-wide text-xs font-semibold"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isLogin ? (
-                <>
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Entrar
-                </>
-              ) : (
-                <>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Criar Conta
-                </>
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setErrors({});
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground uppercase tracking-wide"
-            >
-              {isLogin ? 'Não tem conta? Criar agora' : 'Já tem conta? Fazer login'}
-            </button>
-          </div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            SUPRAVEL
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Sistema de Gestão de Comissões
+          </p>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-4 uppercase tracking-wide">
-          Supravel © 2025
+        <Card className="shadow-xl border-border/50 backdrop-blur-sm">
+          <CardContent className="p-8">
+            <div className="mb-6 text-center">
+              <h2 className="text-xl font-semibold flex items-center justify-center gap-2">
+                {isLogin ? 'Bem-vindo de volta' : 'Criar conta'}
+                <Sparkles className="h-5 w-5 text-primary" />
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isLogin ? 'Entre com suas credenciais' : 'Preencha os dados abaixo'}
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="fullName" className="text-sm font-medium">
+                    Nome Completo
+                  </Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="fullName"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Seu nome completo"
+                      className="h-11 pl-10 rounded-xl"
+                    />
+                  </div>
+                  {errors.fullName && (
+                    <p className="text-xs text-destructive">{errors.fullName}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="h-11 pl-10 rounded-xl"
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-xs text-destructive">{errors.email}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Senha
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-11 pl-10 rounded-xl"
+                  />
+                </div>
+                {errors.password && (
+                  <p className="text-xs text-destructive">{errors.password}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-11 rounded-xl font-semibold"
+                variant="gradient"
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isLogin ? (
+                  <>
+                    <LogIn className="h-4 w-4" />
+                    Entrar
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4" />
+                    Criar Conta
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setErrors({});
+                }}
+                className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                {isLogin ? (
+                  <>Não tem conta? <span className="font-medium text-primary">Criar agora</span></>
+                ) : (
+                  <>Já tem conta? <span className="font-medium text-primary">Fazer login</span></>
+                )}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Supravel © 2026
         </p>
       </div>
     </div>
