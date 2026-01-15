@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Clock, Trash2, Users, RefreshCw } from 'lucide-react';
+import { Loader2, Clock, Trash2, Users, RefreshCw, Copy } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -180,6 +180,31 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
     }
   };
 
+  const handleCopyInviteLink = async (invitation: MemberInvitation) => {
+    const inviteLink = `${window.location.origin}/join?token=${invitation.token}`;
+    
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      toast({
+        title: 'Link copiado!',
+        description: 'Cole o link no WhatsApp ou onde preferir.',
+      });
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = inviteLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      toast({
+        title: 'Link copiado!',
+        description: 'Cole o link no WhatsApp ou onde preferir.',
+      });
+    }
+  };
+
   const handleCancelInvitation = async (invitationId: string) => {
     try {
       const { error } = await supabase
@@ -312,6 +337,19 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{getRoleLabel(invitation.role)}</Badge>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary"
+                              onClick={() => handleCopyInviteLink(invitation)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Copiar link do convite</TooltipContent>
+                        </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
