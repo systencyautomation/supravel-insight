@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.n8n-gateway]
 verify_jwt = false
+
+[functions.complete-member-registration]
+verify_jwt = false
