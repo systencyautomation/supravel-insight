@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, Save, User, Building2, Shield } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, User, Building2, Shield, Eye } from 'lucide-react';
 import { TeamMembersList } from '@/components/TeamMembersList';
 import { InviteMemberDialog } from '@/components/InviteMemberDialog';
 
@@ -26,7 +26,15 @@ interface Organization {
 }
 
 const Profile = () => {
-  const { user, loading: authLoading, userRoles, organizationId } = useAuth();
+  const { 
+    user, 
+    loading: authLoading, 
+    userRoles, 
+    organizationId,
+    effectiveOrgId,
+    impersonatedOrgName,
+    isMasterAdmin
+  } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -36,8 +44,8 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const userRole = userRoles.find(r => r.organization_id === organizationId)?.role;
-  const canInvite = userRole === 'admin' || userRole === 'manager';
+  const userRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
+  const canInvite = isMasterAdmin || userRole === 'admin' || userRole === 'manager';
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -48,7 +56,7 @@ const Profile = () => {
     if (user) {
       fetchData();
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, effectiveOrgId]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -68,12 +76,12 @@ const Profile = () => {
         setFullName(profileData.full_name || '');
       }
 
-      // Fetch organization if user has one
-      if (organizationId) {
+      // Fetch organization if user has one (or is impersonating)
+      if (effectiveOrgId) {
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
           .select('id, name, slug')
-          .eq('id', organizationId)
+          .eq('id', effectiveOrgId)
           .maybeSingle();
 
         if (orgError) throw orgError;
@@ -215,25 +223,34 @@ const Profile = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Nome da empresa</Label>
-                    <Input value={organization.name} disabled className="bg-muted" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Identificador</Label>
-                    <Input value={organization.slug} disabled className="bg-muted" />
-                  </div>
+            <CardContent className="space-y-4">
+              {impersonatedOrgName && (
+                <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-md">
+                  <Eye className="h-4 w-4 text-warning" />
+                  <span className="text-sm text-warning">
+                    Visualizando como: {impersonatedOrgName}
+                  </span>
                 </div>
-                
-                {userRole && (
-                  <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Seu cargo:</span>
-                    <span className="text-sm font-medium">{getRoleLabel(userRole)}</span>
-                  </div>
-                )}
+              )}
+              
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nome da empresa</Label>
+                  <Input value={organization.name} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Identificador</Label>
+                  <Input value={organization.slug} disabled className="bg-muted" />
+                </div>
+              </div>
+              
+              {userRole && !isMasterAdmin && (
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Seu cargo:</span>
+                  <span className="text-sm font-medium">{getRoleLabel(userRole)}</span>
+                </div>
+              )}
               </CardContent>
             </Card>
           )}
