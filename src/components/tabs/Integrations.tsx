@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Mail, Plug, CheckCircle2, AlertCircle, Info, X, Plus, Users } from 'lucide-react';
+import { Loader2, Mail, Plug, CheckCircle2, AlertCircle, Info, X, Plus, Users, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Integrations() {
@@ -23,6 +23,7 @@ export function Integrations() {
 
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [newEmail, setNewEmail] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
 
   const isValidEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toLowerCase().trim());
@@ -145,12 +146,25 @@ export function Integrations() {
       {/* IMAP Configuration */}
       <Card className="rounded-none border-border">
         <CardHeader className="pb-4">
-          <div className="flex items-center gap-3">
-            <Mail className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <CardTitle className="text-base font-medium">Configuração de E-mail (IMAP)</CardTitle>
-              <CardDescription>Credenciais para acesso à caixa de entrada</CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <CardTitle className="text-base font-medium">Configuração de E-mail (IMAP)</CardTitle>
+                <CardDescription>Credenciais para acesso à caixa de entrada</CardDescription>
+              </div>
             </div>
+            {!isEditing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                className="h-8 w-8 p-0"
+                title="Editar configurações"
+              >
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -167,6 +181,7 @@ export function Integrations() {
                 onChange={(e) => handleInputChange('imap_host', e.target.value)}
                 placeholder="imap.hostgator.com.br"
                 className="rounded-none"
+                disabled={!isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -180,6 +195,7 @@ export function Integrations() {
                 onChange={(e) => handleInputChange('imap_port', parseInt(e.target.value) || 993)}
                 placeholder="993"
                 className="rounded-none"
+                disabled={!isEditing}
               />
             </div>
           </div>
@@ -196,6 +212,7 @@ export function Integrations() {
               onChange={(e) => handleInputChange('imap_user', e.target.value)}
               placeholder="ia@suaempresa.com.br"
               className="rounded-none"
+              disabled={!isEditing}
             />
           </div>
 
@@ -211,47 +228,70 @@ export function Integrations() {
               onChange={(e) => handleInputChange('imap_password', e.target.value)}
               placeholder="••••••••••••"
               className="rounded-none"
+              disabled={!isEditing}
             />
           </div>
 
-          <Separator />
+          {isEditing && (
+            <>
+              <Separator />
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={handleTestConnection}
-                disabled={testing || !formData.imap_user || !formData.imap_password}
-                className="rounded-none gap-2"
-              >
-                {testing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : connectionStatus === 'success' ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                ) : connectionStatus === 'error' ? (
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                ) : (
-                  <Plug className="h-4 w-4" />
-                )}
-                Testar Conexão
-              </Button>
-              {connectionStatus === 'success' && (
-                <span className="text-sm text-green-600">Conexão OK</span>
-              )}
-              {connectionStatus === 'error' && (
-                <span className="text-sm text-destructive">Falha na conexão</span>
-              )}
-            </div>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="rounded-none gap-2"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Salvar Configurações
-            </Button>
-          </div>
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleTestConnection}
+                    disabled={testing || !formData.imap_user || !formData.imap_password}
+                    className="rounded-none gap-2"
+                  >
+                    {testing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : connectionStatus === 'success' ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : connectionStatus === 'error' ? (
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    ) : (
+                      <Plug className="h-4 w-4" />
+                    )}
+                    Testar Conexão
+                  </Button>
+                  {connectionStatus === 'success' && (
+                    <span className="text-sm text-green-600">Conexão OK</span>
+                  )}
+                  {connectionStatus === 'error' && (
+                    <span className="text-sm text-destructive">Falha na conexão</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setConnectionStatus('idle');
+                      if (settings) {
+                        setFormData(settings);
+                      }
+                    }}
+                    className="rounded-none"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      await handleSave();
+                      setIsEditing(false);
+                    }}
+                    disabled={saving}
+                    className="rounded-none gap-2"
+                  >
+                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Salvar
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
