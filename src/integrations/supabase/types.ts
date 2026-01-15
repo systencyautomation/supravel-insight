@@ -72,6 +72,7 @@ export type Database = {
           expires_at: string
           id: string
           invitation_id: string | null
+          member_invitation_id: string | null
           used: boolean
         }
         Insert: {
@@ -81,6 +82,7 @@ export type Database = {
           expires_at?: string
           id?: string
           invitation_id?: string | null
+          member_invitation_id?: string | null
           used?: boolean
         }
         Update: {
@@ -90,6 +92,7 @@ export type Database = {
           expires_at?: string
           id?: string
           invitation_id?: string | null
+          member_invitation_id?: string | null
           used?: boolean
         }
         Relationships: [
@@ -98,6 +101,13 @@ export type Database = {
             columns: ["invitation_id"]
             isOneToOne: false
             referencedRelation: "invitations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_verification_codes_member_invitation_id_fkey"
+            columns: ["member_invitation_id"]
+            isOneToOne: false
+            referencedRelation: "member_invitations"
             referencedColumns: ["id"]
           },
         ]

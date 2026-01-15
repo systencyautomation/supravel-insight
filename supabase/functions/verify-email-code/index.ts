@@ -10,6 +10,7 @@ interface VerifyCodeRequest {
   email: string;
   code: string;
   invitation_id: string;
+  invitation_type?: 'organization' | 'member';
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -19,7 +20,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, code, invitation_id }: VerifyCodeRequest = await req.json();
+    const { email, code, invitation_id, invitation_type = 'organization' }: VerifyCodeRequest = await req.json();
 
     if (!email || !code || !invitation_id) {
       return new Response(
@@ -28,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Verifying code for ${email}, invitation ${invitation_id}`);
+    console.log(`Verifying code for ${email}, ${invitation_type} invitation ${invitation_id}`);
 
     // Create Supabase client with service role
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -37,14 +38,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Find valid code
     const now = new Date().toISOString();
-    const { data: verificationCode, error: fetchError } = await supabase
+    let query = supabase
       .from("email_verification_codes")
       .select("*")
       .eq("email", email)
       .eq("code", code)
-      .eq("invitation_id", invitation_id)
       .eq("used", false)
-      .gte("expires_at", now)
+      .gte("expires_at", now);
+    
+    // Filter by correct invitation column based on type
+    if (invitation_type === 'member') {
+      query = query.eq("member_invitation_id", invitation_id);
+    } else {
+      query = query.eq("invitation_id", invitation_id);
+    }
+    
+    const { data: verificationCode, error: fetchError } = await query
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
