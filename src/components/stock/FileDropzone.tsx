@@ -51,9 +51,7 @@ export function FileDropzone({
     setSelectedFile(null);
   }, []);
 
-  if (selectedFile) {
-    const isPdf = selectedFile.name.toLowerCase().endsWith('.pdf');
-    
+  if (selectedFile && !isPdfProcessing) {
     return (
       <div className={cn(
         "border-2 border-dashed border-primary/50 rounded-lg p-6 bg-primary/5",
@@ -66,23 +64,15 @@ export function FileDropzone({
               <p className="font-medium text-foreground">{selectedFile.name}</p>
               <p className="text-sm text-muted-foreground">
                 {(selectedFile.size / 1024).toFixed(1)} KB
-                {isPdf && ' • PDF'}
               </p>
-              {isPdf && isPdfProcessing && (
-                <p className="text-xs text-primary mt-1 animate-pulse">
-                  🤖 Processando PDF com IA...
-                </p>
-              )}
             </div>
           </div>
-          {!isPdfProcessing && (
-            <button 
-              onClick={handleClear}
-              className="p-1 hover:bg-muted rounded"
-            >
-              <X className="h-5 w-5 text-muted-foreground" />
-            </button>
-          )}
+          <button 
+            onClick={handleClear}
+            className="p-1 hover:bg-muted rounded"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
         </div>
       </div>
     );
