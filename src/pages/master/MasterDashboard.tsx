@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Building2, 
   Plus, 
-  LogOut, 
   Eye, 
   Mail, 
   User, 
@@ -458,9 +457,6 @@ export default function MasterDashboard() {
                   Sair de {impersonatedOrgName}
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={signOut}>
-                <LogOut className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </div>
