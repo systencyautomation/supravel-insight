@@ -9,8 +9,7 @@ import { InternalSellerCommissions } from '@/components/tabs/InternalSellerCommi
 import { RepresentativeCommissions } from '@/components/tabs/RepresentativeCommissions';
 import { StockManagement } from '@/components/tabs/StockManagement';
 import { CashFlow } from '@/components/tabs/CashFlow';
-import { Integrations } from '@/components/tabs/Integrations';
-import { Building2, Users, Briefcase, Package, Wallet, Loader2, Settings, ArrowLeft, Plug } from 'lucide-react';
+import { Building2, Users, Briefcase, Package, Wallet, Loader2, Settings, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -101,7 +100,7 @@ const Index = () => {
       
       <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 h-auto p-0 bg-transparent gap-1">
+          <TabsList className="grid w-full grid-cols-5 h-auto p-0 bg-transparent gap-1">
             <TabsTrigger 
               value="empresa" 
               className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
@@ -137,13 +136,6 @@ const Index = () => {
               <Wallet className="h-4 w-4" />
               <span className="hidden sm:inline">Fluxo</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="integracoes" 
-              className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
-            >
-              <Plug className="h-4 w-4" />
-              <span className="hidden sm:inline">Integrações</span>
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="empresa" className="mt-6">
@@ -164,10 +156,6 @@ const Index = () => {
 
           <TabsContent value="fluxo" className="mt-6">
             <CashFlow installments={installments} loading={dataLoading} />
-          </TabsContent>
-
-          <TabsContent value="integracoes" className="mt-6">
-            <Integrations />
           </TabsContent>
         </Tabs>
       </main>

@@ -11,6 +11,7 @@ import Onboarding from "./pages/onboarding/Onboarding";
 import ProfileSettings from "./pages/settings/ProfileSettings";
 import OrganizationSettings from "./pages/settings/OrganizationSettings";
 import TeamSettings from "./pages/settings/TeamSettings";
+import IntegrationsSettings from "./pages/settings/IntegrationsSettings";
 import JoinOrganization from "./pages/JoinOrganization";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/settings/profile" element={<ProfileSettings />} />
             <Route path="/settings/organization" element={<OrganizationSettings />} />
             <Route path="/settings/team" element={<TeamSettings />} />
+            <Route path="/settings/integrations" element={<IntegrationsSettings />} />
             <Route path="/profile" element={<Navigate to="/settings/profile" replace />} />
             <Route path="/join" element={<JoinOrganization />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

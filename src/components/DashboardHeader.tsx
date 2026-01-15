@@ -1,4 +1,4 @@
-import { Moon, Sun, Sparkles, Settings, User, Building2, Users, LogOut } from 'lucide-react';
+import { Moon, Sun, Sparkles, Settings, User, Building2, Users, LogOut, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -78,6 +78,10 @@ export function DashboardHeader() {
               <DropdownMenuItem onClick={() => navigate('/settings/team')} className="cursor-pointer">
                 <Users className="mr-2 h-4 w-4" />
                 Equipe
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings/integrations')} className="cursor-pointer">
+                <Plug className="mr-2 h-4 w-4" />
+                Integrações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
