@@ -46,7 +46,6 @@ const JoinOrganization = () => {
   const [otpCode, setOtpCode] = useState('');
   const [sendingCode, setSendingCode] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -177,60 +176,52 @@ const JoinOrganization = () => {
 
     setVerifying(true);
     try {
-      // Verify OTP code
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-email-code', {
+      // Call the complete-member-registration edge function
+      const { data, error } = await supabase.functions.invoke('complete-member-registration', {
         body: {
           email: invitation.email,
-          code: otpCode,
+          password,
+          fullName,
           invitation_id: invitation.id,
+          code: otpCode,
         },
       });
 
-      if (verifyError) throw verifyError;
-      if (!verifyData?.valid) {
+      if (error) throw error;
+      
+      if (data?.error) {
         toast({
-          title: 'Código inválido',
-          description: 'O código informado está incorreto ou expirou.',
+          title: 'Erro',
+          description: data.error,
           variant: 'destructive',
         });
         return;
       }
 
-      // Create user account
-      setSubmitting(true);
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // Login the user automatically
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: invitation.email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: { full_name: fullName },
-        },
       });
 
-      if (signUpError) throw signUpError;
-      if (!signUpData.user) throw new Error('Erro ao criar usuário');
-
-      // Assign role to user
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: signUpData.user.id,
-          role: invitation.role as any,
-          organization_id: invitation.organization_id,
+      if (signInError) {
+        console.error('Error signing in:', signInError);
+        // Still show success but redirect to login
+        toast({
+          title: 'Conta criada!',
+          description: 'Sua conta foi criada. Faça login para continuar.',
         });
-
-      if (roleError) {
-        console.error('Error assigning role:', roleError);
-        // Continue anyway, admin can fix later
+        setStep('success');
+        return;
       }
 
-      // Update invitation status
-      await supabase
-        .from('member_invitations')
-        .update({ status: 'aceito' })
-        .eq('id', invitation.id);
+      toast({
+        title: 'Bem-vindo!',
+        description: 'Sua conta foi criada e você já está logado.',
+      });
 
-      setStep('success');
+      // Redirect to dashboard
+      navigate('/');
     } catch (error: any) {
       console.error('Error completing registration:', error);
       toast({
@@ -240,7 +231,6 @@ const JoinOrganization = () => {
       });
     } finally {
       setVerifying(false);
-      setSubmitting(false);
     }
   };
 
@@ -331,8 +321,8 @@ const JoinOrganization = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button onClick={() => navigate('/')} className="w-full">
-              Acessar Dashboard
+            <Button onClick={() => navigate('/auth')} className="w-full">
+              Fazer Login
             </Button>
           </CardContent>
         </Card>
@@ -431,7 +421,7 @@ const JoinOrganization = () => {
                   maxLength={6}
                   value={otpCode}
                   onChange={setOtpCode}
-                  disabled={verifying || submitting}
+                  disabled={verifying}
                 >
                   <InputOTPGroup>
                     <InputOTPSlot index={0} />
@@ -446,11 +436,11 @@ const JoinOrganization = () => {
 
               <Button
                 onClick={handleVerifyCode}
-                disabled={verifying || submitting || otpCode.length !== 6}
+                disabled={verifying || otpCode.length !== 6}
                 className="w-full gap-2"
               >
-                {(verifying || submitting) && <Loader2 className="h-4 w-4 animate-spin" />}
-                {submitting ? 'Criando conta...' : 'Verificar e Criar Conta'}
+                {verifying && <Loader2 className="h-4 w-4 animate-spin" />}
+                {verifying ? 'Criando conta...' : 'Verificar e Criar Conta'}
               </Button>
 
               <div className="text-center">
