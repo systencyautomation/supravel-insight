@@ -6,12 +6,14 @@ interface FileDropzoneProps {
   onFileSelect: (file: File) => void;
   accept?: string;
   className?: string;
+  isPdfProcessing?: boolean;
 }
 
 export function FileDropzone({ 
   onFileSelect, 
-  accept = '.xlsx,.xls,.csv',
-  className 
+  accept = '.xlsx,.xls,.csv,.pdf',
+  className,
+  isPdfProcessing = false,
 }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -50,6 +52,8 @@ export function FileDropzone({
   }, []);
 
   if (selectedFile) {
+    const isPdf = selectedFile.name.toLowerCase().endsWith('.pdf');
+    
     return (
       <div className={cn(
         "border-2 border-dashed border-primary/50 rounded-lg p-6 bg-primary/5",
@@ -62,15 +66,23 @@ export function FileDropzone({
               <p className="font-medium text-foreground">{selectedFile.name}</p>
               <p className="text-sm text-muted-foreground">
                 {(selectedFile.size / 1024).toFixed(1)} KB
+                {isPdf && ' • PDF'}
               </p>
+              {isPdf && isPdfProcessing && (
+                <p className="text-xs text-primary mt-1 animate-pulse">
+                  🤖 Processando PDF com IA...
+                </p>
+              )}
             </div>
           </div>
-          <button 
-            onClick={handleClear}
-            className="p-1 hover:bg-muted rounded"
-          >
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
+          {!isPdfProcessing && (
+            <button 
+              onClick={handleClear}
+              className="p-1 hover:bg-muted rounded"
+            >
+              <X className="h-5 w-5 text-muted-foreground" />
+            </button>
+          )}
         </div>
       </div>
     );
@@ -105,7 +117,7 @@ export function FileDropzone({
           ou clique para selecionar
         </p>
         <p className="text-xs text-muted-foreground">
-          Formatos aceitos: .xlsx, .xls, .csv
+          Formatos aceitos: .xlsx, .xls, .csv, .pdf
         </p>
       </label>
     </div>

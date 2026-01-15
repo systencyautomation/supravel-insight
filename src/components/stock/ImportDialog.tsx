@@ -25,6 +25,7 @@ type Step = 'upload' | 'mapping' | 'result';
 export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProps) {
   const [step, setStep] = useState<Step>('upload');
   const [result, setResult] = useState<ImportResultType | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   const {
     parseFile,
@@ -34,9 +35,11 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     mapping,
     setMapping,
     isImporting,
+    isParsing,
   } = useInventoryImport();
 
   const handleFileSelect = async (file: File) => {
+    setSelectedFile(file);
     try {
       await parseFile(file);
       setStep('mapping');
@@ -44,6 +47,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
       toast.error('Erro ao ler arquivo', {
         description: error instanceof Error ? error.message : 'Formato inválido',
       });
+      setSelectedFile(null);
     }
   };
 
@@ -70,6 +74,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
   const handleClose = () => {
     setStep('upload');
     setResult(null);
+    setSelectedFile(null);
     reset();
     onOpenChange(false);
   };
@@ -77,6 +82,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
   const handleBack = () => {
     if (step === 'mapping') {
       setStep('upload');
+      setSelectedFile(null);
       reset();
     }
   };
@@ -130,7 +136,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
             {step === 'result' && 'Resultado da Importação'}
           </DialogTitle>
           <DialogDescription>
-            {step === 'upload' && 'Faça upload de um arquivo Excel ou CSV com os dados do estoque'}
+            {step === 'upload' && 'Faça upload de um arquivo Excel, CSV ou PDF com os dados do estoque'}
             {step === 'mapping' && 'Associe as colunas da planilha aos campos do sistema'}
             {step === 'result' && 'Veja o resultado da importação'}
           </DialogDescription>
@@ -139,24 +145,40 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
         <div className="py-4">
           {step === 'upload' && (
             <div className="space-y-4">
-              <FileDropzone onFileSelect={handleFileSelect} />
+              <FileDropzone 
+                onFileSelect={handleFileSelect} 
+                isPdfProcessing={isParsing}
+              />
               
-              <div className="bg-muted/50 rounded-lg p-4">
-                <h4 className="text-sm font-medium mb-2">💡 Dica</h4>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Se sua Tabela FIPE está em PDF, converta para Excel primeiro usando ferramentas 
-                  como Adobe Acrobat, SmallPDF ou ILovePDF.
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleDownloadTemplate}
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Baixar Template CSV
-                </Button>
-              </div>
+              {isParsing && (
+                <div className="bg-primary/10 rounded-lg p-4 flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Processando PDF com IA...</p>
+                    <p className="text-xs text-muted-foreground">
+                      Isso pode levar alguns segundos
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {!isParsing && (
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <h4 className="text-sm font-medium mb-2">💡 Dica</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Agora você pode importar diretamente arquivos PDF! A IA vai extrair os dados automaticamente.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleDownloadTemplate}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Baixar Template CSV
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
