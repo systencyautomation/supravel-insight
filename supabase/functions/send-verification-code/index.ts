@@ -12,6 +12,7 @@ const corsHeaders = {
 interface SendVerificationRequest {
   email: string;
   invitation_id: string;
+  invitation_type?: 'organization' | 'member'; // 'organization' = onboarding, 'member' = member invitation
 }
 
 function generateCode(): string {
@@ -25,7 +26,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, invitation_id }: SendVerificationRequest = await req.json();
+    const { email, invitation_id, invitation_type = 'organization' }: SendVerificationRequest = await req.json();
 
     if (!email || !invitation_id) {
       return new Response(
@@ -34,7 +35,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Sending verification code to ${email} for invitation ${invitation_id}`);
+    console.log(`Sending verification code to ${email} for ${invitation_type} invitation ${invitation_id}`);
 
     // Create Supabase client with service role
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -62,22 +63,35 @@ const handler = async (req: Request): Promise<Response> => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
     // Invalidate previous unused codes for this email/invitation
-    await supabase
+    const invalidateQuery = supabase
       .from("email_verification_codes")
       .update({ used: true })
       .eq("email", email)
-      .eq("invitation_id", invitation_id)
       .eq("used", false);
+    
+    if (invitation_type === 'member') {
+      await invalidateQuery.eq("member_invitation_id", invitation_id);
+    } else {
+      await invalidateQuery.eq("invitation_id", invitation_id);
+    }
+
+    // Build insert data based on invitation type
+    const insertData: Record<string, unknown> = {
+      email,
+      code,
+      expires_at: expiresAt,
+    };
+    
+    if (invitation_type === 'member') {
+      insertData.member_invitation_id = invitation_id;
+    } else {
+      insertData.invitation_id = invitation_id;
+    }
 
     // Save new code
     const { error: insertError } = await supabase
       .from("email_verification_codes")
-      .insert({
-        email,
-        code,
-        invitation_id,
-        expires_at: expiresAt,
-      });
+      .insert(insertData);
 
     if (insertError) {
       console.error("Error saving verification code:", insertError);

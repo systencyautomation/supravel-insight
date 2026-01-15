@@ -48,7 +48,7 @@ serve(async (req: Request) => {
       .select('*')
       .eq('email', email)
       .eq('code', code)
-      .eq('invitation_id', invitation_id)
+      .eq('member_invitation_id', invitation_id) // Use member_invitation_id for member invitations
       .eq('used', false)
       .gt('expires_at', new Date().toISOString())
       .single();

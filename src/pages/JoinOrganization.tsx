@@ -139,6 +139,7 @@ const JoinOrganization = () => {
         body: {
           email: invitation.email,
           invitation_id: invitation.id,
+          invitation_type: 'member',
         },
       });
 
@@ -243,6 +244,7 @@ const JoinOrganization = () => {
         body: {
           email: invitation.email,
           invitation_id: invitation.id,
+          invitation_type: 'member',
         },
       });
 
