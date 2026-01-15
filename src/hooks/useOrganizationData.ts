@@ -43,14 +43,14 @@ export interface Installment {
 }
 
 export function useOrganizationData() {
-  const { organizationId, user } = useAuth();
+  const { effectiveOrgId, user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !organizationId) {
+    if (!user || !effectiveOrgId) {
       setLoading(false);
       return;
     }
@@ -62,17 +62,17 @@ export function useOrganizationData() {
         supabase
           .from('sales')
           .select('*')
-          .eq('organization_id', organizationId)
+          .eq('organization_id', effectiveOrgId)
           .order('created_at', { ascending: false }),
         supabase
           .from('inventory')
           .select('*')
-          .eq('organization_id', organizationId)
+          .eq('organization_id', effectiveOrgId)
           .order('model_name'),
         supabase
           .from('installments')
           .select('*')
-          .eq('organization_id', organizationId)
+          .eq('organization_id', effectiveOrgId)
           .order('due_date')
       ]);
 
@@ -84,15 +84,15 @@ export function useOrganizationData() {
     };
 
     fetchData();
-  }, [user, organizationId]);
+  }, [user, effectiveOrgId]);
 
   const refetch = async () => {
-    if (!organizationId) return;
+    if (!effectiveOrgId) return;
 
     const [salesResult, inventoryResult, installmentsResult] = await Promise.all([
-      supabase.from('sales').select('*').eq('organization_id', organizationId),
-      supabase.from('inventory').select('*').eq('organization_id', organizationId),
-      supabase.from('installments').select('*').eq('organization_id', organizationId)
+      supabase.from('sales').select('*').eq('organization_id', effectiveOrgId),
+      supabase.from('inventory').select('*').eq('organization_id', effectiveOrgId),
+      supabase.from('installments').select('*').eq('organization_id', effectiveOrgId)
     ]);
 
     if (salesResult.data) setSales(salesResult.data);

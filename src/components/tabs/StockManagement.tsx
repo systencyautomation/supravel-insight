@@ -12,25 +12,20 @@ import { useAuth } from '@/contexts/AuthContext';
 export function StockManagement() {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { effectiveOrgId } = useAuth();
 
   useEffect(() => {
     const fetchInventory = async () => {
-      if (!user) return;
+      if (!effectiveOrgId) {
+        setLoading(false);
+        return;
+      }
       
       try {
-        const { data: userRoles } = await supabase
-          .from('user_roles')
-          .select('organization_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!userRoles?.organization_id) return;
-
         const { data, error } = await supabase
           .from('inventory')
           .select('*')
-          .eq('organization_id', userRoles.organization_id);
+          .eq('organization_id', effectiveOrgId);
 
         if (error) throw error;
 
@@ -52,7 +47,7 @@ export function StockManagement() {
     };
 
     fetchInventory();
-  }, [user]);
+  }, [effectiveOrgId]);
 
   const totalEstoque = stock.reduce((acc, item) => acc + (item.valorTabela * item.quantidade), 0);
   const totalItens = stock.reduce((acc, item) => acc + item.quantidade, 0);
