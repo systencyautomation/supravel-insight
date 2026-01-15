@@ -67,15 +67,15 @@ export function DashboardHeader() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl">
-              <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => navigate('/settings/profile')} className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 Meu Perfil
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/profile#org-section')} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => navigate('/settings/organization')} className="cursor-pointer">
                 <Building2 className="mr-2 h-4 w-4" />
                 Empresa
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/profile#team-section')} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => navigate('/settings/team')} className="cursor-pointer">
                 <Users className="mr-2 h-4 w-4" />
                 Equipe
               </DropdownMenuItem>
