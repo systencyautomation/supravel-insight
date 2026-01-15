@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Bell, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -14,6 +14,7 @@ import { DashboardHeader } from '@/components/DashboardHeader';
 
 export default function SalesApproval() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { user, effectiveOrgId, isSuperAdmin, userRoles } = useAuth();
   
@@ -63,6 +64,17 @@ export default function SalesApproval() {
     loadInventory();
   }, [effectiveOrgId, toast]);
 
+  // Navigate to specific sale from URL param
+  useEffect(() => {
+    const saleId = searchParams.get('saleId');
+    if (saleId && pendingSales.length > 0) {
+      const index = pendingSales.findIndex(s => s.id === saleId);
+      if (index >= 0) {
+        setCurrentIndex(index);
+      }
+    }
+  }, [searchParams, pendingSales]);
+
   // Auto-match inventory item by product code
   useEffect(() => {
     if (currentSale?.produto_codigo && inventory.length > 0) {
@@ -102,6 +114,7 @@ export default function SalesApproval() {
         over_price_liquido: calculationData.overPriceLiquido,
         commission_calculated: calculationData.comissaoTotal,
         observacoes: calculationData.observacoes,
+        valor_entrada: calculationData.valorEntrada,
         aprovado_por: user.id,
         aprovado_em: new Date().toISOString(),
       })

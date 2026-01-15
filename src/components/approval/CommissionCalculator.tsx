@@ -28,6 +28,9 @@ export interface CalculationData {
   overPriceLiquido: number;
   comissaoTotal: number;
   percentualFinal: number;
+  valorEntrada: number;
+  qtdParcelas: number;
+  valorParcela: number;
 }
 
 export function CommissionCalculator({ 
@@ -43,6 +46,8 @@ export function CommissionCalculator({
   const [observacoes, setObservacoes] = useState('');
   const [editingOverPrice, setEditingOverPrice] = useState(false);
   const [manualOverPrice, setManualOverPrice] = useState<number | null>(null);
+  const [valorEntrada, setValorEntrada] = useState(0);
+  const [qtdParcelas, setQtdParcelas] = useState(0);
 
   // Update from inventory item
   useEffect(() => {
@@ -60,6 +65,16 @@ export function CommissionCalculator({
       setObservacoes(sale.observacoes || '');
       if (sale.table_value) setValorTabela(sale.table_value);
       if (sale.percentual_comissao) setPercentualComissao(sale.percentual_comissao);
+      setValorEntrada(sale.valor_entrada || 0);
+      
+      // Parse payment_method for parcelas (format: "boleto_Nx" or similar)
+      const paymentMethod = sale.payment_method || '';
+      const parcelasMatch = paymentMethod.match(/(\d+)/);
+      if (parcelasMatch) {
+        setQtdParcelas(parseInt(parcelasMatch[1], 10));
+      } else {
+        setQtdParcelas(0);
+      }
     }
   }, [sale]);
 
@@ -122,6 +137,13 @@ export function CommissionCalculator({
 
   const activeCalculation = finalCalculation || calculation;
 
+  // Calculate valor da parcela
+  const valorParcela = useMemo(() => {
+    if (qtdParcelas <= 0) return 0;
+    const valorRestante = (sale?.total_value || 0) - valorEntrada;
+    return valorRestante / qtdParcelas;
+  }, [sale?.total_value, valorEntrada, qtdParcelas]);
+
   // Notify parent of changes
   useEffect(() => {
     if (activeCalculation) {
@@ -135,9 +157,12 @@ export function CommissionCalculator({
         overPriceLiquido: activeCalculation.overLiquido,
         comissaoTotal: activeCalculation.comissaoTotal,
         percentualFinal: activeCalculation.percentualFinal,
+        valorEntrada,
+        qtdParcelas,
+        valorParcela,
       });
     }
-  }, [activeCalculation, valorTabela, percentualComissao, icmsDestino, tipoPagamento, observacoes]);
+  }, [activeCalculation, valorTabela, percentualComissao, icmsDestino, tipoPagamento, observacoes, valorEntrada, qtdParcelas, valorParcela]);
 
   if (!sale) {
     return (
@@ -252,6 +277,45 @@ export function CommissionCalculator({
                   <Label htmlFor="parcelado_cartao">Parcelado Cartão (3.5% a.m.)</Label>
                 </div>
               </RadioGroup>
+            </div>
+
+            <Separator />
+
+            {/* Dados de Parcelamento */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Dados de Parcelamento
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="valorEntrada">Valor da Entrada</Label>
+                  <Input
+                    id="valorEntrada"
+                    type="number"
+                    value={valorEntrada}
+                    onChange={(e) => setValorEntrada(parseFloat(e.target.value) || 0)}
+                    className="font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="qtdParcelas">Qtd. Parcelas</Label>
+                  <Input
+                    id="qtdParcelas"
+                    type="number"
+                    min="0"
+                    value={qtdParcelas}
+                    onChange={(e) => setQtdParcelas(parseInt(e.target.value, 10) || 0)}
+                  />
+                </div>
+              </div>
+              {qtdParcelas > 0 && (
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="flex justify-between items-center font-mono text-sm">
+                    <span className="text-muted-foreground">Valor de cada parcela:</span>
+                    <span className="font-semibold text-primary">{formatCurrency(valorParcela)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Separator />
