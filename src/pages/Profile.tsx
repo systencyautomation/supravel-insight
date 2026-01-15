@@ -255,7 +255,10 @@ const Profile = () => {
                     organizationName={organization.name}
                   />
                 </div>
-                <TeamMembersList organizationId={organization.id} />
+                <TeamMembersList 
+                  organizationId={organization.id} 
+                  organizationName={organization.name}
+                />
               </div>
             </>
           )}

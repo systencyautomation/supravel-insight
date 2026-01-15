@@ -235,6 +235,7 @@ export type Database = {
           guest_name: string | null
           id: string
           invited_by: string
+          last_sent_at: string | null
           organization_id: string
           role: Database["public"]["Enums"]["app_role"]
           status: string
@@ -247,6 +248,7 @@ export type Database = {
           guest_name?: string | null
           id?: string
           invited_by: string
+          last_sent_at?: string | null
           organization_id: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
@@ -259,6 +261,7 @@ export type Database = {
           guest_name?: string | null
           id?: string
           invited_by?: string
+          last_sent_at?: string | null
           organization_id?: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
