@@ -1,17 +1,137 @@
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export interface ParsedData {
   headers: string[];
   rows: Record<string, any>[];
 }
 
+// Cell style information
+export interface CellStyle {
+  color?: string;      // Text color in hex (#FF0000)
+  bgColor?: string;    // Background color in hex
+  bold?: boolean;
+  italic?: boolean;
+}
+
+// Cell with value and optional style
+export interface CellData {
+  value: any;
+  style?: CellStyle;
+}
+
 // Grid-based parsing for exact Excel representation
 export interface SheetGrid {
-  data: any[][];  // Raw 2D matrix [row][col]
+  data: CellData[][];  // 2D matrix with styled cells [row][col]
   colCount: number;
   rowCount: number;
 }
 
+// Helper to extract color from ExcelJS fill
+function extractFillColor(fill: ExcelJS.Fill | undefined): string | undefined {
+  if (!fill || fill.type !== 'pattern') return undefined;
+  const patternFill = fill as ExcelJS.FillPattern;
+  if (patternFill.fgColor?.argb) {
+    // ARGB format: first 2 chars are alpha, rest is RGB
+    return `#${patternFill.fgColor.argb.slice(2)}`;
+  }
+  return undefined;
+}
+
+// Helper to extract font color from ExcelJS
+function extractFontColor(font: Partial<ExcelJS.Font> | undefined): string | undefined {
+  if (!font?.color?.argb) return undefined;
+  // ARGB format: first 2 chars are alpha, rest is RGB
+  return `#${font.color.argb.slice(2)}`;
+}
+
+// Parse Excel with styles using ExcelJS
+export async function parseExcelWithStyles(file: File): Promise<SheetGrid> {
+  const buffer = await file.arrayBuffer();
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) {
+    throw new Error('Planilha vazia');
+  }
+  
+  const data: CellData[][] = [];
+  let maxColCount = 0;
+  
+  worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    const rowData: CellData[] = [];
+    
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      // Ensure we fill empty cells before this one
+      while (rowData.length < colNumber - 1) {
+        rowData.push({ value: null });
+      }
+      
+      // Extract cell value
+      let cellValue: any = cell.value;
+      
+      // Handle rich text
+      if (cellValue && typeof cellValue === 'object' && 'richText' in cellValue) {
+        cellValue = (cellValue as ExcelJS.CellRichTextValue).richText
+          .map(rt => rt.text)
+          .join('');
+      }
+      
+      // Handle formula results
+      if (cellValue && typeof cellValue === 'object' && 'result' in cellValue) {
+        cellValue = (cellValue as ExcelJS.CellFormulaValue).result;
+      }
+      
+      // Extract styles
+      const style: CellStyle = {};
+      
+      const fontColor = extractFontColor(cell.font);
+      if (fontColor && fontColor !== '#000000' && fontColor !== '#FFFFFF') {
+        style.color = fontColor;
+      }
+      
+      const bgColor = extractFillColor(cell.fill);
+      if (bgColor && bgColor !== '#FFFFFF' && bgColor !== '#000000') {
+        style.bgColor = bgColor;
+      }
+      
+      if (cell.font?.bold) {
+        style.bold = true;
+      }
+      
+      if (cell.font?.italic) {
+        style.italic = true;
+      }
+      
+      rowData.push({
+        value: cellValue,
+        style: Object.keys(style).length > 0 ? style : undefined
+      });
+    });
+    
+    // Fill remaining empty cells
+    maxColCount = Math.max(maxColCount, rowData.length);
+    data.push(rowData);
+  });
+  
+  // Normalize all rows to have the same column count
+  const normalizedData = data.map(row => {
+    const normalized = [...row];
+    while (normalized.length < maxColCount) {
+      normalized.push({ value: null });
+    }
+    return normalized;
+  });
+  
+  return {
+    data: normalizedData,
+    colCount: maxColCount,
+    rowCount: normalizedData.length,
+  };
+}
+
+// Legacy function for backward compatibility (without styles)
 export function parseExcelAsGrid(file: File): Promise<SheetGrid> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -40,11 +160,11 @@ export function parseExcelAsGrid(file: File): Promise<SheetGrid> {
         // Find max column count
         const colCount = jsonData.reduce((max, row) => Math.max(max, row.length), 0);
         
-        // Normalize all rows to have the same column count
-        const normalizedData = jsonData.map(row => {
-          const normalized = [...row];
+        // Normalize all rows to have the same column count and convert to CellData
+        const normalizedData: CellData[][] = jsonData.map(row => {
+          const normalized: CellData[] = row.map(cell => ({ value: cell }));
           while (normalized.length < colCount) {
-            normalized.push(null);
+            normalized.push({ value: null });
           }
           return normalized;
         });

@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { CellData, CellStyle } from '@/lib/excelParser';
 
 interface SpreadsheetViewerProps {
-  gridData: any[][];
+  gridData: CellData[][];
   colCount: number;
   rowCount: number;
   fileName?: string;
@@ -27,6 +28,22 @@ function getColumnLetter(index: number): string {
     num = Math.floor(num / 26) - 1;
   }
   return letter;
+}
+
+// Extract value from CellData (handles both new and legacy formats)
+function getCellValue(cell: CellData | any): any {
+  if (cell && typeof cell === 'object' && 'value' in cell) {
+    return cell.value;
+  }
+  return cell;
+}
+
+// Extract style from CellData
+function getCellStyle(cell: CellData | any): CellStyle | undefined {
+  if (cell && typeof cell === 'object' && 'style' in cell) {
+    return cell.style;
+  }
+  return undefined;
 }
 
 // Format cell value for display
@@ -61,10 +78,11 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
     
     gridData.forEach((row, rowIndex) => {
       row.forEach((cell, colIndex) => {
+        const value = getCellValue(cell);
         if (
-          cell !== null && 
-          cell !== undefined && 
-          String(cell).toLowerCase().includes(term)
+          value !== null && 
+          value !== undefined && 
+          String(value).toLowerCase().includes(term)
         ) {
           matches.push({ rowIndex, colIndex });
         }
@@ -273,20 +291,38 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
                       {row.map((cell, colIndex) => {
                         const cellIsMatch = isCellMatch(rowIndex, colIndex);
                         const cellIsCurrent = isCurrentMatch(rowIndex, colIndex);
-                        const cellValue = formatCellValue(cell);
+                        const rawValue = getCellValue(cell);
+                        const cellStyle = getCellStyle(cell);
+                        const cellValue = formatCellValue(rawValue);
                         const hasLongContent = cellValue.length > 30;
+                        
+                        // Build inline styles from Excel cell styles
+                        const inlineStyle: React.CSSProperties = {};
+                        if (cellStyle?.color) {
+                          inlineStyle.color = cellStyle.color;
+                        }
+                        if (cellStyle?.bgColor && !cellIsCurrent && !cellIsMatch) {
+                          inlineStyle.backgroundColor = cellStyle.bgColor;
+                        }
+                        if (cellStyle?.bold) {
+                          inlineStyle.fontWeight = 'bold';
+                        }
+                        if (cellStyle?.italic) {
+                          inlineStyle.fontStyle = 'italic';
+                        }
                         
                         const cellContent = (
                           <td 
                             key={colIndex}
                             id={`cell-${rowIndex}-${colIndex}`}
+                            style={inlineStyle}
                             className={`
                               border-r border-b border-border min-w-[100px] h-7 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] cursor-pointer transition-colors
                               ${cellIsCurrent ? 'bg-yellow-300 dark:bg-yellow-600 ring-2 ring-primary ring-inset font-medium' : ''}
                               ${cellIsMatch && !cellIsCurrent ? 'bg-yellow-200 dark:bg-yellow-700/50' : ''}
-                              ${!cellIsMatch && !cellIsCurrent ? 'hover:bg-muted/50' : ''}
+                              ${!cellIsMatch && !cellIsCurrent && !cellStyle?.bgColor ? 'hover:bg-muted/50' : ''}
                             `}
-                            onClick={() => hasLongContent && setSelectedCell({ row: rowIndex, col: colIndex, value: cell })}
+                            onClick={() => hasLongContent && setSelectedCell({ row: rowIndex, col: colIndex, value: rawValue })}
                             title={hasLongContent ? "Clique para ver conteúdo completo" : cellValue}
                           >
                             {cellValue}
@@ -305,7 +341,10 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
                                   <div className="text-xs text-muted-foreground">
                                     Célula {getColumnLetter(colIndex)}{rowIndex + 1}
                                   </div>
-                                  <div className="text-sm whitespace-pre-wrap break-words">
+                                  <div 
+                                    className="text-sm whitespace-pre-wrap break-words"
+                                    style={inlineStyle}
+                                  >
                                     {cellValue}
                                   </div>
                                 </div>
