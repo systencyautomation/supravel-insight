@@ -75,7 +75,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
   const tableRef = useRef<HTMLTableElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLElement | null>(null);
   
   // Zoom state
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -88,6 +88,14 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
   const [didDrag, setDidDrag] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [scrollStart, setScrollStart] = useState({ x: 0, y: 0 });
+  
+  // Get the real ScrollArea viewport from Radix
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+      viewportRef.current = viewport;
+    }
+  }, []);
   
   // Find all matching cells
   const matchingCells = useMemo(() => {
@@ -196,11 +204,11 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
     return () => container.removeEventListener('wheel', handleWheel);
   }, [zoomIn, zoomOut]);
 
-  // Pan/Drag handlers
+  // Pan/Drag handlers - using the real Radix ScrollArea viewport
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Right mouse button = 2
     if (e.button === 2) {
-      const viewport = scrollViewportRef.current;
+      const viewport = viewportRef.current;
       if (!viewport) return;
       
       setIsDragging(true);
@@ -213,7 +221,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging) return;
     
-    const viewport = scrollViewportRef.current;
+    const viewport = viewportRef.current;
     if (!viewport) return;
     
     const deltaX = e.clientX - dragStart.x;
@@ -481,21 +489,20 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
       <div 
         className={`border border-border rounded-lg overflow-hidden bg-background ${isFullscreen ? 'flex-1' : ''}`}
         onContextMenu={handleContextMenu}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
       >
         <ScrollArea 
           className={isFullscreen ? 'h-full' : 'h-[600px]'} 
           ref={scrollAreaRef}
         >
           <div 
-            ref={scrollViewportRef}
             className={`min-w-max ${isDragging ? 'cursor-grabbing select-none' : ''}`}
             style={{ 
               transform: `scale(${zoomLevel / 100})`,
               transformOrigin: 'top left',
             }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
           >
             <table ref={tableRef} className="border-collapse w-full">
               {/* Column headers (A, B, C, ...) */}
