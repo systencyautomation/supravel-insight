@@ -1,47 +1,68 @@
 import { useState, useMemo } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search } from 'lucide-react';
 
 interface SpreadsheetViewerProps {
-  headers: string[];
-  rows: Record<string, any>[];
+  gridData: any[][];
+  colCount: number;
+  rowCount: number;
   fileName?: string;
-  uploadedAt?: string;
 }
 
-export function SpreadsheetViewer({ headers, rows, fileName, uploadedAt }: SpreadsheetViewerProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  const filteredRows = useMemo(() => {
-    if (!searchTerm.trim()) return rows;
-    
-    const term = searchTerm.toLowerCase();
-    return rows.filter(row => 
-      headers.some(header => {
-        const value = row[header];
-        return value !== null && value !== undefined && String(value).toLowerCase().includes(term);
-      })
-    );
-  }, [rows, headers, searchTerm]);
+// Generate Excel-style column letters (A, B, C, ... Z, AA, AB, etc.)
+function getColumnLetter(index: number): string {
+  let letter = '';
+  let num = index;
+  while (num >= 0) {
+    letter = String.fromCharCode((num % 26) + 65) + letter;
+    num = Math.floor(num / 26) - 1;
+  }
+  return letter;
+}
 
-  const formatCellValue = (value: any): string => {
-    if (value === null || value === undefined) return '-';
-    if (typeof value === 'number') {
-      // Check if it looks like currency (large number)
-      if (value >= 1000) {
-        return new Intl.NumberFormat('pt-BR', { 
-          style: 'decimal',
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2 
-        }).format(value);
-      }
-      return String(value);
+// Format cell value for display
+function formatCellValue(value: any): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') {
+    // Format large numbers with locale
+    if (Math.abs(value) >= 1000 || (value % 1 !== 0)) {
+      return new Intl.NumberFormat('pt-BR', { 
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2 
+      }).format(value);
     }
     return String(value);
-  };
+  }
+  return String(value);
+}
+
+export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: SpreadsheetViewerProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Search filter - highlight matching rows
+  const matchingRows = useMemo(() => {
+    if (!searchTerm.trim()) return new Set<number>();
+    
+    const term = searchTerm.toLowerCase();
+    const matches = new Set<number>();
+    
+    gridData.forEach((row, rowIndex) => {
+      if (row.some(cell => 
+        cell !== null && 
+        cell !== undefined && 
+        String(cell).toLowerCase().includes(term)
+      )) {
+        matches.add(rowIndex);
+      }
+    });
+    
+    return matches;
+  }, [gridData, searchTerm]);
+
+  const hasSearch = searchTerm.trim().length > 0;
+  const matchCount = matchingRows.size;
 
   return (
     <div className="space-y-4">
@@ -54,8 +75,13 @@ export function SpreadsheetViewer({ headers, rows, fileName, uploadedAt }: Sprea
             </Badge>
           )}
           <span className="text-xs text-muted-foreground">
-            {filteredRows.length} de {rows.length} linhas
+            {rowCount} linhas × {colCount} colunas
           </span>
+          {hasSearch && (
+            <span className="text-xs text-primary font-medium">
+              {matchCount} {matchCount === 1 ? 'linha encontrada' : 'linhas encontradas'}
+            </span>
+          )}
         </div>
         
         <div className="relative w-full sm:w-64">
@@ -69,56 +95,64 @@ export function SpreadsheetViewer({ headers, rows, fileName, uploadedAt }: Sprea
         </div>
       </div>
       
-      {/* Spreadsheet table */}
-      <div className="border border-border rounded-lg overflow-hidden">
-        <ScrollArea className="h-[500px]">
+      {/* Excel-style spreadsheet */}
+      <div className="border border-border rounded-lg overflow-hidden bg-background">
+        <ScrollArea className="h-[600px]">
           <div className="min-w-max">
-            <Table>
-              <TableHeader className="sticky top-0 bg-muted z-10">
-                <TableRow>
-                  <TableHead className="w-12 text-center text-xs font-medium text-muted-foreground border-r border-border">
-                    #
-                  </TableHead>
-                  {headers.map((header, index) => (
-                    <TableHead 
-                      key={index} 
-                      className="text-xs font-medium whitespace-nowrap border-r border-border last:border-r-0"
+            <table className="border-collapse w-full">
+              {/* Column headers (A, B, C, ...) */}
+              <thead className="sticky top-0 z-20">
+                <tr className="bg-muted">
+                  {/* Corner cell */}
+                  <th className="sticky left-0 z-30 bg-muted border-r border-b border-border w-12 min-w-[48px] h-8 text-center text-xs font-medium text-muted-foreground">
+                    
+                  </th>
+                  {/* Column letters */}
+                  {Array.from({ length: colCount }, (_, i) => (
+                    <th 
+                      key={i}
+                      className="border-r border-b border-border min-w-[100px] h-8 px-2 text-center text-xs font-medium text-muted-foreground"
                     >
-                      {header}
-                    </TableHead>
+                      {getColumnLetter(i)}
+                    </th>
                   ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRows.map((row, rowIndex) => (
-                  <TableRow key={rowIndex} className="hover:bg-muted/50">
-                    <TableCell className="text-center text-xs text-muted-foreground font-mono border-r border-border bg-muted/30">
-                      {rowIndex + 1}
-                    </TableCell>
-                    {headers.map((header, colIndex) => (
-                      <TableCell 
-                        key={colIndex} 
-                        className="text-xs whitespace-nowrap border-r border-border last:border-r-0"
-                      >
-                        {formatCellValue(row[header])}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-                {filteredRows.length === 0 && (
-                  <TableRow>
-                    <TableCell 
-                      colSpan={headers.length + 1} 
-                      className="text-center text-muted-foreground py-8"
+                </tr>
+              </thead>
+              <tbody>
+                {gridData.map((row, rowIndex) => {
+                  const isHighlighted = hasSearch && matchingRows.has(rowIndex);
+                  const isHidden = hasSearch && !matchingRows.has(rowIndex);
+                  
+                  return (
+                    <tr 
+                      key={rowIndex} 
+                      className={`
+                        ${isHighlighted ? 'bg-primary/10' : 'hover:bg-muted/30'}
+                        ${isHidden ? 'opacity-30' : ''}
+                      `}
                     >
-                      {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum dado disponível'}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                      {/* Row number */}
+                      <td className="sticky left-0 z-10 bg-muted border-r border-b border-border w-12 min-w-[48px] h-7 text-center text-xs font-mono text-muted-foreground">
+                        {rowIndex + 1}
+                      </td>
+                      {/* Data cells */}
+                      {row.map((cell, colIndex) => (
+                        <td 
+                          key={colIndex}
+                          className="border-r border-b border-border min-w-[100px] h-7 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px]"
+                          title={cell !== null && cell !== undefined ? String(cell) : undefined}
+                        >
+                          {formatCellValue(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           <ScrollBar orientation="horizontal" />
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
       </div>
     </div>
