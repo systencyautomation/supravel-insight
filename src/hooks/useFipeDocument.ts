@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { parseExcelAsGrid, type SheetGrid } from '@/lib/excelParser';
+import { parseExcelWithStyles, type SheetGrid, type CellData } from '@/lib/excelParser';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface FipeDocument {
   id: string;
   fileName: string;
-  gridData: any[][];
+  gridData: CellData[][];
   colCount: number;
   rowCount: number;
   uploadedAt: string;
@@ -27,7 +28,7 @@ export function useFipeDocument() {
   const parseFile = async (file: File): Promise<SheetGrid> => {
     setIsParsing(true);
     try {
-      const grid = await parseExcelAsGrid(file);
+      const grid = await parseExcelWithStyles(file);
       setParsedGrid(grid);
       return grid;
     } finally {
@@ -43,17 +44,17 @@ export function useFipeDocument() {
     setIsUploading(true);
     
     try {
-      // Parse the file as grid
+      // Parse the file with styles
       const grid = await parseFile(file);
       
-      // Save to database - store grid as rows (array of arrays)
+      // Save to database - store grid as rows (array of arrays with styles)
       const { error } = await supabase
         .from('fipe_documents')
         .insert({
           organization_id: effectiveOrgId,
           file_name: file.name,
           headers: [], // Not used for grid view
-          rows: grid.data, // Store grid data as JSON array
+          rows: grid.data as unknown as Json, // Store grid data with styles as JSON array
           row_count: grid.rowCount,
           uploaded_by: user?.id || null,
         });
@@ -85,22 +86,34 @@ export function useFipeDocument() {
 
     if (error || !data) return null;
 
-    // Handle both grid format (array of arrays) and legacy format (array of objects)
+    // Handle different data formats
     const rowsData = data.rows as any;
-    let gridData: any[][] = [];
+    let gridData: CellData[][] = [];
     let colCount = 0;
     
     if (Array.isArray(rowsData) && rowsData.length > 0) {
       if (Array.isArray(rowsData[0])) {
-        // New grid format: array of arrays
-        gridData = rowsData;
+        // Grid format: array of arrays
+        gridData = rowsData.map((row: any[]) => 
+          row.map((cell: any) => {
+            // Handle new format with style object
+            if (cell && typeof cell === 'object' && 'value' in cell) {
+              return cell as CellData;
+            }
+            // Handle old format (plain values)
+            return { value: cell } as CellData;
+          })
+        );
         colCount = gridData.reduce((max, row) => Math.max(max, row.length), 0);
       } else {
         // Legacy format: array of objects - convert to grid
         const headers = data.headers as string[];
-        gridData = [headers, ...rowsData.map((row: Record<string, any>) => 
-          headers.map(h => row[h] ?? null)
-        )];
+        gridData = [
+          headers.map(h => ({ value: h })),
+          ...rowsData.map((row: Record<string, any>) => 
+            headers.map(h => ({ value: row[h] ?? null }))
+          )
+        ];
         colCount = headers.length;
       }
     }
