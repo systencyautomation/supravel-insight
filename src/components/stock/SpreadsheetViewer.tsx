@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Search, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
 import type { CellData, CellStyle } from '@/lib/excelParser';
 
 interface SpreadsheetViewerProps {
@@ -62,12 +63,29 @@ function formatCellValue(value: any): string {
   return String(value);
 }
 
+const ZOOM_MIN = 50;
+const ZOOM_MAX = 200;
+const ZOOM_STEP = 10;
+
 export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: SpreadsheetViewerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number; value: any } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  
+  // Zoom state
+  const [zoomLevel, setZoomLevel] = useState(100);
+  
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Pan/Drag state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [scrollStart, setScrollStart] = useState({ x: 0, y: 0 });
   
   // Find all matching cells
   const matchingCells = useMemo(() => {
@@ -94,6 +112,135 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
 
   const matchCount = matchingCells.length;
   const hasSearch = searchTerm.trim().length > 0;
+
+  // Zoom functions
+  const zoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(prev + ZOOM_STEP, ZOOM_MAX));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(prev - ZOOM_STEP, ZOOM_MIN));
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setZoomLevel(100);
+  }, []);
+
+  // Fullscreen functions
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(console.error);
+    } else {
+      document.exitFullscreen().catch(console.error);
+    }
+  }, []);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Handle keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          zoomIn();
+        } else if (e.key === '-') {
+          e.preventDefault();
+          zoomOut();
+        } else if (e.key === '0') {
+          e.preventDefault();
+          resetZoom();
+        }
+      }
+      
+      // F11 for fullscreen
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomIn, zoomOut, resetZoom, toggleFullscreen]);
+
+  // Handle mouse wheel zoom with Ctrl
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          zoomIn();
+        } else {
+          zoomOut();
+        }
+      }
+    };
+    
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [zoomIn, zoomOut]);
+
+  // Pan/Drag handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Right mouse button = 2
+    if (e.button === 2) {
+      e.preventDefault();
+      const viewport = scrollViewportRef.current;
+      if (!viewport) return;
+      
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      setScrollStart({ x: viewport.scrollLeft, y: viewport.scrollTop });
+    }
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+    
+    const deltaX = e.clientX - dragStart.x;
+    const deltaY = e.clientY - dragStart.y;
+    
+    viewport.scrollLeft = scrollStart.x - deltaX;
+    viewport.scrollTop = scrollStart.y - deltaY;
+  }, [isDragging, dragStart, scrollStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Global mouse up listener for drag
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false);
+    };
+    
+    if (isDragging) {
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+  }, [isDragging]);
+
+  // Prevent context menu when dragging
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+  }, []);
 
   // Scroll to current match
   const scrollToMatch = useCallback((matchIndex: number) => {
@@ -141,8 +288,8 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
     scrollToMatch(newIndex);
   }, [currentMatchIndex, matchCount, scrollToMatch]);
 
-  // Handle keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  // Handle keyboard navigation for search
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (e.shiftKey) {
@@ -179,8 +326,11 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
   }, [matchingCells]);
 
   return (
-    <div className="space-y-4">
-      {/* File info and search */}
+    <div 
+      ref={containerRef}
+      className={`space-y-4 ${isFullscreen ? 'bg-background p-4 h-screen flex flex-col' : ''}`}
+    >
+      {/* File info, search, zoom and fullscreen controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           {fileName && (
@@ -201,7 +351,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
               placeholder="Buscar na planilha..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={handleKeyDown}
+              onKeyDown={handleSearchKeyDown}
               className="pl-9 pr-9 h-9 text-sm"
             />
             {searchTerm && (
@@ -246,13 +396,98 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
               Nenhum resultado
             </span>
           )}
+
+          {/* Separator */}
+          <div className="hidden sm:block w-px h-6 bg-border" />
+
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={zoomOut}
+                  disabled={zoomLevel <= ZOOM_MIN}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Diminuir zoom (Ctrl -)</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 px-2 min-w-[50px] text-xs font-mono"
+                  onClick={resetZoom}
+                >
+                  {zoomLevel}%
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Resetar zoom (Ctrl 0)</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={zoomIn}
+                  disabled={zoomLevel >= ZOOM_MAX}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Aumentar zoom (Ctrl +)</TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Fullscreen toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                onClick={toggleFullscreen}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{isFullscreen ? 'Sair da tela cheia (Esc)' : 'Tela cheia (F11)'}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
       
       {/* Excel-style spreadsheet */}
-      <div className="border border-border rounded-lg overflow-hidden bg-background">
-        <ScrollArea className="h-[600px]" ref={scrollAreaRef}>
-          <div className="min-w-max">
+      <div 
+        className={`border border-border rounded-lg overflow-hidden bg-background ${isFullscreen ? 'flex-1' : ''}`}
+        onContextMenu={handleContextMenu}
+      >
+        <ScrollArea 
+          className={isFullscreen ? 'h-full' : 'h-[600px]'} 
+          ref={scrollAreaRef}
+        >
+          <div 
+            ref={scrollViewportRef}
+            className={`min-w-max ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            style={{ 
+              transform: `scale(${zoomLevel / 100})`,
+              transformOrigin: 'top left',
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+          >
             <table ref={tableRef} className="border-collapse w-full">
               {/* Column headers (A, B, C, ...) */}
               <thead className="sticky top-0 z-20">
@@ -317,7 +552,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
                             id={`cell-${rowIndex}-${colIndex}`}
                             style={inlineStyle}
                             className={`
-                              border-r border-b border-border min-w-[100px] h-7 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] cursor-pointer transition-colors
+                              border-r border-b border-border min-w-[100px] h-7 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] cursor-pointer transition-colors select-none
                               ${cellIsCurrent ? 'bg-yellow-300 dark:bg-yellow-600 ring-2 ring-primary ring-inset font-medium' : ''}
                               ${cellIsMatch && !cellIsCurrent ? 'bg-yellow-200 dark:bg-yellow-700/50' : ''}
                               ${!cellIsMatch && !cellIsCurrent && !cellStyle?.bgColor ? 'hover:bg-muted/50' : ''}
@@ -366,13 +601,24 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
         </ScrollArea>
       </div>
       
-      {/* Keyboard shortcuts hint */}
-      {hasSearch && matchCount > 0 && (
-        <div className="text-xs text-muted-foreground text-center">
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> próximo • 
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] ml-1">Shift+Enter</kbd> anterior
-        </div>
-      )}
+      {/* Hints */}
+      <div className="text-xs text-muted-foreground text-center space-x-3">
+        <span>
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">Ctrl</kbd> + scroll para zoom
+        </span>
+        <span>•</span>
+        <span>
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">Botão direito</kbd> + arrastar para navegar
+        </span>
+        {hasSearch && matchCount > 0 && (
+          <>
+            <span>•</span>
+            <span>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">Enter</kbd> próximo
+            </span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
