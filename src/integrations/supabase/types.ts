@@ -112,6 +112,47 @@ export type Database = {
           },
         ]
       }
+      fipe_documents: {
+        Row: {
+          file_name: string
+          headers: string[]
+          id: string
+          organization_id: string
+          row_count: number
+          rows: Json
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          file_name: string
+          headers: string[]
+          id?: string
+          organization_id: string
+          row_count?: number
+          rows: Json
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          file_name?: string
+          headers?: string[]
+          id?: string
+          organization_id?: string
+          row_count?: number
+          rows?: Json
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fipe_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       installments: {
         Row: {
           created_at: string | null

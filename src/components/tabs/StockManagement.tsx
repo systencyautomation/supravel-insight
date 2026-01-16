@@ -1,60 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
-import { StockItem } from '@/types/commission';
-import { StockTable } from '@/components/StockTable';
-import { SummaryCard } from '@/components/SummaryCard';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
 import { Upload, FileSpreadsheet } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ImportDialog } from '@/components/stock/ImportDialog';
+import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
+import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function StockManagement() {
-  const [stock, setStock] = useState<StockItem[]>([]);
+  const [document, setDocument] = useState<FipeDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const { effectiveOrgId } = useAuth();
+  const { fetchLatestDocument } = useFipeDocument();
 
-  const fetchInventory = useCallback(async () => {
+  const loadDocument = useCallback(async () => {
     if (!effectiveOrgId) {
       setLoading(false);
       return;
     }
     
     try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('organization_id', effectiveOrgId);
-
-      if (error) throw error;
-
-      const mappedStock: StockItem[] = (data || []).map(item => ({
-        id: item.id,
-        modelo: item.model_name,
-        codInterno: item.internal_code || '',
-        valorTabela: item.base_price || 0,
-        percentualComissao: item.base_commission_pct || 10,
-        quantidade: item.quantity || 0,
-      }));
-
-      setStock(mappedStock);
+      const doc = await fetchLatestDocument();
+      setDocument(doc);
     } catch (error) {
-      console.error('Error fetching inventory:', error);
+      console.error('Error fetching FIPE document:', error);
     } finally {
       setLoading(false);
     }
-  }, [effectiveOrgId]);
+  }, [effectiveOrgId, fetchLatestDocument]);
 
   useEffect(() => {
-    fetchInventory();
-  }, [fetchInventory]);
-
-  const totalModelos = stock.length;
-  const totalItens = stock.reduce((acc, item) => acc + item.quantidade, 0);
+    loadDocument();
+  }, [loadDocument]);
 
   const handleImportSuccess = () => {
-    fetchInventory();
+    loadDocument();
   };
 
   return (
@@ -65,6 +47,11 @@ export function StockManagement() {
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
             Documento oficial - somente consulta
           </p>
+          {document && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Última atualização: {format(new Date(document.uploadedAt), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button 
@@ -83,43 +70,24 @@ export function StockManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <SummaryCard
-          title="Total de Modelos"
-          value={totalModelos.toString()}
-          subtitle="Na tabela"
-          variant="primary"
-        />
-        <SummaryCard
-          title="Itens Disponíveis"
-          value={totalItens.toString()}
-          subtitle="Quantidade total"
-        />
-        <SummaryCard
-          title="Comissão 10%"
-          value={stock.filter(s => s.percentualComissao === 10).length.toString()}
-          subtitle="Modelos"
-        />
-        <SummaryCard
-          title="Comissão 15%"
-          value={stock.filter(s => s.percentualComissao === 15).length.toString()}
-          subtitle="Modelos"
-          variant="success"
-        />
-      </div>
-
       <div>
-        <h3 className="text-sm font-semibold mb-4">Tabela de Preços</h3>
         {loading ? (
           <div className="border border-border p-8 text-center">
             <p className="text-muted-foreground">Carregando...</p>
           </div>
-        ) : stock.length > 0 ? (
-          <StockTable stock={stock} />
+        ) : document ? (
+          <SpreadsheetViewer
+            headers={document.headers}
+            rows={document.rows}
+            fileName={document.fileName}
+            uploadedAt={document.uploadedAt}
+          />
         ) : (
           <div className="border border-border p-8 text-center">
-            <p className="text-muted-foreground">Nenhum item na tabela</p>
-            <p className="text-xs text-muted-foreground mt-2">Importe uma planilha para cadastrar itens</p>
+            <p className="text-muted-foreground">Nenhuma planilha importada</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Importe um arquivo Excel para visualizar a tabela FIPE
+            </p>
           </div>
         )}
       </div>
