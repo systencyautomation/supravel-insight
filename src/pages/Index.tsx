@@ -5,11 +5,10 @@ import { useOrganizationData } from '@/hooks/useOrganizationData';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CompanyCommissions } from '@/components/tabs/CompanyCommissions';
-import { InternalSellerCommissions } from '@/components/tabs/InternalSellerCommissions';
-import { RepresentativeCommissions } from '@/components/tabs/RepresentativeCommissions';
+import { CommissionsTab } from '@/components/tabs/CommissionsTab';
 import { StockManagement } from '@/components/tabs/StockManagement';
 import { CashFlow } from '@/components/tabs/CashFlow';
-import { Building2, Users, Briefcase, Package, Wallet, Loader2, ArrowLeft } from 'lucide-react';
+import { Building2, DollarSign, Package, Wallet, Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -88,7 +87,7 @@ const Index = () => {
       
       <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 h-auto p-0 bg-transparent gap-1">
+          <TabsList className="grid w-full grid-cols-4 h-auto p-0 bg-transparent gap-1">
             <TabsTrigger 
               value="empresa" 
               className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
@@ -97,18 +96,11 @@ const Index = () => {
               <span className="hidden sm:inline">Empresa</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="interno" 
+              value="comissoes" 
               className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
             >
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Vendedor</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="representante" 
-              className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
-            >
-              <Briefcase className="h-4 w-4" />
-              <span className="hidden sm:inline">Representante</span>
+              <DollarSign className="h-4 w-4" />
+              <span className="hidden sm:inline">Comissões</span>
             </TabsTrigger>
             <TabsTrigger 
               value="tabela" 
@@ -130,12 +122,8 @@ const Index = () => {
             <CompanyCommissions sales={displaySales} />
           </TabsContent>
 
-          <TabsContent value="interno" className="mt-6">
-            <InternalSellerCommissions sales={displaySales} />
-          </TabsContent>
-
-          <TabsContent value="representante" className="mt-6">
-            <RepresentativeCommissions sales={displaySales} />
+          <TabsContent value="comissoes" className="mt-6">
+            <CommissionsTab sales={displaySales} />
           </TabsContent>
 
           <TabsContent value="tabela" className="mt-6">
