@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.complete-member-registration]
 verify_jwt = false
+
+[functions.create-member-direct]
+verify_jwt = false
