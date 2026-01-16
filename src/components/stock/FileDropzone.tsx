@@ -6,14 +6,12 @@ interface FileDropzoneProps {
   onFileSelect: (file: File) => void;
   accept?: string;
   className?: string;
-  isPdfProcessing?: boolean;
 }
 
 export function FileDropzone({ 
   onFileSelect, 
-  accept = '.xlsx,.xls,.csv,.pdf',
+  accept = '.xlsx,.xls,.csv',
   className,
-  isPdfProcessing = false,
 }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -51,7 +49,7 @@ export function FileDropzone({
     setSelectedFile(null);
   }, []);
 
-  if (selectedFile && !isPdfProcessing) {
+  if (selectedFile) {
     return (
       <div className={cn(
         "border-2 border-dashed border-primary/50 rounded-lg p-6 bg-primary/5",
@@ -107,7 +105,7 @@ export function FileDropzone({
           ou clique para selecionar
         </p>
         <p className="text-xs text-muted-foreground">
-          Formatos aceitos: .xlsx, .xls, .csv, .pdf
+          Formatos aceitos: .xlsx, .xls, .csv
         </p>
       </label>
     </div>

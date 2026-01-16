@@ -20,6 +20,3 @@ verify_jwt = false
 
 [functions.complete-member-registration]
 verify_jwt = false
-
-[functions.parse-pdf-fipe]
-verify_jwt = false

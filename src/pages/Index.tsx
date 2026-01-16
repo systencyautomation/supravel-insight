@@ -111,11 +111,11 @@ const Index = () => {
               <span className="hidden sm:inline">Representante</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="estoque" 
+              value="tabela" 
               className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
             >
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Estoque</span>
+              <span className="hidden sm:inline">Tabela</span>
             </TabsTrigger>
             <TabsTrigger 
               value="fluxo" 
@@ -138,7 +138,7 @@ const Index = () => {
             <RepresentativeCommissions sales={displaySales} />
           </TabsContent>
 
-          <TabsContent value="estoque" className="mt-6">
+          <TabsContent value="tabela" className="mt-6">
             <StockManagement />
           </TabsContent>
 
