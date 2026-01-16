@@ -10,10 +10,9 @@ import { Button } from '@/components/ui/button';
 import { FileDropzone } from './FileDropzone';
 import { ColumnMapper } from './ColumnMapper';
 import { ImportResult } from './ImportResult';
-import { PdfProcessingStatus } from './PdfProcessingStatus';
 import { useInventoryImport, type ImportResult as ImportResultType } from '@/hooks/useInventoryImport';
 import { toast } from 'sonner';
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 
 interface ImportDialogProps {
   open: boolean;
@@ -21,13 +20,12 @@ interface ImportDialogProps {
   onSuccess: () => void;
 }
 
-type Step = 'upload' | 'processing' | 'mapping' | 'result';
+type Step = 'upload' | 'mapping' | 'result';
 
 export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProps) {
   const [step, setStep] = useState<Step>('upload');
   const [result, setResult] = useState<ImportResultType | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [pdfComplete, setPdfComplete] = useState(false);
   
   const {
     parseFile,
@@ -42,26 +40,16 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
-    const isPdf = file.name.toLowerCase().endsWith('.pdf');
-    
-    if (isPdf) {
-      setStep('processing');
-    }
     
     try {
       await parseFile(file);
-      if (isPdf) {
-        setPdfComplete(true);
-      } else {
-        setStep('mapping');
-      }
+      setStep('mapping');
     } catch (error) {
       toast.error('Erro ao ler arquivo', {
         description: error instanceof Error ? error.message : 'Formato inválido',
       });
       setSelectedFile(null);
       setStep('upload');
-      setPdfComplete(false);
     }
   };
 
@@ -89,7 +77,6 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     setStep('upload');
     setResult(null);
     setSelectedFile(null);
-    setPdfComplete(false);
     reset();
     onOpenChange(false);
   };
@@ -98,20 +85,9 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     if (step === 'mapping') {
       setStep('upload');
       setSelectedFile(null);
-      setPdfComplete(false);
-      reset();
-    } else if (step === 'processing') {
-      setStep('upload');
-      setSelectedFile(null);
-      setPdfComplete(false);
       reset();
     }
   };
-
-  const handleContinueToMapping = () => {
-    setStep('mapping');
-  };
-
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -119,13 +95,11 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
         <DialogHeader>
           <DialogTitle>
             {step === 'upload' && 'Importar Tabela FIPE'}
-            {step === 'processing' && 'Processando PDF'}
             {step === 'mapping' && 'Mapear Colunas'}
             {step === 'result' && 'Resultado da Importação'}
           </DialogTitle>
           <DialogDescription>
-            {step === 'upload' && 'Faça upload de um arquivo Excel, CSV ou PDF com os dados do estoque'}
-            {step === 'processing' && 'Extraindo dados do PDF com inteligência artificial'}
+            {step === 'upload' && 'Faça upload de um arquivo Excel ou CSV com os dados da tabela'}
             {step === 'mapping' && 'Associe as colunas da planilha aos campos do sistema'}
             {step === 'result' && 'Veja o resultado da importação'}
           </DialogDescription>
@@ -135,26 +109,28 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
           {step === 'upload' && (
             <div className="space-y-4">
               <FileDropzone 
-                onFileSelect={handleFileSelect} 
-                isPdfProcessing={false}
+                onFileSelect={handleFileSelect}
+                accept=".xlsx,.xls,.csv"
               />
               
-              <div className="bg-muted/50 rounded-lg p-4">
-                <h4 className="text-sm font-medium mb-2">💡 Dica</h4>
-                <p className="text-xs text-muted-foreground">
-                  Agora você pode importar diretamente arquivos PDF! A IA vai extrair os dados automaticamente.
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+                  📄 Arquivo em PDF?
+                </h4>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
+                  Converta seu PDF para Excel antes de importar. Use o conversor gratuito da Adobe:
                 </p>
+                <a 
+                  href="https://www.adobe.com/br/acrobat/online/pdf-to-excel.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-200 hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Converter PDF para Excel (Adobe)
+                </a>
               </div>
             </div>
-          )}
-
-          {step === 'processing' && (
-            <PdfProcessingStatus
-              isParsing={isParsing}
-              isComplete={pdfComplete}
-              rowCount={parsedData?.rows.length || 0}
-              onContinue={handleContinueToMapping}
-            />
           )}
 
           {step === 'mapping' && parsedData && (
@@ -177,7 +153,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
           )}
         </div>
 
-        {step !== 'result' && step !== 'processing' && (
+        {step !== 'result' && (
           <div className="flex justify-between">
             <div>
               {step === 'mapping' && (
@@ -211,14 +187,6 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
                 </Button>
               )}
             </div>
-          </div>
-        )}
-
-        {step === 'processing' && !pdfComplete && (
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
           </div>
         )}
       </DialogContent>

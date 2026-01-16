@@ -5,7 +5,6 @@ import { SummaryCard } from '@/components/SummaryCard';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { Upload, FileSpreadsheet } from 'lucide-react';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ImportDialog } from '@/components/stock/ImportDialog';
@@ -51,15 +50,8 @@ export function StockManagement() {
     fetchInventory();
   }, [fetchInventory]);
 
-  const totalEstoque = stock.reduce((acc, item) => acc + (item.valorTabela * item.quantidade), 0);
+  const totalModelos = stock.length;
   const totalItens = stock.reduce((acc, item) => acc + item.quantidade, 0);
-
-  const handleUpdate = (updatedItem: StockItem) => {
-    setStock(prev => prev.map(item => 
-      item.id === updatedItem.id ? updatedItem : item
-    ));
-    toast.success('Item atualizado com sucesso');
-  };
 
   const handleImportSuccess = () => {
     fetchInventory();
@@ -69,9 +61,9 @@ export function StockManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Gestão de Estoque</h2>
+          <h2 className="text-lg font-semibold">Tabela FIPE</h2>
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Área do Gestor
+            Documento oficial - somente consulta
           </p>
         </div>
         <div className="flex gap-2">
@@ -93,15 +85,15 @@ export function StockManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <SummaryCard
-          title="Valor em Estoque"
-          value={formatCurrency(totalEstoque)}
-          subtitle="Valor tabela total"
+          title="Total de Modelos"
+          value={totalModelos.toString()}
+          subtitle="Na tabela"
           variant="primary"
         />
         <SummaryCard
           title="Itens Disponíveis"
           value={totalItens.toString()}
-          subtitle={`${stock.length} modelos`}
+          subtitle="Quantidade total"
         />
         <SummaryCard
           title="Comissão 10%"
@@ -117,28 +109,27 @@ export function StockManagement() {
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold mb-4">Estoque de Empilhadeiras</h3>
+        <h3 className="text-sm font-semibold mb-4">Tabela de Preços</h3>
         {loading ? (
           <div className="border border-border p-8 text-center">
             <p className="text-muted-foreground">Carregando...</p>
           </div>
         ) : stock.length > 0 ? (
-          <StockTable stock={stock} onUpdate={handleUpdate} />
+          <StockTable stock={stock} />
         ) : (
           <div className="border border-border p-8 text-center">
-            <p className="text-muted-foreground">Nenhum item em estoque</p>
+            <p className="text-muted-foreground">Nenhum item na tabela</p>
             <p className="text-xs text-muted-foreground mt-2">Importe uma planilha para cadastrar itens</p>
           </div>
         )}
       </div>
 
       <div className="p-4 bg-muted/30 border border-border">
-        <h3 className="text-sm font-semibold mb-2">Campos Editáveis</h3>
-        <ul className="text-xs text-muted-foreground space-y-1">
-          <li>• <strong>Valor Tabela:</strong> Preço base para cálculo de margem</li>
-          <li>• <strong>% Comissão:</strong> Percentual base (10% ou 15%)</li>
-          <li>• Clique no ícone de edição para alterar valores</li>
-        </ul>
+        <h3 className="text-sm font-semibold mb-2">⚠️ Documento Oficial</h3>
+        <p className="text-xs text-muted-foreground">
+          Esta tabela é tratada como documento oficial e não pode ser editada manualmente. 
+          Para atualizar os dados, importe uma nova planilha Excel.
+        </p>
       </div>
 
       <ImportDialog
