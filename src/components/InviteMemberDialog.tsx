@@ -20,8 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader2, UserPlus, Mail, UserCog } from 'lucide-react';
 
 interface InviteMemberDialogProps {
   organizationId: string;
@@ -30,15 +31,43 @@ interface InviteMemberDialogProps {
 
 type AppRole = 'manager' | 'seller' | 'representative';
 
+const roleLabels: Record<AppRole, string> = {
+  manager: 'Gerente',
+  seller: 'Vendedor',
+  representative: 'Representante',
+};
+
 export function InviteMemberDialog({ organizationId, organizationName }: InviteMemberDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'invite' | 'direct'>('invite');
+  
+  // Invite form state
   const [email, setEmail] = useState('');
   const [guestName, setGuestName] = useState('');
   const [role, setRole] = useState<AppRole>('seller');
   const [loading, setLoading] = useState(false);
+
+  // Direct create form state
+  const [directEmail, setDirectEmail] = useState('');
+  const [directName, setDirectName] = useState('');
+  const [directPassword, setDirectPassword] = useState('');
+  const [directConfirmPassword, setDirectConfirmPassword] = useState('');
+  const [directRole, setDirectRole] = useState<AppRole>('seller');
+  const [directLoading, setDirectLoading] = useState(false);
+
+  const resetForms = () => {
+    setEmail('');
+    setGuestName('');
+    setRole('seller');
+    setDirectEmail('');
+    setDirectName('');
+    setDirectPassword('');
+    setDirectConfirmPassword('');
+    setDirectRole('seller');
+  };
 
   const handleInvite = async () => {
     if (!email.trim()) {
@@ -54,7 +83,6 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
 
     setLoading(true);
     try {
-      // Create invitation record
       const { data: invitation, error: insertError } = await supabase
         .from('member_invitations')
         .insert({
@@ -79,7 +107,6 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
         throw insertError;
       }
 
-      // Get inviter profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name')
@@ -89,7 +116,6 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
       const inviterName = profile?.full_name || user.email || 'Um administrador';
       const inviteLink = `${window.location.origin}/join?token=${invitation.token}`;
 
-      // Send invitation email
       const { error: emailError } = await supabase.functions.invoke('send-member-invitation', {
         body: {
           email: email.trim().toLowerCase(),
@@ -103,7 +129,6 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
 
       if (emailError) {
         console.error('Error sending email:', emailError);
-        // Still show success since invitation was created
         toast({
           title: 'Convite criado',
           description: 'O convite foi criado, mas houve um problema ao enviar o email. O link pode ser compartilhado manualmente.',
@@ -117,9 +142,7 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
       }
 
       setOpen(false);
-      setEmail('');
-      setGuestName('');
-      setRole('seller');
+      resetForms();
     } catch (error) {
       console.error('Error creating invitation:', error);
       toast({
@@ -132,72 +155,261 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
     }
   };
 
-  const roleLabels: Record<AppRole, string> = {
-    manager: 'Gerente',
-    seller: 'Vendedor',
-    representative: 'Representante',
+  const handleDirectCreate = async () => {
+    // Validations
+    if (!directEmail.trim()) {
+      toast({
+        title: 'Email obrigatório',
+        description: 'Por favor, informe o email do membro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!directName.trim()) {
+      toast({
+        title: 'Nome obrigatório',
+        description: 'Por favor, informe o nome do membro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!directPassword) {
+      toast({
+        title: 'Senha obrigatória',
+        description: 'Por favor, defina uma senha para o membro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (directPassword.length < 6) {
+      toast({
+        title: 'Senha muito curta',
+        description: 'A senha deve ter pelo menos 6 caracteres.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (directPassword !== directConfirmPassword) {
+      toast({
+        title: 'Senhas não coincidem',
+        description: 'A confirmação de senha deve ser igual à senha.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!user) return;
+
+    setDirectLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-member-direct', {
+        body: {
+          email: directEmail.trim().toLowerCase(),
+          password: directPassword,
+          fullName: directName.trim(),
+          role: directRole,
+          organizationId,
+        },
+      });
+
+      if (error) {
+        console.error('Error creating member:', error);
+        toast({
+          title: 'Erro',
+          description: error.message || 'Não foi possível criar o membro. Tente novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (data?.error) {
+        toast({
+          title: 'Erro',
+          description: data.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Membro criado!',
+        description: `${directName} foi adicionado à equipe e já pode fazer login.`,
+      });
+
+      setOpen(false);
+      resetForms();
+    } catch (error) {
+      console.error('Error creating member:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível criar o membro. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDirectLoading(false);
+    }
   };
 
+  const isLoading = loading || directLoading;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForms(); }}>
       <DialogTrigger asChild>
         <Button className="gap-2">
           <UserPlus className="h-4 w-4" />
-          Convidar Membro
+          Adicionar Membro
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Convidar Membro</DialogTitle>
+          <DialogTitle>Adicionar Membro</DialogTitle>
           <DialogDescription>
-            Envie um convite para adicionar um novo membro à sua equipe em {organizationName}.
+            Adicione um novo membro à equipe de {organizationName}.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="email@exemplo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="guestName">Nome do convidado (opcional)</Label>
-            <Input
-              id="guestName"
-              placeholder="Nome do novo membro"
-              value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="role">Cargo</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as AppRole)} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o cargo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manager">{roleLabels.manager}</SelectItem>
-                <SelectItem value="seller">{roleLabels.seller}</SelectItem>
-                <SelectItem value="representative">{roleLabels.representative}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button onClick={handleInvite} disabled={loading} className="gap-2">
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Enviar Convite
-          </Button>
-        </DialogFooter>
+        
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'invite' | 'direct')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="invite" className="gap-2" disabled={isLoading}>
+              <Mail className="h-4 w-4" />
+              Enviar Convite
+            </TabsTrigger>
+            <TabsTrigger value="direct" className="gap-2" disabled={isLoading}>
+              <UserCog className="h-4 w-4" />
+              Criar Diretamente
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="invite" className="mt-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="invite-email">Email *</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="email@exemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-guestName">Nome do convidado (opcional)</Label>
+                <Input
+                  id="invite-guestName"
+                  placeholder="Nome do novo membro"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-role">Cargo</Label>
+                <Select value={role} onValueChange={(v) => setRole(v as AppRole)} disabled={loading}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manager">{roleLabels.manager}</SelectItem>
+                    <SelectItem value="seller">{roleLabels.seller}</SelectItem>
+                    <SelectItem value="representative">{roleLabels.representative}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Um email será enviado com um link para o convidado criar sua conta.
+              </p>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                Cancelar
+              </Button>
+              <Button onClick={handleInvite} disabled={loading} className="gap-2">
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Enviar Convite
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+          
+          <TabsContent value="direct" className="mt-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="direct-email">Email *</Label>
+                <Input
+                  id="direct-email"
+                  type="email"
+                  placeholder="email@exemplo.com"
+                  value={directEmail}
+                  onChange={(e) => setDirectEmail(e.target.value)}
+                  disabled={directLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="direct-name">Nome completo *</Label>
+                <Input
+                  id="direct-name"
+                  placeholder="Nome do membro"
+                  value={directName}
+                  onChange={(e) => setDirectName(e.target.value)}
+                  disabled={directLoading}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="direct-password">Senha *</Label>
+                  <Input
+                    id="direct-password"
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={directPassword}
+                    onChange={(e) => setDirectPassword(e.target.value)}
+                    disabled={directLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="direct-confirm">Confirmar senha *</Label>
+                  <Input
+                    id="direct-confirm"
+                    type="password"
+                    placeholder="Repita a senha"
+                    value={directConfirmPassword}
+                    onChange={(e) => setDirectConfirmPassword(e.target.value)}
+                    disabled={directLoading}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="direct-role">Cargo</Label>
+                <Select value={directRole} onValueChange={(v) => setDirectRole(v as AppRole)} disabled={directLoading}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manager">{roleLabels.manager}</SelectItem>
+                    <SelectItem value="seller">{roleLabels.seller}</SelectItem>
+                    <SelectItem value="representative">{roleLabels.representative}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                O membro será criado imediatamente e poderá fazer login com as credenciais definidas.
+              </p>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={directLoading}>
+                Cancelar
+              </Button>
+              <Button onClick={handleDirectCreate} disabled={directLoading} className="gap-2">
+                {directLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Criar Membro
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
