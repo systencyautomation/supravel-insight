@@ -221,6 +221,13 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging) return;
     
+    // If right button is no longer pressed, stop dragging
+    // e.buttons uses bitmask: 2 = right button
+    if (!(e.buttons & 2)) {
+      setIsDragging(false);
+      return;
+    }
+    
     const viewport = viewportRef.current;
     if (!viewport) return;
     
@@ -239,17 +246,22 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
     setIsDragging(false);
   }, []);
 
-  // Global mouse up listener for drag
+  const handleMouseLeave = useCallback(() => {
+    // Reset dragging when mouse leaves the component
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  }, [isDragging]);
+
+  // Global mouse up listener - ALWAYS active to catch mouseup anywhere
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       setIsDragging(false);
     };
     
-    if (isDragging) {
-      window.addEventListener('mouseup', handleGlobalMouseUp);
-      return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-    }
-  }, [isDragging]);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
 
   // Prevent context menu only when actually dragged
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -492,6 +504,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
       >
         <ScrollArea 
           className={isFullscreen ? 'h-full' : 'h-[600px]'} 
