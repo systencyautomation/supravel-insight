@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { parseExcelFile, type ParsedData } from '@/lib/excelParser';
+import { parseExcelAsGrid, type SheetGrid } from '@/lib/excelParser';
 
 export interface FipeDocument {
   id: string;
   fileName: string;
-  headers: string[];
-  rows: Record<string, any>[];
+  gridData: any[][];
+  colCount: number;
   rowCount: number;
   uploadedAt: string;
 }
@@ -22,14 +22,14 @@ export function useFipeDocument() {
   const { effectiveOrgId, user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
-  const [parsedData, setParsedData] = useState<ParsedData | null>(null);
+  const [parsedGrid, setParsedGrid] = useState<SheetGrid | null>(null);
 
-  const parseFile = async (file: File): Promise<ParsedData> => {
+  const parseFile = async (file: File): Promise<SheetGrid> => {
     setIsParsing(true);
     try {
-      const data = await parseExcelFile(file);
-      setParsedData(data);
-      return data;
+      const grid = await parseExcelAsGrid(file);
+      setParsedGrid(grid);
+      return grid;
     } finally {
       setIsParsing(false);
     }
@@ -43,18 +43,18 @@ export function useFipeDocument() {
     setIsUploading(true);
     
     try {
-      // Parse the file
-      const data = await parseFile(file);
+      // Parse the file as grid
+      const grid = await parseFile(file);
       
-      // Save to database
+      // Save to database - store grid as rows (array of arrays)
       const { error } = await supabase
         .from('fipe_documents')
         .insert({
           organization_id: effectiveOrgId,
           file_name: file.name,
-          headers: data.headers,
-          rows: data.rows,
-          row_count: data.rows.length,
+          headers: [], // Not used for grid view
+          rows: grid.data, // Store grid data as JSON array
+          row_count: grid.rowCount,
           uploaded_by: user?.id || null,
         });
       
@@ -64,7 +64,7 @@ export function useFipeDocument() {
 
       return {
         success: true,
-        rowCount: data.rows.length,
+        rowCount: grid.rowCount,
         fileName: file.name,
       };
     } finally {
@@ -85,18 +85,38 @@ export function useFipeDocument() {
 
     if (error || !data) return null;
 
+    // Handle both grid format (array of arrays) and legacy format (array of objects)
+    const rowsData = data.rows as any;
+    let gridData: any[][] = [];
+    let colCount = 0;
+    
+    if (Array.isArray(rowsData) && rowsData.length > 0) {
+      if (Array.isArray(rowsData[0])) {
+        // New grid format: array of arrays
+        gridData = rowsData;
+        colCount = gridData.reduce((max, row) => Math.max(max, row.length), 0);
+      } else {
+        // Legacy format: array of objects - convert to grid
+        const headers = data.headers as string[];
+        gridData = [headers, ...rowsData.map((row: Record<string, any>) => 
+          headers.map(h => row[h] ?? null)
+        )];
+        colCount = headers.length;
+      }
+    }
+
     return {
       id: data.id,
       fileName: data.file_name,
-      headers: data.headers,
-      rows: data.rows as Record<string, any>[],
-      rowCount: data.row_count,
+      gridData,
+      colCount,
+      rowCount: gridData.length,
       uploadedAt: data.uploaded_at,
     };
   }, [effectiveOrgId]);
 
   const reset = () => {
-    setParsedData(null);
+    setParsedGrid(null);
   };
 
   return {
@@ -104,7 +124,7 @@ export function useFipeDocument() {
     uploadDocument,
     fetchLatestDocument,
     reset,
-    parsedData,
+    parsedGrid,
     isUploading,
     isParsing,
   };

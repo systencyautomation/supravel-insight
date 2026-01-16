@@ -77,10 +77,10 @@ export function StockManagement() {
           </div>
         ) : document ? (
           <SpreadsheetViewer
-            headers={document.headers}
-            rows={document.rows}
+            gridData={document.gridData}
+            colCount={document.colCount}
+            rowCount={document.rowCount}
             fileName={document.fileName}
-            uploadedAt={document.uploadedAt}
           />
         ) : (
           <div className="border border-border p-8 text-center">

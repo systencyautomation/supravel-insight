@@ -5,6 +5,65 @@ export interface ParsedData {
   rows: Record<string, any>[];
 }
 
+// Grid-based parsing for exact Excel representation
+export interface SheetGrid {
+  data: any[][];  // Raw 2D matrix [row][col]
+  colCount: number;
+  rowCount: number;
+}
+
+export function parseExcelAsGrid(file: File): Promise<SheetGrid> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array', cellStyles: true });
+        
+        // Get first sheet
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        
+        // Convert to 2D array preserving all cells
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+          header: 1, 
+          defval: null,
+          blankrows: true 
+        }) as any[][];
+        
+        if (jsonData.length === 0) {
+          reject(new Error('Planilha vazia'));
+          return;
+        }
+        
+        // Find max column count
+        const colCount = jsonData.reduce((max, row) => Math.max(max, row.length), 0);
+        
+        // Normalize all rows to have the same column count
+        const normalizedData = jsonData.map(row => {
+          const normalized = [...row];
+          while (normalized.length < colCount) {
+            normalized.push(null);
+          }
+          return normalized;
+        });
+        
+        resolve({
+          data: normalizedData,
+          colCount,
+          rowCount: normalizedData.length,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 export function parseExcelFile(file: File): Promise<ParsedData> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
