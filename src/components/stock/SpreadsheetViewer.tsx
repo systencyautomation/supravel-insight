@@ -85,6 +85,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
   
   // Pan/Drag state
   const [isDragging, setIsDragging] = useState(false);
+  const [didDrag, setDidDrag] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [scrollStart, setScrollStart] = useState({ x: 0, y: 0 });
   
@@ -199,11 +200,11 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Right mouse button = 2
     if (e.button === 2) {
-      e.preventDefault();
       const viewport = scrollViewportRef.current;
       if (!viewport) return;
       
       setIsDragging(true);
+      setDidDrag(false);
       setDragStart({ x: e.clientX, y: e.clientY });
       setScrollStart({ x: viewport.scrollLeft, y: viewport.scrollTop });
     }
@@ -218,8 +219,12 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
     const deltaX = e.clientX - dragStart.x;
     const deltaY = e.clientY - dragStart.y;
     
-    viewport.scrollLeft = scrollStart.x - deltaX;
-    viewport.scrollTop = scrollStart.y - deltaY;
+    // Only consider it a drag if moved more than 5 pixels
+    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+      setDidDrag(true);
+      viewport.scrollLeft = scrollStart.x - deltaX;
+      viewport.scrollTop = scrollStart.y - deltaY;
+    }
   }, [isDragging, dragStart, scrollStart]);
 
   const handleMouseUp = useCallback(() => {
@@ -238,10 +243,13 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
     }
   }, [isDragging]);
 
-  // Prevent context menu when dragging
+  // Prevent context menu only when actually dragged
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-  }, []);
+    if (didDrag) {
+      e.preventDefault();
+    }
+    setDidDrag(false);
+  }, [didDrag]);
 
   // Scroll to current match
   const scrollToMatch = useCallback((matchIndex: number) => {
@@ -480,7 +488,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
         >
           <div 
             ref={scrollViewportRef}
-            className={`min-w-max ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`min-w-max ${isDragging ? 'cursor-grabbing select-none' : ''}`}
             style={{ 
               transform: `scale(${zoomLevel / 100})`,
               transformOrigin: 'top left',
