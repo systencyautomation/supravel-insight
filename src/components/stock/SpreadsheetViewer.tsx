@@ -466,87 +466,6 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
             </TooltipTrigger>
             <TooltipContent>{isFullscreen ? 'Sair da tela cheia (Esc)' : 'Tela cheia (F11)'}</TooltipContent>
           </Tooltip>
-
-          {/* Shortcuts dialog */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <button className="text-xs text-muted-foreground hover:text-foreground underline transition-colors ml-1">
-                Atalhos
-              </button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  ⌨️ Atalhos de Teclado
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-2">
-                {/* Zoom */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-2">Zoom</h4>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl +</kbd>
-                      <span className="text-muted-foreground">Aumentar zoom</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl -</kbd>
-                      <span className="text-muted-foreground">Diminuir zoom</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl 0</kbd>
-                      <span className="text-muted-foreground">Resetar zoom (100%)</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl + Scroll</kbd>
-                      <span className="text-muted-foreground">Zoom com mouse</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Screen */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-2">Tela</h4>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">F11</kbd>
-                      <span className="text-muted-foreground">Tela cheia</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Esc</kbd>
-                      <span className="text-muted-foreground">Sair da tela cheia</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Search */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-2">Busca</h4>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Enter</kbd>
-                      <span className="text-muted-foreground">Próximo resultado</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Shift + Enter</kbd>
-                      <span className="text-muted-foreground">Resultado anterior</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Navigation */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-2">Navegação</h4>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Botão direito + arrastar</kbd>
-                      <span className="text-muted-foreground">Mover planilha</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
       
@@ -700,6 +619,86 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
             </span>
           </>
         )}
+        <span>•</span>
+        <Dialog>
+          <DialogTrigger asChild>
+            <button className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">
+              Atalhos
+            </button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                ⌨️ Atalhos de Teclado
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              {/* Zoom */}
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-2">Zoom</h4>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl +</kbd>
+                    <span className="text-muted-foreground">Aumentar zoom</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl -</kbd>
+                    <span className="text-muted-foreground">Diminuir zoom</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl 0</kbd>
+                    <span className="text-muted-foreground">Resetar zoom (100%)</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Ctrl + Scroll</kbd>
+                    <span className="text-muted-foreground">Zoom com mouse</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Screen */}
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-2">Tela</h4>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">F11</kbd>
+                    <span className="text-muted-foreground">Tela cheia</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Esc</kbd>
+                    <span className="text-muted-foreground">Sair da tela cheia</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search */}
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-2">Busca</h4>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Enter</kbd>
+                    <span className="text-muted-foreground">Próximo resultado</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Shift + Enter</kbd>
+                    <span className="text-muted-foreground">Resultado anterior</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation */}
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-2">Navegação</h4>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Botão direito + arrastar</kbd>
+                    <span className="text-muted-foreground">Mover planilha</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
