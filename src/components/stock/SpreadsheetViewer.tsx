@@ -581,7 +581,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
                             id={`cell-${rowIndex}-${colIndex}`}
                             style={inlineStyle}
                             className={`
-                              border-r border-b border-border min-w-[100px] h-7 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] cursor-pointer transition-colors select-none
+                              border-r border-b border-border min-w-[100px] h-7 px-2 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] cursor-pointer transition-colors
                               ${cellIsCurrent ? 'bg-yellow-300 dark:bg-yellow-600 ring-2 ring-primary ring-inset font-medium' : ''}
                               ${cellIsMatch && !cellIsCurrent ? 'bg-yellow-200 dark:bg-yellow-700/50' : ''}
                               ${!cellIsMatch && !cellIsCurrent && !cellStyle?.bgColor ? 'hover:bg-muted/50' : ''}
