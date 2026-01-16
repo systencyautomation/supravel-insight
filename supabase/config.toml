@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.create-member-direct]
 verify_jwt = false
+
+[functions.delete-auth-user]
+verify_jwt = false
