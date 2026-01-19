@@ -115,14 +115,24 @@ export function CommissionCalculator({
       return value.includes('comiss');
     }) ?? -1;
     
-    // Search for matching product code
+    const productCode = String(codigoParaBusca).trim();
+    
+    // Extract prefix before space or hyphen for flexible matching
+    // e.g. "CDD12J - N." -> "CDD12J"
+    const prefixMatch = productCode.match(/^([A-Za-z0-9]+)/);
+    const codePrefix = prefixMatch ? prefixMatch[1] : productCode;
+
+    // Search for matching product code with multiple strategies
+    let bestMatch: { rowIndex: number; valorTabela: number; comissao: number } | null = null;
+    
     for (let i = headerRowIndex + 1; i < gridData.length; i++) {
       const row = gridData[i];
       if (!row) continue;
       
       const cellValue = String(row[codIndex]?.value || '').trim();
-      const productCode = String(codigoParaBusca).trim();
+      if (!cellValue) continue;
       
+      // Strategy 1: Exact match (highest priority)
       if (cellValue === productCode) {
         return {
           rowIndex: i,
@@ -130,9 +140,36 @@ export function CommissionCalculator({
           comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
         };
       }
+      
+      // Strategy 2: Table code matches the prefix (e.g. table has "CDD12J", we have "CDD12J - N.")
+      if (cellValue === codePrefix && !bestMatch) {
+        bestMatch = {
+          rowIndex: i,
+          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+        };
+      }
+      
+      // Strategy 3: Table code starts with our prefix
+      if (!bestMatch && cellValue.toUpperCase().startsWith(codePrefix.toUpperCase())) {
+        bestMatch = {
+          rowIndex: i,
+          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+        };
+      }
+      
+      // Strategy 4: Our code starts with the table code
+      if (!bestMatch && productCode.toUpperCase().startsWith(cellValue.toUpperCase())) {
+        bestMatch = {
+          rowIndex: i,
+          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+        };
+      }
     }
     
-    return null;
+    return bestMatch;
   }, [sale?.produto_modelo, sale?.produto_codigo, fipeDocument]);
 
   // Update from sale and installments
