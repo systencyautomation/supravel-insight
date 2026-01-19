@@ -20,7 +20,8 @@ const ICMS_RATES: Record<string, number> = {
 };
 
 export interface ApprovalCalculationParams {
-  valorNF: number;
+  valorNF: number;           // Valor Real (com VP aplicado) - usado para Over Price
+  valorFaturado: number;     // Valor Faturado da NF - usado para calcular percentual final
   valorTabela: number;
   percentualComissao: number;
   icmsOrigem: number;
@@ -104,7 +105,7 @@ export function calcularValorReal(
 export function calculateApprovalCommission(
   params: ApprovalCalculationParams
 ): ApprovalCalculationResult {
-  const { valorNF, valorTabela, percentualComissao, icmsOrigem, icmsDestino } = params;
+  const { valorNF, valorFaturado, valorTabela, percentualComissao, icmsOrigem, icmsDestino } = params;
 
   // Debug log
   console.log('[approvalCalculator] Entrada:', {
@@ -165,10 +166,10 @@ export function calculateApprovalCommission(
   // Comissão total = Comissão do Pedido + Over Líquido
   const comissaoTotal = comissaoPedido + overLiquido;
 
-  // Percentual final sobre valor NF (Valor Real)
-  const percentualFinal = valorNF > 0 ? (comissaoTotal / valorNF) * 100 : 0;
+  // Percentual final sobre VALOR FATURADO DA NF (não sobre Valor Presente)
+  const percentualFinal = valorFaturado > 0 ? (comissaoTotal / valorFaturado) * 100 : 0;
 
-  console.log('[approvalCalculator] Resultado:', { comissaoPedido, overLiquido, comissaoTotal, percentualFinal });
+  console.log('[approvalCalculator] Resultado:', { comissaoPedido, overLiquido, comissaoTotal, percentualFinal, valorFaturado });
 
   return {
     valorTabelaAjustado,

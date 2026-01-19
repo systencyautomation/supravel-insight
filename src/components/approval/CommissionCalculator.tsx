@@ -275,11 +275,13 @@ export function CommissionCalculator({
     console.log('=== Calculadora Debug ===');
     console.log('valorTabela (input):', valorTabela);
     console.log('valorReal (VP):', valorReal);
+    console.log('valorFaturado (NF):', valorFaturado);
     console.log('icmsTabela:', icmsTabela, '% -> ', icmsTabela / 100);
     console.log('icmsDestino:', icmsDestino, '% -> ', icmsDestino / 100);
 
     const result = calculateApprovalCommission({
-      valorNF: valorReal, // Usar Valor Real (com VP) como base
+      valorNF: valorReal,       // Valor Real (com VP) para calcular Over Price
+      valorFaturado,            // Valor Faturado da NF para calcular percentual final
       valorTabela,
       percentualComissao,
       icmsOrigem: icmsTabela / 100,
@@ -288,10 +290,11 @@ export function CommissionCalculator({
     
     console.log('valorTabelaAjustado (output):', result.valorTabelaAjustado);
     console.log('overPrice (output):', result.overPrice);
+    console.log('percentualFinal (sobre NF):', result.percentualFinal);
     console.log('=========================');
     
     return result;
-  }, [valorReal, valorTabela, percentualComissao, icmsTabela, icmsDestino]);
+  }, [valorReal, valorFaturado, valorTabela, percentualComissao, icmsTabela, icmsDestino]);
 
   // Use manual over price if set
   const effectiveOverPrice = manualOverPrice !== null ? manualOverPrice : (calculation?.overPrice || 0);
@@ -319,7 +322,8 @@ export function CommissionCalculator({
 
     const comissaoPedido = (percentualComissao / 100) * valorTabela;
     const comissaoTotal = comissaoPedido + overLiquido;
-    const percentualFinal = valorReal ? (comissaoTotal / valorReal) * 100 : 0;
+    // Percentual sobre Valor Faturado (NF), não sobre Valor Real (VP)
+    const percentualFinal = valorFaturado > 0 ? (comissaoTotal / valorFaturado) * 100 : 0;
 
     return {
       ...calculation,
@@ -332,7 +336,7 @@ export function CommissionCalculator({
       comissaoTotal,
       percentualFinal,
     };
-  }, [calculation, manualOverPrice, icmsDestino, percentualComissao, valorTabela, valorReal]);
+  }, [calculation, manualOverPrice, icmsDestino, percentualComissao, valorTabela, valorFaturado]);
 
   const activeCalculation = finalCalculation || calculation;
 
