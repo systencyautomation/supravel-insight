@@ -271,13 +271,26 @@ export function CommissionCalculator({
   const calculation = useMemo(() => {
     if (!valorReal) return null;
 
-    return calculateApprovalCommission({
+    // Debug logs
+    console.log('=== Calculadora Debug ===');
+    console.log('valorTabela (input):', valorTabela);
+    console.log('valorReal (VP):', valorReal);
+    console.log('icmsTabela:', icmsTabela, '% -> ', icmsTabela / 100);
+    console.log('icmsDestino:', icmsDestino, '% -> ', icmsDestino / 100);
+
+    const result = calculateApprovalCommission({
       valorNF: valorReal, // Usar Valor Real (com VP) como base
       valorTabela,
       percentualComissao,
       icmsOrigem: icmsTabela / 100,
       icmsDestino: icmsDestino / 100,
     });
+    
+    console.log('valorTabelaAjustado (output):', result.valorTabelaAjustado);
+    console.log('overPrice (output):', result.overPrice);
+    console.log('=========================');
+    
+    return result;
   }, [valorReal, valorTabela, percentualComissao, icmsTabela, icmsDestino]);
 
   // Use manual over price if set
