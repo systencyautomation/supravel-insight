@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.delete-auth-user]
 verify_jwt = false
+
+[functions.parse-nfe-xml]
+verify_jwt = false

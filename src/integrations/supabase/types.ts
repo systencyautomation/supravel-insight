@@ -488,6 +488,9 @@ export type Database = {
           pis_cofins: number | null
           produto_codigo: string | null
           produto_descricao: string | null
+          produto_marca: string | null
+          produto_modelo: string | null
+          produto_numero_serie: string | null
           representative_id: string | null
           status: string | null
           table_value: number | null
@@ -530,6 +533,9 @@ export type Database = {
           pis_cofins?: number | null
           produto_codigo?: string | null
           produto_descricao?: string | null
+          produto_marca?: string | null
+          produto_modelo?: string | null
+          produto_numero_serie?: string | null
           representative_id?: string | null
           status?: string | null
           table_value?: number | null
@@ -572,6 +578,9 @@ export type Database = {
           pis_cofins?: number | null
           produto_codigo?: string | null
           produto_descricao?: string | null
+          produto_marca?: string | null
+          produto_modelo?: string | null
+          produto_numero_serie?: string | null
           representative_id?: string | null
           status?: string | null
           table_value?: number | null

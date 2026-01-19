@@ -80,14 +80,14 @@ export function SaleInfoHeader({ sale }: SaleInfoHeaderProps) {
             </div>
             <div className="flex items-center gap-2">
               <code className="bg-background border px-2 py-0.5 rounded text-xs font-mono">
-                {sale.produto_codigo || 'N/A'}
+                {sale.produto_modelo || sale.produto_codigo || 'N/A'}
               </code>
-              {sale.produto_codigo && (
+              {(sale.produto_modelo || sale.produto_codigo) && (
                 <Button 
                   variant="ghost" 
                   size="icon" 
                   className="h-6 w-6"
-                  onClick={() => copyToClipboard(sale.produto_codigo!)}
+                  onClick={() => copyToClipboard(sale.produto_modelo || sale.produto_codigo || '')}
                   title="Copiar código do produto"
                 >
                   {copied ? (
@@ -101,6 +101,16 @@ export function SaleInfoHeader({ sale }: SaleInfoHeaderProps) {
             <p className="text-xs text-muted-foreground truncate" title={sale.produto_descricao || '-'}>
               {sale.produto_descricao || '-'}
             </p>
+            {sale.produto_marca && (
+              <p className="text-xs text-muted-foreground">
+                Marca: <span className="font-medium">{sale.produto_marca}</span>
+              </p>
+            )}
+            {sale.produto_numero_serie && (
+              <p className="text-xs text-muted-foreground font-mono">
+                S/N: {sale.produto_numero_serie}
+              </p>
+            )}
           </div>
           
           {/* Valor e UF */}

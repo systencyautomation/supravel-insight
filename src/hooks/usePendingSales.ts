@@ -22,6 +22,9 @@ export interface PendingSale {
   created_at: string | null;
   produto_codigo: string | null;
   produto_descricao: string | null;
+  produto_marca: string | null;
+  produto_modelo: string | null; // Código FIPE
+  produto_numero_serie: string | null;
   percentual_icms: number | null;
   percentual_comissao: number | null;
   over_price_liquido: number | null;
