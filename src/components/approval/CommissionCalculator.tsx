@@ -9,9 +9,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { calculateApprovalCommission, formatCurrency, getIcmsRate } from '@/lib/approvalCalculator';
 import type { PendingSale } from '@/hooks/usePendingSales';
+import type { FipeDocument } from '@/hooks/useFipeDocument';
+
+export interface Installment {
+  id: string;
+  sale_id: string;
+  installment_number: number;
+  value: number;
+  due_date: string | null;
+  status: string | null;
+}
 
 interface CommissionCalculatorProps {
   sale: PendingSale | null;
+  installments: Installment[];
+  fipeDocument: FipeDocument | null;
   onCalculationChange: (data: CalculationData) => void;
 }
 
@@ -32,6 +44,8 @@ export interface CalculationData {
 
 export function CommissionCalculator({ 
   sale, 
+  installments,
+  fipeDocument,
   onCalculationChange 
 }: CommissionCalculatorProps) {
   // Dados da Tabela
@@ -47,23 +61,110 @@ export function CommissionCalculator({
   const [tipoPagamento, setTipoPagamento] = useState('a_vista');
   const [valorEntrada, setValorEntrada] = useState(0);
   const [qtdParcelas, setQtdParcelas] = useState(0);
+  const [valorParcelaReal, setValorParcelaReal] = useState(0);
 
   // Over Price editing
   const [editingOverPrice, setEditingOverPrice] = useState(false);
   const [manualOverPrice, setManualOverPrice] = useState<number | null>(null);
 
-  // Update from sale
+  // Search FIPE spreadsheet for product code
+  const matchedFipeRow = useMemo(() => {
+    if (!sale?.produto_codigo || !fipeDocument?.gridData) return null;
+    
+    const gridData = fipeDocument.gridData;
+    if (!gridData || gridData.length < 4) return null;
+
+    // Find header row (usually row 2 or 3)
+    let headerRowIndex = -1;
+    let codIndex = -1;
+    
+    for (let i = 0; i < Math.min(5, gridData.length); i++) {
+      const row = gridData[i];
+      if (!row) continue;
+      
+      const idx = row.findIndex(cell => {
+        const value = String(cell?.value || '').toLowerCase();
+        return value.includes('cód') && value.includes('interno');
+      });
+      
+      if (idx >= 0) {
+        headerRowIndex = i;
+        codIndex = idx;
+        break;
+      }
+    }
+    
+    if (headerRowIndex === -1 || codIndex === -1) return null;
+    
+    const headerRow = gridData[headerRowIndex];
+    
+    // Find value and commission column indices
+    const valorIndex = headerRow?.findIndex(cell => {
+      const value = String(cell?.value || '').toLowerCase();
+      return value.includes('valor') && value.includes('12%');
+    }) ?? -1;
+    
+    const comissaoIndex = headerRow?.findIndex(cell => {
+      const value = String(cell?.value || '').toLowerCase();
+      return value.includes('comiss');
+    }) ?? -1;
+    
+    // Search for matching product code
+    for (let i = headerRowIndex + 1; i < gridData.length; i++) {
+      const row = gridData[i];
+      if (!row) continue;
+      
+      const cellValue = String(row[codIndex]?.value || '').trim();
+      const productCode = String(sale.produto_codigo || '').trim();
+      
+      if (cellValue === productCode) {
+        return {
+          rowIndex: i,
+          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
+        };
+      }
+    }
+    
+    return null;
+  }, [sale?.produto_codigo, fipeDocument]);
+
+  // Update from sale and installments
   useEffect(() => {
     if (sale) {
       setValorFaturado(sale.total_value || 0);
       setIcmsDestino((sale.percentual_icms || getIcmsRate(sale.uf_destiny || '') * 100));
       setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);
-      setTipoPagamento(sale.payment_method || 'a_vista');
+      
+      // Pre-fill from existing sale data if available
       if (sale.table_value) setValorTabela(sale.table_value);
       if (sale.percentual_comissao) setPercentualComissao(sale.percentual_comissao);
       setValorEntrada(sale.valor_entrada || 0);
+    }
+  }, [sale]);
+
+  // Pre-fill from installments
+  useEffect(() => {
+    if (installments.length > 0) {
+      // First installment is usually the down payment (entrada)
+      const entrada = installments.find(i => i.installment_number === 1);
+      const parcelas = installments.filter(i => i.installment_number > 1);
       
-      // Parse payment_method for parcelas
+      if (parcelas.length > 0) {
+        setTipoPagamento('parcelado_boleto');
+        setValorEntrada(entrada?.value || 0);
+        setQtdParcelas(parcelas.length);
+        setValorParcelaReal(parcelas[0]?.value || 0);
+      } else if (entrada && installments.length === 1) {
+        // Single payment = à vista
+        setTipoPagamento('a_vista');
+        setValorEntrada(0);
+        setQtdParcelas(0);
+        setValorParcelaReal(0);
+      }
+    } else if (sale) {
+      // Fallback to payment_method parsing
+      setTipoPagamento(sale.payment_method || 'a_vista');
       const paymentMethod = sale.payment_method || '';
       const parcelasMatch = paymentMethod.match(/(\d+)/);
       if (parcelasMatch) {
@@ -72,7 +173,19 @@ export function CommissionCalculator({
         setQtdParcelas(0);
       }
     }
-  }, [sale]);
+  }, [installments, sale]);
+
+  // Pre-fill from FIPE spreadsheet match
+  useEffect(() => {
+    if (matchedFipeRow && !sale?.table_value) {
+      if (matchedFipeRow.valorTabela > 0) {
+        setValorTabela(matchedFipeRow.valorTabela);
+      }
+      if (matchedFipeRow.comissao > 0) {
+        setPercentualComissao(matchedFipeRow.comissao);
+      }
+    }
+  }, [matchedFipeRow, sale?.table_value]);
 
   // Calculate commission
   const calculation = useMemo(() => {
@@ -130,12 +243,26 @@ export function CommissionCalculator({
 
   const activeCalculation = finalCalculation || calculation;
 
-  // Calculate valor da parcela
+  // Calculate valor da parcela (use real value if available, otherwise calculate)
   const valorParcela = useMemo(() => {
+    if (valorParcelaReal > 0) return valorParcelaReal;
     if (qtdParcelas <= 0) return 0;
     const valorRestante = valorFaturado - valorEntrada;
     return valorRestante / qtdParcelas;
-  }, [valorFaturado, valorEntrada, qtdParcelas]);
+  }, [valorFaturado, valorEntrada, qtdParcelas, valorParcelaReal]);
+
+  // Calculate boleto interest
+  const jurosCalculado = useMemo(() => {
+    if (tipoPagamento !== 'parcelado_boleto' || qtdParcelas === 0) {
+      return { valor: 0, percentual: 0 };
+    }
+    
+    const totalParcelado = valorEntrada + (qtdParcelas * valorParcela);
+    const juros = totalParcelado - valorFaturado;
+    const percentualJuros = valorFaturado > 0 ? (juros / valorFaturado) * 100 : 0;
+    
+    return { valor: juros, percentual: percentualJuros };
+  }, [tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorFaturado]);
 
   // Notify parent of changes
   useEffect(() => {
@@ -256,15 +383,22 @@ export function CommissionCalculator({
               <RadioGroup 
                 value={tipoPagamento} 
                 onValueChange={setTipoPagamento}
-                className="flex gap-4"
+                className="flex flex-col gap-2"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="a_vista" id="a_vista" />
                   <Label htmlFor="a_vista" className="text-sm font-normal">À Vista</Label>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="parcelado_boleto" id="parcelado_boleto" />
-                  <Label htmlFor="parcelado_boleto" className="text-sm font-normal">Parcelado Boleto</Label>
+                <div className="flex flex-col">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="parcelado_boleto" id="parcelado_boleto" />
+                    <Label htmlFor="parcelado_boleto" className="text-sm font-normal">Parcelado Boleto</Label>
+                  </div>
+                  {tipoPagamento === 'parcelado_boleto' && jurosCalculado.valor !== 0 && (
+                    <p className="text-xs text-muted-foreground ml-6 mt-0.5">
+                      Juros: {formatCurrency(jurosCalculado.valor)} ({jurosCalculado.percentual.toFixed(2)}%)
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="parcelado_cartao" id="parcelado_cartao" />

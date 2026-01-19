@@ -7,13 +7,12 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSales } from '@/hooks/usePendingSales';
-import { CommissionCalculator, CalculationData } from '@/components/approval/CommissionCalculator';
+import { CommissionCalculator, CalculationData, type Installment } from '@/components/approval/CommissionCalculator';
 import { ApprovalActions } from '@/components/approval/ApprovalActions';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
 import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
 export default function SalesApproval() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -25,6 +24,7 @@ export default function SalesApproval() {
   const [calculationData, setCalculationData] = useState<CalculationData | null>(null);
   const [fipeDocument, setFipeDocument] = useState<FipeDocument | null>(null);
   const [documentLoading, setDocumentLoading] = useState(true);
+  const [installments, setInstallments] = useState<Installment[]>([]);
   const { fetchLatestDocument } = useFipeDocument();
 
   // Check permissions
@@ -56,6 +56,32 @@ export default function SalesApproval() {
     };
     loadDocument();
   }, [effectiveOrgId, fetchLatestDocument]);
+
+  // Load installments for current sale
+  useEffect(() => {
+    const fetchInstallments = async () => {
+      if (!currentSale?.id) {
+        setInstallments([]);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('installments')
+        .select('*')
+        .eq('sale_id', currentSale.id)
+        .order('installment_number', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching installments:', error);
+        setInstallments([]);
+        return;
+      }
+      
+      setInstallments(data || []);
+    };
+    
+    fetchInstallments();
+  }, [currentSale?.id]);
 
   // Navigate to specific sale from URL param
   useEffect(() => {
@@ -267,6 +293,8 @@ export default function SalesApproval() {
             <div className="h-full p-4">
               <CommissionCalculator
                 sale={currentSale}
+                installments={installments}
+                fipeDocument={fipeDocument}
                 onCalculationChange={handleCalculationChange}
               />
             </div>
