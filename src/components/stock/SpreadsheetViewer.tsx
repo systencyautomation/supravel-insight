@@ -360,7 +360,7 @@ export function SpreadsheetViewer({ gridData, colCount, rowCount, fileName }: Sp
       className={`space-y-4 ${isFullscreen ? 'bg-background p-4 h-screen flex flex-col' : ''}`}
     >
       {/* File info, search, zoom and fullscreen controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-[5px]">
         <div className="flex items-center gap-3 flex-wrap">
           {fileName && (
             <Badge variant="outline" className="text-xs">
