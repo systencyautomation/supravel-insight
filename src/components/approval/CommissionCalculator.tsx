@@ -3,27 +3,24 @@ import { Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { calculateApprovalCommission, formatCurrency, formatPercent, getIcmsRate } from '@/lib/approvalCalculator';
+import { calculateApprovalCommission, formatCurrency, getIcmsRate } from '@/lib/approvalCalculator';
 import type { PendingSale } from '@/hooks/usePendingSales';
-import type { InventoryItem } from './FipeTable';
 
 interface CommissionCalculatorProps {
   sale: PendingSale | null;
-  selectedInventoryItem: InventoryItem | null;
   onCalculationChange: (data: CalculationData) => void;
 }
 
 export interface CalculationData {
   valorTabela: number;
   percentualComissao: number;
+  icmsTabela: number;
   icmsDestino: number;
   tipoPagamento: string;
-  observacoes: string;
   overPrice: number;
   overPriceLiquido: number;
   comissaoTotal: number;
@@ -35,39 +32,38 @@ export interface CalculationData {
 
 export function CommissionCalculator({ 
   sale, 
-  selectedInventoryItem,
   onCalculationChange 
 }: CommissionCalculatorProps) {
-  // Editable fields
+  // Dados da Tabela
   const [valorTabela, setValorTabela] = useState(0);
+  const [icmsTabela, setIcmsTabela] = useState(12);
   const [percentualComissao, setPercentualComissao] = useState(0);
-  const [icmsDestino, setIcmsDestino] = useState(0);
+
+  // Dados da Nota Fiscal
+  const [valorFaturado, setValorFaturado] = useState(0);
+  const [icmsDestino, setIcmsDestino] = useState(12);
+
+  // Parcelamento
   const [tipoPagamento, setTipoPagamento] = useState('a_vista');
-  const [observacoes, setObservacoes] = useState('');
-  const [editingOverPrice, setEditingOverPrice] = useState(false);
-  const [manualOverPrice, setManualOverPrice] = useState<number | null>(null);
   const [valorEntrada, setValorEntrada] = useState(0);
   const [qtdParcelas, setQtdParcelas] = useState(0);
 
-  // Update from inventory item
-  useEffect(() => {
-    if (selectedInventoryItem) {
-      setValorTabela(selectedInventoryItem.base_price || 0);
-      setPercentualComissao(selectedInventoryItem.base_commission_pct || 0);
-    }
-  }, [selectedInventoryItem]);
+  // Over Price editing
+  const [editingOverPrice, setEditingOverPrice] = useState(false);
+  const [manualOverPrice, setManualOverPrice] = useState<number | null>(null);
 
   // Update from sale
   useEffect(() => {
     if (sale) {
-      setIcmsDestino(sale.percentual_icms || getIcmsRate(sale.uf_destiny || '') * 100);
+      setValorFaturado(sale.total_value || 0);
+      setIcmsDestino((sale.percentual_icms || getIcmsRate(sale.uf_destiny || '') * 100));
+      setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);
       setTipoPagamento(sale.payment_method || 'a_vista');
-      setObservacoes(sale.observacoes || '');
       if (sale.table_value) setValorTabela(sale.table_value);
       if (sale.percentual_comissao) setPercentualComissao(sale.percentual_comissao);
       setValorEntrada(sale.valor_entrada || 0);
       
-      // Parse payment_method for parcelas (format: "boleto_Nx" or similar)
+      // Parse payment_method for parcelas
       const paymentMethod = sale.payment_method || '';
       const parcelasMatch = paymentMethod.match(/(\d+)/);
       if (parcelasMatch) {
@@ -80,18 +76,16 @@ export function CommissionCalculator({
 
   // Calculate commission
   const calculation = useMemo(() => {
-    if (!sale?.total_value) return null;
+    if (!valorFaturado) return null;
 
-    const icmsOrigem = getIcmsRate(sale.emitente_uf || 'SP');
-    
     return calculateApprovalCommission({
-      valorNF: sale.total_value,
+      valorNF: valorFaturado,
       valorTabela,
       percentualComissao,
-      icmsOrigem,
+      icmsOrigem: icmsTabela / 100,
       icmsDestino: icmsDestino / 100,
     });
-  }, [sale, valorTabela, percentualComissao, icmsDestino]);
+  }, [valorFaturado, valorTabela, percentualComissao, icmsTabela, icmsDestino]);
 
   // Use manual over price if set
   const effectiveOverPrice = manualOverPrice !== null ? manualOverPrice : (calculation?.overPrice || 0);
@@ -100,7 +94,6 @@ export function CommissionCalculator({
   const finalCalculation = useMemo(() => {
     if (!calculation || manualOverPrice === null) return calculation;
 
-    // Recalculate deductions based on manual over price
     const overPrice = manualOverPrice;
     let deducaoIcms = 0;
     let deducaoPisCofins = 0;
@@ -120,7 +113,7 @@ export function CommissionCalculator({
 
     const comissaoPedido = (percentualComissao / 100) * valorTabela;
     const comissaoTotal = comissaoPedido + overLiquido;
-    const percentualFinal = sale?.total_value ? (comissaoTotal / sale.total_value) * 100 : 0;
+    const percentualFinal = valorFaturado ? (comissaoTotal / valorFaturado) * 100 : 0;
 
     return {
       ...calculation,
@@ -133,16 +126,16 @@ export function CommissionCalculator({
       comissaoTotal,
       percentualFinal,
     };
-  }, [calculation, manualOverPrice, icmsDestino, percentualComissao, valorTabela, sale]);
+  }, [calculation, manualOverPrice, icmsDestino, percentualComissao, valorTabela, valorFaturado]);
 
   const activeCalculation = finalCalculation || calculation;
 
   // Calculate valor da parcela
   const valorParcela = useMemo(() => {
     if (qtdParcelas <= 0) return 0;
-    const valorRestante = (sale?.total_value || 0) - valorEntrada;
+    const valorRestante = valorFaturado - valorEntrada;
     return valorRestante / qtdParcelas;
-  }, [sale?.total_value, valorEntrada, qtdParcelas]);
+  }, [valorFaturado, valorEntrada, qtdParcelas]);
 
   // Notify parent of changes
   useEffect(() => {
@@ -150,9 +143,9 @@ export function CommissionCalculator({
       onCalculationChange({
         valorTabela,
         percentualComissao,
+        icmsTabela,
         icmsDestino,
         tipoPagamento,
-        observacoes,
         overPrice: activeCalculation.overPrice,
         overPriceLiquido: activeCalculation.overLiquido,
         comissaoTotal: activeCalculation.comissaoTotal,
@@ -162,7 +155,7 @@ export function CommissionCalculator({
         valorParcela,
       });
     }
-  }, [activeCalculation, valorTabela, percentualComissao, icmsDestino, tipoPagamento, observacoes, valorEntrada, qtdParcelas, valorParcela]);
+  }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, onCalculationChange]);
 
   if (!sale) {
     return (
@@ -179,78 +172,75 @@ export function CommissionCalculator({
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0">
         <ScrollArea className="h-full">
-          <div className="p-4 space-y-6">
-            {/* Dados da NFe */}
+          <div className="p-4 space-y-5">
+            {/* Dados da Tabela */}
             <div className="space-y-3">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                Dados da NFe (automático)
+                Dados da Tabela
               </h3>
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Código:</span>{' '}
-                    <span className="font-mono">{sale.produto_codigo || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">NFe:</span>{' '}
-                    <span className="font-mono">{sale.nfe_number || '-'}</span>
-                  </div>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Produto:</span>{' '}
-                  {sale.produto_descricao || sale.client_name || '-'}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Valor NF:</span>{' '}
-                    <span className="font-semibold text-primary">
-                      {formatCurrency(sale.total_value || 0)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">UF Destino:</span>{' '}
-                    {sale.uf_destiny || '-'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Dados editáveis */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                Dados da Tabela FIPE
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="valorTabela">Valor Tabela</Label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="valorTabela" className="text-xs">Valor Tabela à Vista</Label>
                   <Input
                     id="valorTabela"
                     type="number"
                     value={valorTabela}
                     onChange={(e) => setValorTabela(parseFloat(e.target.value) || 0)}
-                    className="font-mono"
+                    className="font-mono h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="percentualComissao">% Comissão</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="icmsTabela" className="text-xs">% Icms</Label>
+                  <Input
+                    id="icmsTabela"
+                    type="number"
+                    step="1"
+                    value={icmsTabela}
+                    onChange={(e) => setIcmsTabela(parseFloat(e.target.value) || 0)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="percentualComissao" className="text-xs">% Comissão</Label>
                   <Input
                     id="percentualComissao"
                     type="number"
                     step="0.5"
                     value={percentualComissao}
                     onChange={(e) => setPercentualComissao(parseFloat(e.target.value) || 0)}
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="icmsDestino">% ICMS Destino</Label>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Dados da Nota Fiscal */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Dados da Nota Fiscal
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="valorFaturado" className="text-xs">Valor Faturado Nota Fiscal</Label>
+                  <Input
+                    id="valorFaturado"
+                    type="number"
+                    value={valorFaturado}
+                    onChange={(e) => setValorFaturado(parseFloat(e.target.value) || 0)}
+                    className="font-mono h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="icmsDestino" className="text-xs">% Icms</Label>
                   <Input
                     id="icmsDestino"
                     type="number"
                     step="1"
                     value={icmsDestino}
                     onChange={(e) => setIcmsDestino(parseFloat(e.target.value) || 0)}
+                    className="h-9"
                   />
                 </div>
               </div>
@@ -258,61 +248,54 @@ export function CommissionCalculator({
 
             <Separator />
 
-            {/* Tipo de Pagamento */}
+            {/* Parcelamento */}
             <div className="space-y-3">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                Tipo de Pagamento
+                Parcelamento
               </h3>
-              <RadioGroup value={tipoPagamento} onValueChange={setTipoPagamento}>
+              <RadioGroup 
+                value={tipoPagamento} 
+                onValueChange={setTipoPagamento}
+                className="flex gap-4"
+              >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="a_vista" id="a_vista" />
-                  <Label htmlFor="a_vista">À Vista</Label>
+                  <Label htmlFor="a_vista" className="text-sm font-normal">À Vista</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="parcelado_boleto" id="parcelado_boleto" />
-                  <Label htmlFor="parcelado_boleto">Parcelado Boleto (2.2% a.m.)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="parcelado_cartao" id="parcelado_cartao" />
-                  <Label htmlFor="parcelado_cartao">Parcelado Cartão (3.5% a.m.)</Label>
+                  <Label htmlFor="parcelado_boleto" className="text-sm font-normal">Parcelado Boleto</Label>
                 </div>
               </RadioGroup>
-            </div>
-
-            <Separator />
-
-            {/* Dados de Parcelamento */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                Dados de Parcelamento
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="valorEntrada">Valor da Entrada</Label>
-                  <Input
-                    id="valorEntrada"
-                    type="number"
-                    value={valorEntrada}
-                    onChange={(e) => setValorEntrada(parseFloat(e.target.value) || 0)}
-                    className="font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="qtdParcelas">Qtd. Parcelas</Label>
-                  <Input
-                    id="qtdParcelas"
-                    type="number"
-                    min="0"
-                    value={qtdParcelas}
-                    onChange={(e) => setQtdParcelas(parseInt(e.target.value, 10) || 0)}
-                  />
-                </div>
-              </div>
-              {qtdParcelas > 0 && (
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <div className="flex justify-between items-center font-mono text-sm">
-                    <span className="text-muted-foreground">Valor de cada parcela:</span>
-                    <span className="font-semibold text-primary">{formatCurrency(valorParcela)}</span>
+              
+              {tipoPagamento === 'parcelado_boleto' && (
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="valorEntrada" className="text-xs">Entrada R$</Label>
+                    <Input
+                      id="valorEntrada"
+                      type="number"
+                      value={valorEntrada}
+                      onChange={(e) => setValorEntrada(parseFloat(e.target.value) || 0)}
+                      className="font-mono h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="qtdParcelas" className="text-xs">Número de Parcelas</Label>
+                    <Input
+                      id="qtdParcelas"
+                      type="number"
+                      min="1"
+                      value={qtdParcelas}
+                      onChange={(e) => setQtdParcelas(parseInt(e.target.value, 10) || 0)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Valor da Parcela</Label>
+                    <div className="h-9 px-3 flex items-center bg-muted rounded-md font-mono text-sm">
+                      {formatCurrency(valorParcela)}
+                    </div>
                   </div>
                 </div>
               )}
@@ -328,12 +311,15 @@ export function CommissionCalculator({
                 </h3>
                 <div className="bg-muted/50 rounded-lg p-4 space-y-2 font-mono text-sm">
                   <div className="flex justify-between">
-                    <span>Valor Tabela Ajustado:</span>
+                    <span>Valor Tabela à Vista Icms Ajustado:</span>
                     <span>{formatCurrency(activeCalculation.valorTabelaAjustado)}</span>
                   </div>
+                  
+                  <Separator className="my-2" />
+                  
                   <div className="flex justify-between items-center">
                     <span className="flex items-center gap-2">
-                      Over Price:
+                      Over Price
                       <Button
                         variant="ghost"
                         size="icon"
@@ -366,20 +352,20 @@ export function CommissionCalculator({
                     )}
                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>(-) ICMS {icmsDestino}%:</span>
+                    <span>(-) Icms</span>
                     <span>-{formatCurrency(activeCalculation.deducaoIcms)}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>(-) PIS/COFINS 9,25%:</span>
+                    <span>(-) Pis/Cofins</span>
                     <span>-{formatCurrency(activeCalculation.deducaoPisCofins)}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>(-) IR/CSLL 34%:</span>
+                    <span>(-) IR/CSLL</span>
                     <span>-{formatCurrency(activeCalculation.deducaoIrCsll)}</span>
                   </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between font-semibold">
-                    <span>Over Líquido:</span>
+                    <span>Resultado Líquido</span>
                     <span className={activeCalculation.overLiquido < 0 ? 'text-destructive' : 'text-success'}>
                       {formatCurrency(activeCalculation.overLiquido)}
                     </span>
@@ -390,48 +376,31 @@ export function CommissionCalculator({
 
             <Separator />
 
-            {/* Comissão Final */}
+            {/* Comissão à ser Paga */}
             {activeCalculation && (
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                  Comissão Final
+                  Comissão à ser Paga
                 </h3>
                 <div className="bg-primary/10 rounded-lg p-4 space-y-2 font-mono text-sm">
                   <div className="flex justify-between">
-                    <span>Pedido ({percentualComissao}% × {formatCurrency(valorTabela)}):</span>
+                    <span>Pedido</span>
                     <span>{formatCurrency(activeCalculation.comissaoPedido)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Over Líquido:</span>
+                    <span>Over</span>
                     <span className={activeCalculation.overLiquido < 0 ? 'text-destructive' : ''}>
                       {formatCurrency(activeCalculation.overLiquido)}
                     </span>
                   </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between text-lg font-bold">
-                    <span>TOTAL COMISSÃO:</span>
+                    <span>R$</span>
                     <span className="text-primary">{formatCurrency(activeCalculation.comissaoTotal)}</span>
-                  </div>
-                  <div className="text-center text-muted-foreground">
-                    ({activeCalculation.percentualFinal.toFixed(2)}% do valor faturado)
                   </div>
                 </div>
               </div>
             )}
-
-            <Separator />
-
-            {/* Observações */}
-            <div className="space-y-2">
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea
-                id="observacoes"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Adicione observações sobre esta venda..."
-                className="min-h-[80px]"
-              />
-            </div>
           </div>
         </ScrollArea>
       </CardContent>
