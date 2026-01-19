@@ -383,28 +383,27 @@ export function CommissionCalculator({
               <RadioGroup 
                 value={tipoPagamento} 
                 onValueChange={setTipoPagamento}
-                className="flex flex-col gap-2"
+                className="flex gap-4"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="a_vista" id="a_vista" />
                   <Label htmlFor="a_vista" className="text-sm font-normal">À Vista</Label>
                 </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="parcelado_boleto" id="parcelado_boleto" />
-                    <Label htmlFor="parcelado_boleto" className="text-sm font-normal">Parcelado Boleto</Label>
-                  </div>
-                  {tipoPagamento === 'parcelado_boleto' && jurosCalculado.valor !== 0 && (
-                    <p className="text-xs text-muted-foreground ml-6 mt-0.5">
-                      Juros: {formatCurrency(jurosCalculado.valor)} ({jurosCalculado.percentual.toFixed(2)}%)
-                    </p>
-                  )}
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="parcelado_boleto" id="parcelado_boleto" />
+                  <Label htmlFor="parcelado_boleto" className="text-sm font-normal">Parcelado Boleto</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="parcelado_cartao" id="parcelado_cartao" />
                   <Label htmlFor="parcelado_cartao" className="text-sm font-normal">Parcelado Cartão</Label>
                 </div>
               </RadioGroup>
+              
+              {tipoPagamento === 'parcelado_boleto' && jurosCalculado.valor !== 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Juros: {formatCurrency(jurosCalculado.valor)} ({jurosCalculado.percentual.toFixed(2)}%)
+                </p>
+              )}
               
               <div className="grid grid-cols-3 gap-3 mt-3">
                 <div className="space-y-1.5">
