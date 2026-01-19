@@ -64,6 +64,13 @@ interface PagamentoInfo {
   valor: number | null;
 }
 
+// Interface para boletos enviados pelo n8n
+interface BoletoInfo {
+  valor: number;
+  vencimento: string;  // formato: YYYY-MM-DD
+  numero?: string;     // número do boleto (opcional)
+}
+
 interface ParsedNfe {
   produto: ProductInfo;
   nfe: NfeInfo;
@@ -337,7 +344,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { xml_content, organization_id, email_from, email_subject, filename } = body;
+    const { xml_content, organization_id, email_from, email_subject, filename, boletos } = body;
 
     if (!xml_content || typeof xml_content !== 'string') {
       return new Response(
@@ -386,15 +393,54 @@ serve(async (req) => {
       }
     }
 
-    // Determine payment method from XML
-    const paymentMethod = parsedData.pagamento.tipo 
-      ? TIPOS_PAGAMENTO[parsedData.pagamento.tipo] || 'a_vista'
-      : (parsedData.cobranca.duplicatas.length > 1 ? 'parcelado_boleto' : 'a_vista');
-
-    // Calculate valor_entrada (first installment if parcelado)
+    // Validar e processar boletos se enviados
+    const boletosArray: BoletoInfo[] = Array.isArray(boletos) ? boletos : [];
+    const usarBoletos = boletosArray.length > 0;
+    
+    let paymentMethod: string;
     let valorEntrada = 0;
-    if (parsedData.cobranca.duplicatas.length > 0 && paymentMethod !== 'a_vista') {
-      valorEntrada = parsedData.cobranca.duplicatas[0]?.valor || 0;
+    let somaBoletos = 0;
+    let entradaCalculada: { total_nf: number; soma_boletos: number; entrada: number } | null = null;
+
+    if (usarBoletos) {
+      // === USAR BOLETOS COMO FONTE DE VERDADE ===
+      console.log(`Usando ${boletosArray.length} boletos do e-mail para calcular parcelas e entrada`);
+      
+      // Calcular soma dos boletos
+      somaBoletos = boletosArray.reduce((sum, b) => sum + (b.valor || 0), 0);
+      
+      // Calcular entrada: Valor Total NF - Soma dos Boletos
+      const totalNf = parsedData.valores.total_nf || 0;
+      valorEntrada = totalNf - somaBoletos;
+      
+      // Garantir que entrada não seja negativa
+      if (valorEntrada < 0) {
+        console.warn(`Entrada calculada negativa (${valorEntrada}), ajustando para 0`);
+        valorEntrada = 0;
+      }
+      
+      entradaCalculada = {
+        total_nf: totalNf,
+        soma_boletos: somaBoletos,
+        entrada: valorEntrada
+      };
+      
+      console.log('Entrada calculada:', entradaCalculada);
+      
+      // Payment method baseado nos boletos
+      paymentMethod = boletosArray.length > 1 ? 'parcelado_boleto' : 'a_vista';
+    } else {
+      // === FALLBACK: USAR DADOS DO XML ===
+      console.log('Nenhum boleto enviado, usando duplicatas do XML');
+      
+      paymentMethod = parsedData.pagamento.tipo 
+        ? TIPOS_PAGAMENTO[parsedData.pagamento.tipo] || 'a_vista'
+        : (parsedData.cobranca.duplicatas.length > 1 ? 'parcelado_boleto' : 'a_vista');
+
+      // Valor entrada baseado na primeira duplicata do XML
+      if (parsedData.cobranca.duplicatas.length > 0 && paymentMethod !== 'a_vista') {
+        valorEntrada = parsedData.cobranca.duplicatas[0]?.valor || 0;
+      }
     }
 
     // Insert into sales table
@@ -445,9 +491,32 @@ serve(async (req) => {
 
     console.log('Sale inserted successfully:', sale.id);
 
-    // Insert installments if there are duplicatas
+    // Insert installments - usar boletos ou duplicatas do XML
     let installmentsInserted = 0;
-    if (parsedData.cobranca.duplicatas.length > 0) {
+    
+    if (usarBoletos) {
+      // === USAR BOLETOS PARA CRIAR INSTALLMENTS ===
+      const installmentsToInsert = boletosArray.map((boleto, index) => ({
+        organization_id,
+        sale_id: sale.id,
+        installment_number: index + 1,
+        value: boleto.valor || 0,
+        due_date: boleto.vencimento || null,
+        status: 'pendente'
+      }));
+
+      const { error: installmentsError } = await supabase
+        .from('installments')
+        .insert(installmentsToInsert);
+
+      if (installmentsError) {
+        console.error('Error inserting installments from boletos:', installmentsError);
+      } else {
+        installmentsInserted = installmentsToInsert.length;
+        console.log(`Inserted ${installmentsInserted} installments from boletos for sale ${sale.id}`);
+      }
+    } else if (parsedData.cobranca.duplicatas.length > 0) {
+      // === FALLBACK: USAR DUPLICATAS DO XML ===
       const installmentsToInsert = parsedData.cobranca.duplicatas.map((dup, index) => ({
         organization_id,
         sale_id: sale.id,
@@ -462,22 +531,30 @@ serve(async (req) => {
         .insert(installmentsToInsert);
 
       if (installmentsError) {
-        console.error('Error inserting installments:', installmentsError);
-        // Don't fail the whole request, just log the error
+        console.error('Error inserting installments from XML:', installmentsError);
       } else {
         installmentsInserted = installmentsToInsert.length;
-        console.log(`Inserted ${installmentsInserted} installments for sale ${sale.id}`);
+        console.log(`Inserted ${installmentsInserted} installments from XML for sale ${sale.id}`);
       }
     }
 
+    // Resposta com informações sobre a fonte dos dados
+    const response: Record<string, unknown> = { 
+      success: true, 
+      sale,
+      parsed: parsedData,
+      inserted: true,
+      installments_count: installmentsInserted,
+      boletos_source: usarBoletos
+    };
+
+    // Adicionar detalhes do cálculo se boletos foram usados
+    if (entradaCalculada) {
+      response.entrada_calculada = entradaCalculada;
+    }
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        sale,
-        parsed: parsedData,
-        inserted: true,
-        installments_count: installmentsInserted
-      }),
+      JSON.stringify(response),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
