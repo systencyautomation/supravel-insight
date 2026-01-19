@@ -71,9 +71,11 @@ export function CommissionCalculator({
   const [editingOverPrice, setEditingOverPrice] = useState(false);
   const [manualOverPrice, setManualOverPrice] = useState<number | null>(null);
 
-  // Search FIPE spreadsheet for product code
+  // Search FIPE spreadsheet for product code (prioritize produto_modelo = código FIPE)
   const matchedFipeRow = useMemo(() => {
-    if (!sale?.produto_codigo || !fipeDocument?.gridData) return null;
+    // Priorizar produto_modelo (código FIPE real), depois produto_codigo
+    const codigoParaBusca = sale?.produto_modelo || sale?.produto_codigo;
+    if (!codigoParaBusca || !fipeDocument?.gridData) return null;
     
     const gridData = fipeDocument.gridData;
     if (!gridData || gridData.length < 4) return null;
@@ -119,7 +121,7 @@ export function CommissionCalculator({
       if (!row) continue;
       
       const cellValue = String(row[codIndex]?.value || '').trim();
-      const productCode = String(sale.produto_codigo || '').trim();
+      const productCode = String(codigoParaBusca).trim();
       
       if (cellValue === productCode) {
         return {
@@ -131,7 +133,7 @@ export function CommissionCalculator({
     }
     
     return null;
-  }, [sale?.produto_codigo, fipeDocument]);
+  }, [sale?.produto_modelo, sale?.produto_codigo, fipeDocument]);
 
   // Update from sale and installments
   useEffect(() => {
