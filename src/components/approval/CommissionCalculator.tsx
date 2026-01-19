@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Pencil, Check, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
@@ -385,11 +386,10 @@ export function CommissionCalculator({
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="valorTabela" className="text-xs">Valor Tabela à Vista</Label>
-                  <Input
+                  <CurrencyInput
                     id="valorTabela"
-                    type="number"
                     value={valorTabela}
-                    onChange={(e) => setValorTabela(parseFloat(e.target.value) || 0)}
+                    onChange={setValorTabela}
                     className="font-mono h-9"
                   />
                 </div>
@@ -428,11 +428,10 @@ export function CommissionCalculator({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="valorFaturado" className="text-xs">Valor Faturado Nota Fiscal</Label>
-                  <Input
+                  <CurrencyInput
                     id="valorFaturado"
-                    type="number"
                     value={valorFaturado}
-                    onChange={(e) => setValorFaturado(parseFloat(e.target.value) || 0)}
+                    onChange={setValorFaturado}
                     className="font-mono h-9"
                   />
                 </div>
@@ -485,11 +484,10 @@ export function CommissionCalculator({
               <div className="grid grid-cols-3 gap-3 mt-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="valorEntrada" className="text-xs">Entrada R$</Label>
-                  <Input
+                  <CurrencyInput
                     id="valorEntrada"
-                    type="number"
                     value={valorEntrada}
-                    onChange={(e) => setValorEntrada(parseFloat(e.target.value) || 0)}
+                    onChange={setValorEntrada}
                     className="font-mono h-9"
                   />
                 </div>
