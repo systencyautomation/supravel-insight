@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +10,7 @@ interface ProductInfo {
   codigo: string | null;
   descricao: string | null;
   marca: string | null;
-  modelo: string | null; // Código FIPE
+  modelo: string | null;
   numero_serie: string | null;
   ncm: string | null;
   cfop: string | null;
@@ -75,10 +76,8 @@ function extractInfAdProd(infAdProd: string): { marca: string | null; modelo: st
 
   if (!infAdProd) return result;
 
-  // Normalizar quebras de linha e espaços extras
   const normalized = infAdProd.replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ');
 
-  // Extrair Marca (vários formatos)
   const marcaPatterns = [
     /Marca:\s*([^,;\n\r]+)/i,
     /MARCA:\s*([^,;\n\r]+)/i,
@@ -91,7 +90,6 @@ function extractInfAdProd(infAdProd: string): { marca: string | null; modelo: st
     }
   }
 
-  // Extrair Modelo (este é o código FIPE!)
   const modeloPatterns = [
     /Modelo\s*(?:da\s*)?(?:M[áa]quina)?:\s*([^,;\n\r]+)/i,
     /MODELO:\s*([^,;\n\r]+)/i,
@@ -105,7 +103,6 @@ function extractInfAdProd(infAdProd: string): { marca: string | null; modelo: st
     }
   }
 
-  // Extrair Número de Série (vários formatos)
   const seriePatterns = [
     /N[úu]mero\s*de\s*S[ée]rie:\s*([^,;\n\r]+)/i,
     /S[ée]rie:\s*([^,;\n\r]+)/i,
@@ -125,7 +122,6 @@ function extractInfAdProd(infAdProd: string): { marca: string | null; modelo: st
 }
 
 function parseNfeXml(xmlContent: string): ParsedNfe {
-  // Extract product info
   const cProd = extractTag(xmlContent, 'cProd');
   const xProd = extractTag(xmlContent, 'xProd');
   const ncm = extractTag(xmlContent, 'NCM');
@@ -135,12 +131,10 @@ function parseNfeXml(xmlContent: string): ParsedNfe {
   const vUnCom = extractNumber(xmlContent, 'vUnCom');
   const vProd = extractNumber(xmlContent, 'vProd');
 
-  // Extract infAdProd (additional product info)
   const infAdProdMatch = xmlContent.match(/<infAdProd>([\s\S]*?)<\/infAdProd>/i);
   const infAdProdContent = infAdProdMatch ? infAdProdMatch[1] : '';
   const { marca, modelo, numeroSerie } = extractInfAdProd(infAdProdContent);
 
-  // Extract NFe info
   const chNFe = extractTag(xmlContent, 'chNFe');
   const nNF = extractTag(xmlContent, 'nNF');
   const serie = extractTag(xmlContent, 'serie');
@@ -148,29 +142,24 @@ function parseNfeXml(xmlContent: string): ParsedNfe {
   const dhEmi = extractTag(xmlContent, 'dhEmi');
   const emissaoDate = dhEmi ? dhEmi.split('T')[0] : null;
 
-  // Extract emitente info
   const emitMatch = xmlContent.match(/<emit>([\s\S]*?)<\/emit>/i);
   const emitContent = emitMatch ? emitMatch[1] : '';
   const emitCnpj = extractTag(emitContent, 'CNPJ');
   const emitNome = extractTag(emitContent, 'xNome');
   
-  // UF do emitente (dentro de enderEmit)
   const enderEmitMatch = emitContent.match(/<enderEmit>([\s\S]*?)<\/enderEmit>/i);
   const enderEmitContent = enderEmitMatch ? enderEmitMatch[1] : '';
   const emitUf = extractTag(enderEmitContent, 'UF');
 
-  // Extract destinatario info
   const destMatch = xmlContent.match(/<dest>([\s\S]*?)<\/dest>/i);
   const destContent = destMatch ? destMatch[1] : '';
   const destCnpj = extractTag(destContent, 'CNPJ') || extractTag(destContent, 'CPF');
   const destNome = extractTag(destContent, 'xNome');
   
-  // UF do destinatário (dentro de enderDest)
   const enderDestMatch = destContent.match(/<enderDest>([\s\S]*?)<\/enderDest>/i);
   const enderDestContent = enderDestMatch ? enderDestMatch[1] : '';
   const destUf = extractTag(enderDestContent, 'UF');
 
-  // Extract valores
   const totalMatch = xmlContent.match(/<total>([\s\S]*?)<\/total>/i);
   const totalContent = totalMatch ? totalMatch[1] : '';
   const icmsTotMatch = totalContent.match(/<ICMSTot>([\s\S]*?)<\/ICMSTot>/i);
@@ -185,7 +174,7 @@ function parseNfeXml(xmlContent: string): ParsedNfe {
       codigo: cProd,
       descricao: xProd,
       marca,
-      modelo, // Código FIPE
+      modelo,
       numero_serie: numeroSerie,
       ncm,
       cfop,
@@ -220,7 +209,6 @@ function parseNfeXml(xmlContent: string): ParsedNfe {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -234,7 +222,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { xml_content } = body;
+    const { xml_content, organization_id, email_from, email_subject, filename } = body;
 
     if (!xml_content || typeof xml_content !== 'string') {
       return new Response(
@@ -243,12 +231,99 @@ serve(async (req) => {
       );
     }
 
-    const parsedData = parseNfeXml(xml_content);
+    if (!organization_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'organization_id is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const parsedData = parseNfeXml(xml_content);
     console.log('Parsed NFe data:', JSON.stringify(parsedData, null, 2));
 
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Check for duplicate NFe
+    if (parsedData.nfe.chave) {
+      const { data: existing } = await supabase
+        .from('sales')
+        .select('id')
+        .eq('nfe_key', parsedData.nfe.chave)
+        .eq('organization_id', organization_id)
+        .maybeSingle();
+
+      if (existing) {
+        console.log(`NFe ${parsedData.nfe.chave} already exists, skipping insert`);
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'NFe já existe no sistema',
+            duplicate: true,
+            existing_id: existing.id,
+            parsed: parsedData 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Insert into sales table
+    const { data: sale, error: insertError } = await supabase
+      .from('sales')
+      .insert({
+        organization_id,
+        nfe_key: parsedData.nfe.chave,
+        nfe_number: parsedData.nfe.numero,
+        nfe_series: parsedData.nfe.serie,
+        nfe_model: parsedData.nfe.modelo,
+        emission_date: parsedData.nfe.emissao,
+        produto_codigo: parsedData.produto.codigo,
+        produto_descricao: parsedData.produto.descricao,
+        produto_marca: parsedData.produto.marca,
+        produto_modelo: parsedData.produto.modelo,
+        produto_numero_serie: parsedData.produto.numero_serie,
+        emitente_cnpj: parsedData.emitente.cnpj,
+        emitente_nome: parsedData.emitente.nome,
+        emitente_uf: parsedData.emitente.uf,
+        client_cnpj: parsedData.destinatario.cnpj,
+        client_name: parsedData.destinatario.nome,
+        uf_destiny: parsedData.destinatario.uf,
+        total_produtos: parsedData.valores.total_produtos,
+        total_ipi: parsedData.valores.ipi,
+        total_value: parsedData.valores.total_nf,
+        nfe_email_from: email_from || null,
+        nfe_filename: filename || null,
+        status: 'pendente',
+        nfe_processed_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting sale:', insertError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Failed to insert sale: ${insertError.message}`,
+          parsed: parsedData 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Sale inserted successfully:', sale.id);
+
     return new Response(
-      JSON.stringify({ success: true, data: parsedData }),
+      JSON.stringify({ 
+        success: true, 
+        sale,
+        parsed: parsedData,
+        inserted: true
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
