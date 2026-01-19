@@ -106,15 +106,32 @@ export function calculateApprovalCommission(
 ): ApprovalCalculationResult {
   const { valorNF, valorTabela, percentualComissao, icmsOrigem, icmsDestino } = params;
 
+  // Debug log
+  console.log('[approvalCalculator] Entrada:', {
+    valorNF,
+    valorTabela,
+    percentualComissao,
+    icmsOrigem,
+    icmsDestino
+  });
+
   // Valor Tabela Ajustado (considerando ICMS)
   // Se ICMS origem = ICMS destino, não precisa ajustar
+  // Comparação com tolerância para evitar problemas de ponto flutuante
   let valorTabelaAjustado = valorTabela;
-  if (icmsOrigem !== icmsDestino && icmsOrigem > 0) {
+  const icmsDiferente = Math.abs(icmsOrigem - icmsDestino) > 0.001;
+  
+  if (icmsDiferente && icmsOrigem > 0) {
+    // Fórmula: valorTabela / (1 - icmsOrigem) * (1 - icmsDestino)
     valorTabelaAjustado = valorTabela / (1 - icmsOrigem) * (1 - icmsDestino);
+    console.log('[approvalCalculator] ICMS diferente, ajustando:', { icmsOrigem, icmsDestino, valorTabelaAjustado });
+  } else {
+    console.log('[approvalCalculator] ICMS igual, sem ajuste:', valorTabelaAjustado);
   }
 
-  // Over Price
+  // Over Price = Valor Real (VP) - Valor Tabela Ajustado
   const overPrice = valorNF - valorTabelaAjustado;
+  console.log('[approvalCalculator] Over Price:', overPrice, '=', valorNF, '-', valorTabelaAjustado);
 
   // Inicializa deduções
   let deducaoIcms = 0;
@@ -123,7 +140,7 @@ export function calculateApprovalCommission(
   let overLiquido = 0;
 
   if (overPrice > 0) {
-    // Deduções do Over
+    // Deduções do Over (aplicadas em cascata)
     deducaoIcms = overPrice * icmsDestino;
     
     const subtotalAposIcms = overPrice - deducaoIcms;
@@ -133,19 +150,25 @@ export function calculateApprovalCommission(
     deducaoIrCsll = subtotalAposPisCofins * IR_CSLL_RATE;
     
     overLiquido = subtotalAposPisCofins - deducaoIrCsll;
+    
+    console.log('[approvalCalculator] Deduções:', { deducaoIcms, deducaoPisCofins, deducaoIrCsll, overLiquido });
   } else {
     // Se over negativo, passa direto (sem deduções)
     overLiquido = overPrice;
+    console.log('[approvalCalculator] Over negativo, sem deduções:', overLiquido);
   }
 
-  // Comissão do pedido (% sobre valor tabela)
+  // Comissão do pedido (% sobre valor tabela ORIGINAL, não ajustado)
   const comissaoPedido = (percentualComissao / 100) * valorTabela;
+  console.log('[approvalCalculator] Comissão Pedido:', comissaoPedido, '=', percentualComissao, '% de', valorTabela);
 
-  // Comissão total
+  // Comissão total = Comissão do Pedido + Over Líquido
   const comissaoTotal = comissaoPedido + overLiquido;
 
-  // Percentual final sobre valor NF
+  // Percentual final sobre valor NF (Valor Real)
   const percentualFinal = valorNF > 0 ? (comissaoTotal / valorNF) * 100 : 0;
+
+  console.log('[approvalCalculator] Resultado:', { comissaoPedido, overLiquido, comissaoTotal, percentualFinal });
 
   return {
     valorTabelaAjustado,
