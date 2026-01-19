@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { calculateApprovalCommission, formatCurrency, getIcmsRate } from '@/lib/approvalCalculator';
+import { calculateApprovalCommission, formatCurrency, getIcmsRate, calcularValorReal, getTaxaJuros } from '@/lib/approvalCalculator';
 import type { PendingSale } from '@/hooks/usePendingSales';
 import type { FipeDocument } from '@/hooks/useFipeDocument';
 
@@ -40,6 +40,10 @@ export interface CalculationData {
   valorEntrada: number;
   qtdParcelas: number;
   valorParcela: number;
+  // Campos de Valor Presente
+  valorReal: number;        // Valor com VP aplicado
+  jurosEmbutidos: number;   // Diferença entre parcelado e VP
+  taxaJuros: number;        // Taxa usada (2.2% ou 3.5%)
 }
 
 export function CommissionCalculator({ 
@@ -187,18 +191,54 @@ export function CommissionCalculator({
     }
   }, [matchedFipeRow, sale?.table_value]);
 
-  // Calculate commission
+  // Calculate valor da parcela (use real value if available, otherwise calculate)
+  const valorParcela = useMemo(() => {
+    if (valorParcelaReal > 0) return valorParcelaReal;
+    if (qtdParcelas <= 0) return 0;
+    const valorRestante = valorFaturado - valorEntrada;
+    return valorRestante / qtdParcelas;
+  }, [valorFaturado, valorEntrada, qtdParcelas, valorParcelaReal]);
+
+  // Calculate Valor Real (com VP para parcelados)
+  const valorReal = useMemo(() => {
+    return calcularValorReal(
+      tipoPagamento as 'a_vista' | 'parcelado_boleto' | 'parcelado_cartao',
+      valorFaturado,
+      valorEntrada,
+      valorParcela,
+      qtdParcelas
+    );
+  }, [tipoPagamento, valorFaturado, valorEntrada, valorParcela, qtdParcelas]);
+
+  // Calculate juros embutidos (diferença entre total parcelado e VP)
+  const jurosEmbutidos = useMemo(() => {
+    if (tipoPagamento === 'a_vista') {
+      return { valor: 0, taxaMensal: 0, taxaLabel: '' };
+    }
+    
+    const totalParcelado = valorEntrada + (qtdParcelas * valorParcela);
+    const diferencaVP = totalParcelado - valorReal;
+    const taxa = getTaxaJuros(tipoPagamento);
+    
+    return {
+      valor: diferencaVP,
+      taxaMensal: taxa * 100,
+      taxaLabel: `${(taxa * 100).toFixed(1)}% a.m.`
+    };
+  }, [tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorReal]);
+
+  // Calculate commission using Valor Real (with VP)
   const calculation = useMemo(() => {
-    if (!valorFaturado) return null;
+    if (!valorReal) return null;
 
     return calculateApprovalCommission({
-      valorNF: valorFaturado,
+      valorNF: valorReal, // Usar Valor Real (com VP) como base
       valorTabela,
       percentualComissao,
       icmsOrigem: icmsTabela / 100,
       icmsDestino: icmsDestino / 100,
     });
-  }, [valorFaturado, valorTabela, percentualComissao, icmsTabela, icmsDestino]);
+  }, [valorReal, valorTabela, percentualComissao, icmsTabela, icmsDestino]);
 
   // Use manual over price if set
   const effectiveOverPrice = manualOverPrice !== null ? manualOverPrice : (calculation?.overPrice || 0);
@@ -226,7 +266,7 @@ export function CommissionCalculator({
 
     const comissaoPedido = (percentualComissao / 100) * valorTabela;
     const comissaoTotal = comissaoPedido + overLiquido;
-    const percentualFinal = valorFaturado ? (comissaoTotal / valorFaturado) * 100 : 0;
+    const percentualFinal = valorReal ? (comissaoTotal / valorReal) * 100 : 0;
 
     return {
       ...calculation,
@@ -239,30 +279,9 @@ export function CommissionCalculator({
       comissaoTotal,
       percentualFinal,
     };
-  }, [calculation, manualOverPrice, icmsDestino, percentualComissao, valorTabela, valorFaturado]);
+  }, [calculation, manualOverPrice, icmsDestino, percentualComissao, valorTabela, valorReal]);
 
   const activeCalculation = finalCalculation || calculation;
-
-  // Calculate valor da parcela (use real value if available, otherwise calculate)
-  const valorParcela = useMemo(() => {
-    if (valorParcelaReal > 0) return valorParcelaReal;
-    if (qtdParcelas <= 0) return 0;
-    const valorRestante = valorFaturado - valorEntrada;
-    return valorRestante / qtdParcelas;
-  }, [valorFaturado, valorEntrada, qtdParcelas, valorParcelaReal]);
-
-  // Calculate boleto interest
-  const jurosCalculado = useMemo(() => {
-    if (tipoPagamento !== 'parcelado_boleto' || qtdParcelas === 0) {
-      return { valor: 0, percentual: 0 };
-    }
-    
-    const totalParcelado = valorEntrada + (qtdParcelas * valorParcela);
-    const juros = totalParcelado - valorFaturado;
-    const percentualJuros = valorFaturado > 0 ? (juros / valorFaturado) * 100 : 0;
-    
-    return { valor: juros, percentual: percentualJuros };
-  }, [tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorFaturado]);
 
   // Notify parent of changes
   useEffect(() => {
@@ -280,9 +299,12 @@ export function CommissionCalculator({
         valorEntrada,
         qtdParcelas,
         valorParcela,
+        valorReal,
+        jurosEmbutidos: jurosEmbutidos.valor,
+        taxaJuros: getTaxaJuros(tipoPagamento),
       });
     }
-  }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, onCalculationChange]);
+  }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorReal, jurosEmbutidos, onCalculationChange]);
 
   if (!sale) {
     return (
@@ -399,9 +421,9 @@ export function CommissionCalculator({
                 </div>
               </RadioGroup>
               
-              {tipoPagamento === 'parcelado_boleto' && jurosCalculado.valor !== 0 && (
+              {tipoPagamento !== 'a_vista' && jurosEmbutidos.valor !== 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Juros: {formatCurrency(jurosCalculado.valor)} ({jurosCalculado.percentual.toFixed(2)}%)
+                  Juros: {formatCurrency(jurosEmbutidos.valor)} ({jurosEmbutidos.taxaLabel})
                 </p>
               )}
               
@@ -435,6 +457,36 @@ export function CommissionCalculator({
                 </div>
               </div>
             </div>
+
+            <Separator />
+
+            {/* Resumo Financeiro */}
+            {tipoPagamento !== 'a_vista' && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                  Resumo Financeiro
+                </h3>
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 space-y-2 font-mono text-sm">
+                  <div className="flex justify-between">
+                    <span>Valor Total Faturado (NF):</span>
+                    <span>{formatCurrency(valorFaturado)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Total Parcelado (Entrada + Parcelas):</span>
+                    <span>{formatCurrency(valorEntrada + qtdParcelas * valorParcela)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>(-) Juros ({jurosEmbutidos.taxaLabel}):</span>
+                    <span className="text-orange-600 dark:text-orange-400">- {formatCurrency(jurosEmbutidos.valor)}</span>
+                  </div>
+                  <Separator className="my-2" />
+                  <div className="flex justify-between font-semibold">
+                    <span>Valor Presente Real:</span>
+                    <span className="text-primary">{formatCurrency(valorReal)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <Separator />
 

@@ -2,6 +2,10 @@
 const PIS_COFINS_RATE = 0.0925; // 9,25%
 const IR_CSLL_RATE = 0.34; // 34%
 
+// Taxas de juros mensais para cálculo de Valor Presente
+const TAXA_BOLETO = 0.022; // 2,2% ao mês
+const TAXA_CARTAO = 0.035; // 3,5% ao mês
+
 // Tabela de ICMS por UF (interestadual)
 const ICMS_RATES: Record<string, number> = {
   // Norte/Nordeste/Centro-Oeste e ES: 7%
@@ -48,6 +52,53 @@ export function formatCurrency(value: number): string {
 
 export function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
+}
+
+/**
+ * Retorna a taxa de juros mensal baseada no tipo de pagamento
+ */
+export function getTaxaJuros(tipoPagamento: string): number {
+  if (tipoPagamento === 'parcelado_boleto') return TAXA_BOLETO;
+  if (tipoPagamento === 'parcelado_cartao') return TAXA_CARTAO;
+  return 0;
+}
+
+/**
+ * Calcula o Valor Presente de uma série de parcelas
+ * VP = PMT × [(1 - (1 + i)^(-n)) / i]
+ */
+export function calcularValorPresente(
+  valorParcela: number,
+  numParcelas: number,
+  taxaMensal: number
+): number {
+  if (numParcelas <= 0) return 0;
+  if (taxaMensal <= 0) return valorParcela * numParcelas;
+  
+  const fatorVP = (1 - Math.pow(1 + taxaMensal, -numParcelas)) / taxaMensal;
+  return valorParcela * fatorVP;
+}
+
+/**
+ * Calcula o Valor Real da venda considerando VP para parcelamentos
+ * À vista: Valor NF direto
+ * Parcelado: Entrada + VP(parcelas)
+ */
+export function calcularValorReal(
+  tipoPagamento: 'a_vista' | 'parcelado_boleto' | 'parcelado_cartao',
+  valorNF: number,
+  valorEntrada: number,
+  valorParcela: number,
+  numParcelas: number
+): number {
+  if (tipoPagamento === 'a_vista') {
+    return valorNF;
+  }
+  
+  const taxa = getTaxaJuros(tipoPagamento);
+  const vpParcelas = calcularValorPresente(valorParcela, numParcelas, taxa);
+  
+  return valorEntrada + vpParcelas;
 }
 
 export function calculateApprovalCommission(
