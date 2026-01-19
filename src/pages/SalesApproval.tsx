@@ -86,7 +86,6 @@ export default function SalesApproval() {
         over_price: calculationData.overPrice,
         over_price_liquido: calculationData.overPriceLiquido,
         commission_calculated: calculationData.comissaoTotal,
-        observacoes: calculationData.observacoes,
         valor_entrada: calculationData.valorEntrada,
         aprovado_por: user.id,
         aprovado_em: new Date().toISOString(),
@@ -122,7 +121,6 @@ export default function SalesApproval() {
       .from('sales')
       .update({
         status: 'rejeitado',
-        observacoes: calculationData.observacoes,
         motivo_rejeicao: motivo,
       })
       .eq('id', currentSale.id);
@@ -269,7 +267,6 @@ export default function SalesApproval() {
             <div className="h-full p-4">
               <CommissionCalculator
                 sale={currentSale}
-                selectedInventoryItem={null}
                 onCalculationChange={handleCalculationChange}
               />
             </div>
