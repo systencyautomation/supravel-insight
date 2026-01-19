@@ -63,7 +63,7 @@ export function FipeTable({ inventory, selectedItemId, onSelectItem, autoMatchCo
     <Card className="h-full flex flex-col">
       <CardHeader className="flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Tabela FIPE</CardTitle>
+          <CardTitle className="text-lg">Tabela</CardTitle>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" onClick={handleZoomOut} className="h-8 w-8">
               <ZoomOut className="h-4 w-4" />

@@ -6,11 +6,13 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePendingSales, PendingSale } from '@/hooks/usePendingSales';
-import { FipeTable, InventoryItem } from '@/components/approval/FipeTable';
+import { usePendingSales } from '@/hooks/usePendingSales';
 import { CommissionCalculator, CalculationData } from '@/components/approval/CommissionCalculator';
 import { ApprovalActions } from '@/components/approval/ApprovalActions';
 import { DashboardHeader } from '@/components/DashboardHeader';
+import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
+import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SalesApproval() {
   const navigate = useNavigate();
@@ -20,10 +22,10 @@ export default function SalesApproval() {
   
   const { pendingSales, count, loading, refetch } = usePendingSales();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
   const [calculationData, setCalculationData] = useState<CalculationData | null>(null);
-  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [fipeDocument, setFipeDocument] = useState<FipeDocument | null>(null);
+  const [documentLoading, setDocumentLoading] = useState(true);
+  const { fetchLatestDocument } = useFipeDocument();
 
   // Check permissions
   const canApprove = useMemo(() => {
@@ -36,33 +38,24 @@ export default function SalesApproval() {
     return pendingSales[currentIndex] || null;
   }, [pendingSales, currentIndex]);
 
-  // Load inventory
+  // Load FIPE document
   useEffect(() => {
-    if (!effectiveOrgId) return;
-
-    const loadInventory = async () => {
-      setInventoryLoading(true);
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('organization_id', effectiveOrgId)
-        .order('model_name');
-
-      if (error) {
-        console.error('Error loading inventory:', error);
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar a tabela FIPE',
-          variant: 'destructive',
-        });
-      } else {
-        setInventory(data || []);
+    const loadDocument = async () => {
+      if (!effectiveOrgId) {
+        setDocumentLoading(false);
+        return;
       }
-      setInventoryLoading(false);
+      try {
+        const doc = await fetchLatestDocument();
+        setFipeDocument(doc);
+      } catch (error) {
+        console.error('Error fetching FIPE document:', error);
+      } finally {
+        setDocumentLoading(false);
+      }
     };
-
-    loadInventory();
-  }, [effectiveOrgId, toast]);
+    loadDocument();
+  }, [effectiveOrgId, fetchLatestDocument]);
 
   // Navigate to specific sale from URL param
   useEffect(() => {
@@ -74,26 +67,6 @@ export default function SalesApproval() {
       }
     }
   }, [searchParams, pendingSales]);
-
-  // Auto-match inventory item by product code
-  useEffect(() => {
-    if (currentSale?.produto_codigo && inventory.length > 0) {
-      const matchedItem = inventory.find(
-        item => item.internal_code === currentSale.produto_codigo
-      );
-      if (matchedItem) {
-        setSelectedInventoryItem(matchedItem);
-      } else {
-        setSelectedInventoryItem(null);
-      }
-    } else {
-      setSelectedInventoryItem(null);
-    }
-  }, [currentSale, inventory]);
-
-  const handleSelectInventoryItem = useCallback((item: InventoryItem) => {
-    setSelectedInventoryItem(item);
-  }, []);
 
   const handleCalculationChange = useCallback((data: CalculationData) => {
     setCalculationData(data);
@@ -184,7 +157,7 @@ export default function SalesApproval() {
     setCurrentIndex(prev => Math.min(pendingSales.length - 1, prev + 1));
   };
 
-  if (loading || inventoryLoading) {
+  if (loading || documentLoading) {
     return (
       <div className="min-h-screen bg-background">
         <DashboardHeader />
@@ -268,12 +241,25 @@ export default function SalesApproval() {
         <ResizablePanelGroup direction="horizontal" className="h-full">
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="h-full p-4">
-              <FipeTable
-                inventory={inventory}
-                selectedItemId={selectedInventoryItem?.id || null}
-                onSelectItem={handleSelectInventoryItem}
-                autoMatchCode={currentSale?.produto_codigo}
-              />
+              <Card className="h-full flex flex-col">
+                <CardHeader className="flex-shrink-0 pb-3">
+                  <CardTitle className="text-lg">Tabela</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden p-0">
+                  {fipeDocument ? (
+                    <SpreadsheetViewer
+                      gridData={fipeDocument.gridData}
+                      colCount={fipeDocument.colCount}
+                      rowCount={fipeDocument.rowCount}
+                      fileName={fipeDocument.fileName}
+                    />
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">Nenhuma planilha importada</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </ResizablePanel>
           
@@ -283,7 +269,7 @@ export default function SalesApproval() {
             <div className="h-full p-4">
               <CommissionCalculator
                 sale={currentSale}
-                selectedInventoryItem={selectedInventoryItem}
+                selectedInventoryItem={null}
                 onCalculationChange={handleCalculationChange}
               />
             </div>
