@@ -46,12 +46,32 @@ interface ValoresInfo {
   ipi: number | null;
 }
 
+interface Duplicata {
+  numero: string | null;
+  vencimento: string | null;
+  valor: number | null;
+}
+
+interface CobrancaInfo {
+  duplicatas: Duplicata[];
+  valorOriginal: number | null;
+  valorLiquido: number | null;
+}
+
+interface PagamentoInfo {
+  tipo: string | null;
+  tipoDescricao: string | null;
+  valor: number | null;
+}
+
 interface ParsedNfe {
   produto: ProductInfo;
   nfe: NfeInfo;
   emitente: EmitenteInfo;
   destinatario: DestinatarioInfo;
   valores: ValoresInfo;
+  cobranca: CobrancaInfo;
+  pagamento: PagamentoInfo;
 }
 
 function extractTag(xml: string, tagName: string): string | null {
@@ -121,6 +141,95 @@ function extractInfAdProd(infAdProd: string): { marca: string | null; modelo: st
   return result;
 }
 
+// Mapeamento de tipos de pagamento NFe para nosso sistema
+const TIPOS_PAGAMENTO: Record<string, string> = {
+  '01': 'a_vista',           // Dinheiro
+  '02': 'a_vista',           // Cheque
+  '03': 'parcelado_cartao',  // Cartão de Crédito
+  '04': 'a_vista',           // Cartão de Débito
+  '05': 'a_vista',           // Crédito Loja
+  '10': 'a_vista',           // Vale Alimentação
+  '11': 'a_vista',           // Vale Refeição
+  '12': 'a_vista',           // Vale Presente
+  '13': 'a_vista',           // Vale Combustível
+  '14': 'a_vista',           // Duplicata Mercantil
+  '15': 'parcelado_boleto',  // Boleto Bancário
+  '16': 'a_vista',           // Depósito Bancário
+  '17': 'a_vista',           // PIX
+  '18': 'a_vista',           // Transferência
+  '19': 'a_vista',           // Fidelidade/Cashback
+  '90': 'a_vista',           // Sem Pagamento
+  '99': 'a_vista',           // Outros
+};
+
+const TIPOS_PAGAMENTO_DESC: Record<string, string> = {
+  '01': 'Dinheiro',
+  '02': 'Cheque',
+  '03': 'Cartão de Crédito',
+  '04': 'Cartão de Débito',
+  '05': 'Crédito Loja',
+  '15': 'Boleto Bancário',
+  '16': 'Depósito Bancário',
+  '17': 'PIX',
+  '18': 'Transferência',
+  '99': 'Outros',
+};
+
+function extractDuplicatas(xmlContent: string): CobrancaInfo {
+  const result: CobrancaInfo = {
+    duplicatas: [],
+    valorOriginal: null,
+    valorLiquido: null,
+  };
+
+  const cobrMatch = xmlContent.match(/<cobr>([\s\S]*?)<\/cobr>/i);
+  if (!cobrMatch) return result;
+
+  const cobrContent = cobrMatch[1];
+
+  // Extract fatura info
+  const fatMatch = cobrContent.match(/<fat>([\s\S]*?)<\/fat>/i);
+  if (fatMatch) {
+    result.valorOriginal = extractNumber(fatMatch[1], 'vOrig');
+    result.valorLiquido = extractNumber(fatMatch[1], 'vLiq');
+  }
+
+  // Extract duplicatas
+  const dupRegex = /<dup>([\s\S]*?)<\/dup>/gi;
+  let dupMatch;
+  while ((dupMatch = dupRegex.exec(cobrContent)) !== null) {
+    const dupContent = dupMatch[1];
+    result.duplicatas.push({
+      numero: extractTag(dupContent, 'nDup'),
+      vencimento: extractTag(dupContent, 'dVenc'),
+      valor: extractNumber(dupContent, 'vDup'),
+    });
+  }
+
+  return result;
+}
+
+function extractPagamento(xmlContent: string): PagamentoInfo {
+  const result: PagamentoInfo = {
+    tipo: null,
+    tipoDescricao: null,
+    valor: null,
+  };
+
+  const pagMatch = xmlContent.match(/<pag>([\s\S]*?)<\/pag>/i);
+  if (!pagMatch) return result;
+
+  const detPagMatch = pagMatch[1].match(/<detPag>([\s\S]*?)<\/detPag>/i);
+  if (!detPagMatch) return result;
+
+  const tPag = extractTag(detPagMatch[1], 'tPag');
+  result.tipo = tPag;
+  result.tipoDescricao = tPag ? (TIPOS_PAGAMENTO_DESC[tPag] || 'Outros') : null;
+  result.valor = extractNumber(detPagMatch[1], 'vPag');
+
+  return result;
+}
+
 function parseNfeXml(xmlContent: string): ParsedNfe {
   const cProd = extractTag(xmlContent, 'cProd');
   const xProd = extractTag(xmlContent, 'xProd');
@@ -169,6 +278,10 @@ function parseNfeXml(xmlContent: string): ParsedNfe {
   const vNF = extractNumber(icmsTotContent, 'vNF');
   const vIPI = extractNumber(icmsTotContent, 'vIPI');
 
+  // Extract cobrança e pagamento
+  const cobranca = extractDuplicatas(xmlContent);
+  const pagamento = extractPagamento(xmlContent);
+
   return {
     produto: {
       codigo: cProd,
@@ -205,6 +318,8 @@ function parseNfeXml(xmlContent: string): ParsedNfe {
       total_nf: vNF,
       ipi: vIPI,
     },
+    cobranca,
+    pagamento,
   };
 }
 
@@ -271,6 +386,17 @@ serve(async (req) => {
       }
     }
 
+    // Determine payment method from XML
+    const paymentMethod = parsedData.pagamento.tipo 
+      ? TIPOS_PAGAMENTO[parsedData.pagamento.tipo] || 'a_vista'
+      : (parsedData.cobranca.duplicatas.length > 1 ? 'parcelado_boleto' : 'a_vista');
+
+    // Calculate valor_entrada (first installment if parcelado)
+    let valorEntrada = 0;
+    if (parsedData.cobranca.duplicatas.length > 0 && paymentMethod !== 'a_vista') {
+      valorEntrada = parsedData.cobranca.duplicatas[0]?.valor || 0;
+    }
+
     // Insert into sales table
     const { data: sale, error: insertError } = await supabase
       .from('sales')
@@ -297,6 +423,8 @@ serve(async (req) => {
         total_value: parsedData.valores.total_nf,
         nfe_email_from: email_from || null,
         nfe_filename: filename || null,
+        payment_method: paymentMethod,
+        valor_entrada: valorEntrada,
         status: 'pendente',
         nfe_processed_at: new Date().toISOString()
       })
@@ -317,12 +445,38 @@ serve(async (req) => {
 
     console.log('Sale inserted successfully:', sale.id);
 
+    // Insert installments if there are duplicatas
+    let installmentsInserted = 0;
+    if (parsedData.cobranca.duplicatas.length > 0) {
+      const installmentsToInsert = parsedData.cobranca.duplicatas.map((dup, index) => ({
+        organization_id,
+        sale_id: sale.id,
+        installment_number: index + 1,
+        value: dup.valor || 0,
+        due_date: dup.vencimento || null,
+        status: 'pendente'
+      }));
+
+      const { error: installmentsError } = await supabase
+        .from('installments')
+        .insert(installmentsToInsert);
+
+      if (installmentsError) {
+        console.error('Error inserting installments:', installmentsError);
+        // Don't fail the whole request, just log the error
+      } else {
+        installmentsInserted = installmentsToInsert.length;
+        console.log(`Inserted ${installmentsInserted} installments for sale ${sale.id}`);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         sale,
         parsed: parsedData,
-        inserted: true
+        inserted: true,
+        installments_count: installmentsInserted
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
