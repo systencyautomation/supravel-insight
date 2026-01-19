@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Check, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -324,9 +324,25 @@ export function CommissionCalculator({
           <div className="p-4 space-y-5">
             {/* Dados da Tabela */}
             <div className="space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                Dados da Tabela
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                  Dados da Tabela
+                </h3>
+                {/* Feedback visual do match */}
+                {sale?.produto_codigo && (
+                  matchedFipeRow ? (
+                    <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-500">
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Produto encontrado (linha {matchedFipeRow.rowIndex + 1})</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-500">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      <span>Código não encontrado na tabela</span>
+                    </div>
+                  )
+                )}
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="valorTabela" className="text-xs">Valor Tabela à Vista</Label>

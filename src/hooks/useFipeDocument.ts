@@ -47,7 +47,18 @@ export function useFipeDocument() {
       // Parse the file with styles
       const grid = await parseFile(file);
       
-      // Save to database - store grid as rows (array of arrays with styles)
+      // Delete existing documents for this organization (replace instead of add)
+      const { error: deleteError } = await supabase
+        .from('fipe_documents')
+        .delete()
+        .eq('organization_id', effectiveOrgId);
+      
+      if (deleteError) {
+        console.warn('Error deleting existing documents:', deleteError);
+        // Continue anyway - it might be empty
+      }
+      
+      // Save new document to database
       const { error } = await supabase
         .from('fipe_documents')
         .insert({

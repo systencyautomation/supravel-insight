@@ -13,6 +13,7 @@ import { DashboardHeader } from '@/components/DashboardHeader';
 import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
 import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SaleInfoHeader } from '@/components/approval/SaleInfoHeader';
 export default function SalesApproval() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -259,6 +260,9 @@ export default function SalesApproval() {
           </div>
         </div>
       </div>
+
+      {/* Sale Info Header */}
+      <SaleInfoHeader sale={currentSale} />
 
       {/* Main content */}
       <div className="flex-1 overflow-hidden">
