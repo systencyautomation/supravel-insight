@@ -7,8 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CompanyCommissions } from '@/components/tabs/CompanyCommissions';
 import { CommissionsTab } from '@/components/tabs/CommissionsTab';
 import { StockManagement } from '@/components/tabs/StockManagement';
-import { CashFlow } from '@/components/tabs/CashFlow';
-import { Building2, DollarSign, Package, Wallet, Loader2, ArrowLeft } from 'lucide-react';
+import { Building2, DollarSign, Package, Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -87,7 +86,7 @@ const Index = () => {
       
       <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 h-auto p-0 bg-transparent gap-1">
+          <TabsList className="grid w-full grid-cols-3 h-auto p-0 bg-transparent gap-1">
             <TabsTrigger 
               value="empresa" 
               className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
@@ -109,13 +108,6 @@ const Index = () => {
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Tabela</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="fluxo" 
-              className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
-            >
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Fluxo</span>
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="empresa" className="mt-6">
@@ -130,9 +122,6 @@ const Index = () => {
             <StockManagement />
           </TabsContent>
 
-          <TabsContent value="fluxo" className="mt-6">
-            <CashFlow installments={installments} loading={dataLoading} />
-          </TabsContent>
         </Tabs>
       </main>
 
