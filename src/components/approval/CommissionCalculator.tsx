@@ -266,39 +266,41 @@ export function CommissionCalculator({
                   <RadioGroupItem value="parcelado_boleto" id="parcelado_boleto" />
                   <Label htmlFor="parcelado_boleto" className="text-sm font-normal">Parcelado Boleto</Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="parcelado_cartao" id="parcelado_cartao" />
+                  <Label htmlFor="parcelado_cartao" className="text-sm font-normal">Parcelado Cartão</Label>
+                </div>
               </RadioGroup>
               
-              {tipoPagamento === 'parcelado_boleto' && (
-                <div className="grid grid-cols-3 gap-3 mt-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="valorEntrada" className="text-xs">Entrada R$</Label>
-                    <Input
-                      id="valorEntrada"
-                      type="number"
-                      value={valorEntrada}
-                      onChange={(e) => setValorEntrada(parseFloat(e.target.value) || 0)}
-                      className="font-mono h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="qtdParcelas" className="text-xs">Número de Parcelas</Label>
-                    <Input
-                      id="qtdParcelas"
-                      type="number"
-                      min="1"
-                      value={qtdParcelas}
-                      onChange={(e) => setQtdParcelas(parseInt(e.target.value, 10) || 0)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Valor da Parcela</Label>
-                    <div className="h-9 px-3 flex items-center bg-muted rounded-md font-mono text-sm">
-                      {formatCurrency(valorParcela)}
-                    </div>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="valorEntrada" className="text-xs">Entrada R$</Label>
+                  <Input
+                    id="valorEntrada"
+                    type="number"
+                    value={valorEntrada}
+                    onChange={(e) => setValorEntrada(parseFloat(e.target.value) || 0)}
+                    className="font-mono h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="qtdParcelas" className="text-xs">Número de Parcelas</Label>
+                  <Input
+                    id="qtdParcelas"
+                    type="number"
+                    min="0"
+                    value={qtdParcelas}
+                    onChange={(e) => setQtdParcelas(parseInt(e.target.value, 10) || 0)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Valor da Parcela</Label>
+                  <div className="h-9 px-3 flex items-center bg-muted rounded-md font-mono text-sm">
+                    {formatCurrency(valorParcela)}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
             <Separator />
@@ -396,7 +398,12 @@ export function CommissionCalculator({
                   <Separator className="my-2" />
                   <div className="flex justify-between text-lg font-bold">
                     <span>R$</span>
-                    <span className="text-primary">{formatCurrency(activeCalculation.comissaoTotal)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-primary">{formatCurrency(activeCalculation.comissaoTotal)}</span>
+                      <span className="text-sm font-normal text-muted-foreground">
+                        ({activeCalculation.percentualFinal.toFixed(4)}%)
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
