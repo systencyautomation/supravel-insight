@@ -70,29 +70,29 @@ export function OrganizationsCard({
             </Button>
           </div>
         ) : (
-          <Table>
+        <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow className="hover:bg-transparent bg-muted/30">
-                <TableHead className="text-xs">Empresa</TableHead>
-                <TableHead className="text-xs">Slug</TableHead>
-                <TableHead className="text-xs hidden md:table-cell">Criada</TableHead>
-                <TableHead className="text-xs text-center">Status</TableHead>
-                <TableHead className="text-xs text-right">Ações</TableHead>
+                <TableHead className="text-xs w-[30%]">Empresa</TableHead>
+                <TableHead className="text-xs w-[15%]">Slug</TableHead>
+                <TableHead className="text-xs hidden md:table-cell w-[15%]">Criada</TableHead>
+                <TableHead className="text-xs text-center w-[20%]">Status</TableHead>
+                <TableHead className="text-xs text-right w-[20%]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {organizations.map((org) => (
                 <TableRow key={org.id} className="group">
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
+                  <TableCell className="font-medium min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
                         {org.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="truncate max-w-[120px]">{org.name}</span>
+                      <span className="truncate">{org.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {org.slug}
+                  <TableCell className="font-mono text-xs text-muted-foreground min-w-0">
+                    <span className="truncate block">{org.slug}</span>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
                     {new Date(org.created_at).toLocaleDateString('pt-BR')}
