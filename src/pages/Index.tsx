@@ -153,7 +153,7 @@ const Index = () => {
       <footer className="border-t border-border py-3 mt-auto">
         <div className="container mx-auto px-6 text-center">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Supravel © 2026 — Sistema de Gestão de Comissões
+            Connect CRM © 2026 — Sistema de Gestão de Comissões
           </p>
         </div>
       </footer>
