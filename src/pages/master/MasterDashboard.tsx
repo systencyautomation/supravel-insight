@@ -6,26 +6,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Building2, 
-  Plus, 
-  Eye, 
-  Mail, 
-  User, 
-  Send,
-  Clock,
-  CheckCircle,
-  XCircle,
-  ArrowLeft,
-  RefreshCw,
-  Loader2,
-  Trash2
-} from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { User, Send, Mail } from 'lucide-react';
 import { z } from 'zod';
+
+import { MasterDashboardSkeleton } from '@/components/master/MasterDashboardSkeleton';
+import { MasterHeader } from '@/components/master/MasterHeader';
+import { MasterKPICards } from '@/components/master/MasterKPICards';
+import { OrganizationsCard } from '@/components/master/OrganizationsCard';
+import { InvitationsCard } from '@/components/master/InvitationsCard';
 import { SaasAdminSection } from '@/components/master/SaasAdminSection';
 
 interface Organization {
@@ -186,7 +176,6 @@ export default function MasterDashboard() {
     setCreating(true);
 
     try {
-      // 1. Create organization
       const { data: org, error: orgError } = await supabase
         .from('organizations')
         .insert({ name: newOrgName, slug: newOrgSlug })
@@ -195,7 +184,6 @@ export default function MasterDashboard() {
 
       if (orgError) throw orgError;
 
-      // 2. Create user account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
@@ -207,7 +195,6 @@ export default function MasterDashboard() {
 
       if (authError) throw authError;
 
-      // 3. Assign admin role to user for this organization
       if (authData.user) {
         const { error: roleError } = await supabase
           .from('user_roles')
@@ -260,7 +247,6 @@ export default function MasterDashboard() {
     setSending(true);
 
     try {
-      // Create invitation record
       const { data: invite, error: inviteError } = await supabase
         .from('invitations')
         .insert({
@@ -273,10 +259,8 @@ export default function MasterDashboard() {
 
       if (inviteError) throw inviteError;
 
-      // Generate invite link
       const inviteLink = `${window.location.origin}/onboarding?token=${invite.token}`;
 
-      // Try to send email via edge function
       try {
         const { error: emailError } = await supabase.functions.invoke('send-invitation', {
           body: { email: inviteEmail, inviteLink, organizationName: inviteOrgName }
@@ -284,7 +268,6 @@ export default function MasterDashboard() {
 
         if (emailError) {
           console.warn('Email sending failed:', emailError);
-          // Show link to copy manually
           toast({
             title: 'Convite Criado',
             description: `Link do convite: ${inviteLink}`,
@@ -296,7 +279,6 @@ export default function MasterDashboard() {
           });
         }
       } catch {
-        // Edge function not deployed yet
         toast({
           title: 'Convite Criado',
           description: `Copie e envie este link: ${inviteLink}`,
@@ -327,17 +309,6 @@ export default function MasterDashboard() {
     setInviteOrgName('');
     setErrors({});
     setCreateTab('manual');
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'aceito':
-        return <CheckCircle className="h-4 w-4 text-success" />;
-      case 'expirado':
-        return <XCircle className="h-4 w-4 text-destructive" />;
-      default:
-        return <Clock className="h-4 w-4 text-warning" />;
-    }
   };
 
   const getResendCooldown = (lastSentAt: string): number => {
@@ -426,362 +397,193 @@ export default function MasterDashboard() {
   };
 
   if (loading || loadingData) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground font-mono text-sm">Carregando...</div>
-      </div>
-    );
+    return <MasterDashboardSkeleton />;
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Building2 className="h-6 w-6 text-primary" />
-              <div>
-                <h1 className="text-lg font-medium text-foreground">Master Dashboard</h1>
-                <p className="text-xs text-muted-foreground font-mono">{user?.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {impersonatedOrgName && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exitImpersonation}
-                  className="text-xs"
-                >
-                  <ArrowLeft className="h-3 w-3 mr-1" />
-                  Sair de {impersonatedOrgName}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <MasterHeader
+        userEmail={user?.email}
+        isMasterAdmin={isMasterAdmin}
+        impersonatedOrgName={impersonatedOrgName}
+        onExitImpersonation={exitImpersonation}
+        onSignOut={signOut}
+      />
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-card border border-border p-4">
-            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Organizações</p>
-            <p className="text-2xl font-medium text-foreground mt-1">{organizations.length}</p>
-          </div>
-          <div className="bg-card border border-border p-4">
-            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Ativas</p>
-            <p className="text-2xl font-medium text-success mt-1">
-              {organizations.filter(o => o.active).length}
-            </p>
-          </div>
-          <div className="bg-card border border-border p-4">
-            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Convites Pendentes</p>
-            <p className="text-2xl font-medium text-warning mt-1">
-              {invitations.filter(i => i.status === 'pendente').length}
-            </p>
-          </div>
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* KPI Cards */}
+        <div className="animate-fade-in">
+          <MasterKPICards 
+            organizations={organizations} 
+            invitations={invitations} 
+          />
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-sm font-medium text-foreground uppercase tracking-wide">Organizações</h2>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="text-xs">
-                <Plus className="h-3 w-3 mr-1" />
-                Nova Organização
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md border-border">
-              <DialogHeader>
-                <DialogTitle className="text-foreground">Adicionar Organização</DialogTitle>
-              </DialogHeader>
-              
-              <Tabs value={createTab} onValueChange={(v) => setCreateTab(v as 'manual' | 'invite')}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="manual" className="flex-1 text-xs">
-                    <User className="h-3 w-3 mr-1" />
-                    Manual
-                  </TabsTrigger>
-                  <TabsTrigger value="invite" className="flex-1 text-xs">
-                    <Mail className="h-3 w-3 mr-1" />
-                    Convite
-                  </TabsTrigger>
-                </TabsList>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <OrganizationsCard
+            organizations={organizations}
+            onToggleActive={toggleActive}
+            onImpersonate={handleImpersonate}
+            onOpenDialog={() => {
+              setCreateTab('manual');
+              setDialogOpen(true);
+            }}
+          />
 
-                <TabsContent value="manual" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Nome da Empresa</Label>
-                      <Input
-                        value={newOrgName}
-                        onChange={(e) => setNewOrgName(e.target.value)}
-                        placeholder="Supravel Ltda"
-                        className="text-sm"
-                      />
-                      {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Slug</Label>
-                      <Input
-                        value={newOrgSlug}
-                        onChange={(e) => setNewOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                        placeholder="supravel"
-                        className="text-sm font-mono"
-                      />
-                      {errors.slug && <p className="text-xs text-destructive">{errors.slug}</p>}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-border pt-4">
-                    <p className="text-xs text-muted-foreground mb-3">Dados do Administrador</p>
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Nome Completo</Label>
-                        <Input
-                          value={adminName}
-                          onChange={(e) => setAdminName(e.target.value)}
-                          placeholder="João Silva"
-                          className="text-sm"
-                        />
-                        {errors.adminName && <p className="text-xs text-destructive">{errors.adminName}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Email</Label>
-                        <Input
-                          type="email"
-                          value={adminEmail}
-                          onChange={(e) => setAdminEmail(e.target.value)}
-                          placeholder="admin@empresa.com"
-                          className="text-sm"
-                        />
-                        {errors.adminEmail && <p className="text-xs text-destructive">{errors.adminEmail}</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Senha</Label>
-                        <Input
-                          type="password"
-                          value={adminPassword}
-                          onChange={(e) => setAdminPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="text-sm"
-                        />
-                        {errors.adminPassword && <p className="text-xs text-destructive">{errors.adminPassword}</p>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={createOrganization} 
-                    disabled={creating}
-                    className="w-full text-sm"
-                  >
-                    {creating ? 'Criando...' : 'Criar Organização'}
-                  </Button>
-                </TabsContent>
-
-                <TabsContent value="invite" className="space-y-4 mt-4">
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Email do Cliente</Label>
-                      <Input
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="cliente@empresa.com"
-                        className="text-sm"
-                      />
-                      {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Nome da Empresa (opcional)</Label>
-                      <Input
-                        value={inviteOrgName}
-                        onChange={(e) => setInviteOrgName(e.target.value)}
-                        placeholder="Será preenchido pelo cliente"
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="bg-muted p-3 border border-border">
-                    <p className="text-xs text-muted-foreground">
-                      Um link único será gerado e enviado para o email informado. 
-                      O cliente poderá completar o cadastro através deste link.
-                    </p>
-                  </div>
-
-                  <Button 
-                    onClick={sendInvite} 
-                    disabled={sending}
-                    className="w-full text-sm"
-                  >
-                    <Send className="h-3 w-3 mr-1" />
-                    {sending ? 'Enviando...' : 'Enviar Convite'}
-                  </Button>
-                </TabsContent>
-              </Tabs>
-            </DialogContent>
-          </Dialog>
+          <InvitationsCard
+            invitations={invitations}
+            resendingId={resendingId}
+            deletingId={deletingId}
+            onResend={resendInvite}
+            onDelete={deleteInvite}
+            onOpenDialog={() => {
+              setCreateTab('invite');
+              setDialogOpen(true);
+            }}
+            getResendCooldown={getResendCooldown}
+          />
         </div>
-
-        {/* Organizations Table */}
-        <div className="bg-card border border-border mb-6">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Empresa</th>
-                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Slug</th>
-                <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Criada em</th>
-                <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Status</th>
-                <th className="text-right px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {organizations.map((org) => (
-                <tr key={org.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium text-foreground">{org.name}</td>
-                  <td className="px-4 py-3 font-mono text-muted-foreground text-xs">{org.slug}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">
-                    {new Date(org.created_at).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Switch
-                      checked={org.active}
-                      onCheckedChange={() => toggleActive(org)}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleImpersonate(org)}
-                      className="text-xs"
-                    >
-                      <Eye className="h-3 w-3 mr-1" />
-                      Visualizar
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-              {organizations.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    Nenhuma organização cadastrada
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Invitations */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-sm font-medium text-foreground uppercase tracking-wide">Convites</h2>
-        </div>
-
-        <TooltipProvider>
-          <div className="bg-card border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Email</th>
-                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Empresa</th>
-                  <th className="text-left px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Enviado em</th>
-                  <th className="text-center px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Status</th>
-                  <th className="text-right px-4 py-3 font-medium text-xs uppercase tracking-wide text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invitations.map((invite) => {
-                  const cooldown = getResendCooldown(invite.last_sent_at);
-                  const isResending = resendingId === invite.id;
-                  const canResend = invite.status === 'pendente' && cooldown === 0;
-                  
-                  return (
-                    <tr key={invite.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 font-mono text-foreground text-xs">{invite.email}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {invite.organization_name || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {new Date(invite.created_at).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          {getStatusIcon(invite.status || 'pendente')}
-                          <span className="text-xs capitalize">{invite.status}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {invite.status === 'pendente' && (
-                          <div className="flex items-center justify-end gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => resendInvite(invite)}
-                                  disabled={!canResend || isResending}
-                                  className="text-xs"
-                                >
-                                  {isResending ? (
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                  ) : (
-                                    <RefreshCw className="h-3 w-3 mr-1" />
-                                  )}
-                                  {cooldown > 0 ? `${cooldown} min` : 'Reenviar'}
-                                </Button>
-                              </TooltipTrigger>
-                              {cooldown > 0 && (
-                                <TooltipContent>
-                                  <p>Aguarde {cooldown} minuto(s) para reenviar</p>
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => deleteInvite(invite)}
-                                  disabled={deletingId === invite.id}
-                                  className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                                >
-                                  {deletingId === invite.id ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-3 w-3" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Remover convite</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {invitations.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                      Nenhum convite enviado
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </TooltipProvider>
 
         {/* SaaS Admin Section - Only visible to Master Admin */}
         {isMasterAdmin && <SaasAdminSection />}
       </main>
+
+      {/* Create/Invite Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md border-border/50">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              {createTab === 'manual' ? 'Nova Organização' : 'Enviar Convite'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <Tabs value={createTab} onValueChange={(v) => setCreateTab(v as 'manual' | 'invite')}>
+            <TabsList className="w-full">
+              <TabsTrigger value="manual" className="flex-1 text-xs">
+                <User className="h-3 w-3 mr-1" />
+                Manual
+              </TabsTrigger>
+              <TabsTrigger value="invite" className="flex-1 text-xs">
+                <Mail className="h-3 w-3 mr-1" />
+                Convite
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="manual" className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nome da Empresa</Label>
+                  <Input
+                    value={newOrgName}
+                    onChange={(e) => setNewOrgName(e.target.value)}
+                    placeholder="Supravel Ltda"
+                    className="text-sm"
+                  />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Slug</Label>
+                  <Input
+                    value={newOrgSlug}
+                    onChange={(e) => setNewOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                    placeholder="supravel"
+                    className="text-sm font-mono"
+                  />
+                  {errors.slug && <p className="text-xs text-destructive">{errors.slug}</p>}
+                </div>
+              </div>
+
+              <div className="border-t border-border/50 pt-4">
+                <p className="text-xs text-muted-foreground mb-3">Dados do Administrador</p>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nome Completo</Label>
+                    <Input
+                      value={adminName}
+                      onChange={(e) => setAdminName(e.target.value)}
+                      placeholder="João Silva"
+                      className="text-sm"
+                    />
+                    {errors.adminName && <p className="text-xs text-destructive">{errors.adminName}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Email</Label>
+                    <Input
+                      type="email"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      placeholder="admin@empresa.com"
+                      className="text-sm"
+                    />
+                    {errors.adminEmail && <p className="text-xs text-destructive">{errors.adminEmail}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Senha</Label>
+                    <Input
+                      type="password"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="text-sm"
+                    />
+                    {errors.adminPassword && <p className="text-xs text-destructive">{errors.adminPassword}</p>}
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={createOrganization} 
+                disabled={creating}
+                className="w-full text-sm"
+              >
+                {creating ? 'Criando...' : 'Criar Organização'}
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="invite" className="space-y-4 mt-4">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Email do Cliente</Label>
+                  <Input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="cliente@empresa.com"
+                    className="text-sm"
+                  />
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Nome da Empresa (opcional)</Label>
+                  <Input
+                    value={inviteOrgName}
+                    onChange={(e) => setInviteOrgName(e.target.value)}
+                    placeholder="Será preenchido pelo cliente"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-muted/50 p-3 rounded-lg border border-border/50">
+                <p className="text-xs text-muted-foreground">
+                  Um link único será gerado e enviado para o email informado. 
+                  O cliente poderá completar o cadastro através deste link.
+                </p>
+              </div>
+
+              <Button 
+                onClick={sendInvite} 
+                disabled={sending}
+                className="w-full text-sm"
+              >
+                <Send className="h-3 w-3 mr-1" />
+                {sending ? 'Enviando...' : 'Enviar Convite'}
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

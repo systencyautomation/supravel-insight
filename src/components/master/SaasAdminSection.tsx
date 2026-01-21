@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Table, 
@@ -13,8 +14,9 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Plus, Trash2, Loader2, ShieldCheck } from 'lucide-react';
+import { Plus, Trash2, Loader2, ShieldCheck, UserPlus } from 'lucide-react';
 import { z } from 'zod';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SaasAdmin {
   id: string;
@@ -28,6 +30,25 @@ const saasAdminSchema = z.object({
   fullName: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
   password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres')
 });
+
+function SaasAdminSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[1, 2].map((i) => (
+        <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-border/50 last:border-0">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          </div>
+          <Skeleton className="h-8 w-8" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function SaasAdminSection() {
   const { toast } = useToast();
@@ -50,7 +71,6 @@ export function SaasAdminSection() {
   const fetchSaasAdmins = async () => {
     setLoading(true);
     try {
-      // Get all users with saas_admin role
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -66,7 +86,6 @@ export function SaasAdminSection() {
 
       const userIds = roles.map(r => r.user_id);
 
-      // Get profiles for these users
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email, full_name, created_at')
@@ -166,30 +185,40 @@ export function SaasAdminSection() {
   };
 
   return (
-    <section className="mt-8">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-medium text-foreground uppercase tracking-wide">
+    <Card className="overflow-hidden animate-fade-in" style={{ animationDelay: '300ms' }}>
+      <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+            </div>
             Administradores SaaS
-          </h2>
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            {saasAdmins.length} cadastrado{saasAdmins.length !== 1 ? 's' : ''}
+          </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="text-xs">
+            <Button size="sm" variant="outline">
               <Plus className="h-3 w-3 mr-1" />
-              Adicionar SaaS Admin
+              Adicionar
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md border-border">
+          <DialogContent className="sm:max-w-md border-border/50">
             <DialogHeader>
-              <DialogTitle className="text-foreground">Novo SaaS Admin</DialogTitle>
+              <DialogTitle className="text-foreground flex items-center gap-2">
+                <UserPlus className="h-5 w-5 text-primary" />
+                Novo SaaS Admin
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
-              <p className="text-xs text-muted-foreground">
-                SaaS Admins podem criar organizações, gerenciar convites e visualizar qualquer organização.
-                Não podem deletar organizações nem adicionar outros SaaS Admins.
-              </p>
+              <div className="bg-muted/50 p-3 rounded-lg border border-border/50">
+                <p className="text-xs text-muted-foreground">
+                  SaaS Admins podem criar organizações, gerenciar convites e visualizar qualquer organização.
+                  Não podem deletar organizações nem adicionar outros SaaS Admins.
+                </p>
+              </div>
               
               <div className="space-y-3">
                 <div className="space-y-1">
@@ -252,29 +281,52 @@ export function SaasAdminSection() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </CardHeader>
 
-      <div className="bg-card border border-border">
+      <CardContent className="p-0">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <SaasAdminSkeleton />
+        ) : saasAdmins.length === 0 ? (
+          <div className="py-12 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <ShieldCheck className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="font-medium text-foreground mb-1">
+              Nenhum SaaS Admin
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Adicione administradores para ajudar a gerenciar o sistema
+            </p>
+            <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-3 w-3 mr-1" />
+              Adicionar SaaS Admin
+            </Button>
           </div>
         ) : (
           <Table>
             <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs uppercase tracking-wide">Nome</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide">Email</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide">Adicionado em</TableHead>
-                <TableHead className="text-right text-xs uppercase tracking-wide">Ações</TableHead>
+              <TableRow className="hover:bg-transparent bg-muted/30">
+                <TableHead className="text-xs">Nome</TableHead>
+                <TableHead className="text-xs">Email</TableHead>
+                <TableHead className="text-xs hidden md:table-cell">Adicionado em</TableHead>
+                <TableHead className="text-right text-xs">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {saasAdmins.map((admin) => (
-                <TableRow key={admin.id}>
-                  <TableCell className="font-medium">{admin.full_name || '—'}</TableCell>
-                  <TableCell className="font-mono text-xs">{admin.email}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                <TableRow key={admin.id} className="group">
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
+                        {(admin.full_name || admin.email).charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium">{admin.full_name || '—'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {admin.email}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground hidden md:table-cell">
                     {new Date(admin.created_at).toLocaleDateString('pt-BR')}
                   </TableCell>
                   <TableCell className="text-right">
@@ -283,7 +335,7 @@ export function SaasAdminSection() {
                       size="sm"
                       onClick={() => handleDelete(admin)}
                       disabled={deletingId === admin.id}
-                      className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       {deletingId === admin.id ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -294,17 +346,10 @@ export function SaasAdminSection() {
                   </TableCell>
                 </TableRow>
               ))}
-              {saasAdmins.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    Nenhum SaaS Admin cadastrado
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
           </Table>
         )}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
