@@ -1,6 +1,7 @@
-import { Shield, ArrowLeft, LogOut, ShieldCheck } from 'lucide-react';
+import { Shield, ArrowLeft, LogOut, ShieldCheck, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useTheme } from '@/hooks/useTheme';
 
 interface MasterHeaderProps {
   userEmail: string | undefined;
@@ -17,6 +18,8 @@ export function MasterHeader({
   onExitImpersonation,
   onSignOut,
 }: MasterHeaderProps) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <header className="border-b border-border/50 bg-gradient-to-r from-background via-background to-primary/5">
       <div className="max-w-7xl mx-auto px-4 py-4">
@@ -60,6 +63,18 @@ export function MasterHeader({
                 Sair de {impersonatedOrgName}
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="rounded-xl hover:bg-accent/80"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5 text-warning" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
             <Button
               variant="ghost"
               size="sm"
