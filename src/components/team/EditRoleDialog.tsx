@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, Check, RotateCcw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -198,6 +198,11 @@ export function EditRoleDialog({
     }
   };
 
+  const handleResetToDefault = () => {
+    const templatePerms = roleTemplates[newRole] || defaultRolePermissions[newRole];
+    setPermissions([...templatePerms]);
+  };
+
   const handleSave = async () => {
     if (!member) return;
     
@@ -349,9 +354,22 @@ export function EditRoleDialog({
                   {newRole === 'admin' ? 'Acesso total (todas as permissões)' : 'Permissões'}
                 </p>
                 {isCustomized && (
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                    Customizado
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      Customizado
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                      onClick={handleResetToDefault}
+                      disabled={updating}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Resetar
+                    </Button>
+                  </div>
                 )}
               </div>
               
