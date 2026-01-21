@@ -7,6 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Send, Mail, LayoutDashboard, Building2, MailOpen } from 'lucide-react';
 import { z } from 'zod';
@@ -88,6 +98,10 @@ export default function MasterDashboard() {
   const [sending, setSending] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Deactivation confirmation state
+  const [deactivateConfirmOrg, setDeactivateConfirmOrg] = useState<Organization | null>(null);
+  const [deactivateConfirmText, setDeactivateConfirmText] = useState('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -192,7 +206,18 @@ export default function MasterDashboard() {
     });
   };
 
-  const toggleActive = async (org: Organization) => {
+  const handleToggleActive = (org: Organization) => {
+    if (org.active) {
+      // If currently active, we're deactivating - require confirmation
+      setDeactivateConfirmOrg(org);
+      setDeactivateConfirmText('');
+    } else {
+      // If currently inactive, we're activating - do it immediately
+      executeToggleActive(org);
+    }
+  };
+
+  const executeToggleActive = async (org: Organization) => {
     const { error } = await supabase
       .from('organizations')
       .update({ active: !org.active })
@@ -204,7 +229,18 @@ export default function MasterDashboard() {
       setOrganizations(orgs => 
         orgs.map(o => o.id === org.id ? { ...o, active: !o.active } : o)
       );
+      toast({
+        title: org.active ? 'Organização Desativada' : 'Organização Ativada',
+        description: `${org.name} foi ${org.active ? 'desativada' : 'ativada'} com sucesso.`,
+      });
     }
+  };
+
+  const confirmDeactivate = async () => {
+    if (deactivateConfirmText !== 'DESATIVAR' || !deactivateConfirmOrg) return;
+    await executeToggleActive(deactivateConfirmOrg);
+    setDeactivateConfirmOrg(null);
+    setDeactivateConfirmText('');
   };
 
   const createOrganization = async () => {
@@ -523,7 +559,7 @@ export default function MasterDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <OrganizationsCard
                 organizations={organizations}
-                onToggleActive={toggleActive}
+                onToggleActive={handleToggleActive}
                 onImpersonate={handleImpersonate}
                 onOpenDialog={openOrgDialog}
               />
@@ -547,7 +583,7 @@ export default function MasterDashboard() {
             <OrganizationsList
               organizations={organizations}
               members={members}
-              onToggleActive={toggleActive}
+              onToggleActive={handleToggleActive}
               onImpersonate={handleImpersonate}
               onOpenDialog={openOrgDialog}
             />
@@ -703,6 +739,61 @@ export default function MasterDashboard() {
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      {/* Deactivation Confirmation Dialog */}
+      <AlertDialog 
+        open={!!deactivateConfirmOrg} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivateConfirmOrg(null);
+            setDeactivateConfirmText('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">
+              Desativar Organização
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Você está prestes a desativar a organização{' '}
+                  <strong className="text-foreground">{deactivateConfirmOrg?.name}</strong>.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Usuários desta organização perderão acesso ao sistema enquanto ela estiver desativada.
+                </p>
+                <div className="pt-2">
+                  <Label htmlFor="confirm-deactivate" className="text-foreground">
+                    Digite <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-destructive">DESATIVAR</code> para confirmar:
+                  </Label>
+                  <Input
+                    id="confirm-deactivate"
+                    value={deactivateConfirmText}
+                    onChange={(e) => setDeactivateConfirmText(e.target.value.toUpperCase())}
+                    placeholder="DESATIVAR"
+                    className="mt-2"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeactivateConfirmText('')}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeactivate}
+              disabled={deactivateConfirmText !== 'DESATIVAR'}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Desativar Organização
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
