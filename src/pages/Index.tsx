@@ -123,7 +123,6 @@ const Index = () => {
               <TabsContent value="dashboard">
                 <EmpresaOverview
                   salesWithDetails={salesWithDetails}
-                  salesWithCalculations={salesWithCalculations}
                   metrics={metrics}
                   dateRange={dateRange}
                   onDateRangeChange={setDateRange}
