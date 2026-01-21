@@ -5,9 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { SettingsLayout } from '@/layouts/SettingsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users } from 'lucide-react';
+import { Loader2, Users, Shield } from 'lucide-react';
 import { TeamMembersList } from '@/components/TeamMembersList';
 import { InviteMemberDialog } from '@/components/InviteMemberDialog';
+import { RolePermissionsManager } from '@/components/team/RolePermissionsManager';
 
 interface Organization {
   id: string;
@@ -25,6 +26,7 @@ export default function TeamSettings() {
 
   const userRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
   const canInvite = isMasterAdmin || userRole === 'admin' || userRole === 'manager';
+  const canManagePermissions = isMasterAdmin || userRole === 'admin';
 
   useEffect(() => {
     if (!effectiveOrgId || !canInvite) {
@@ -65,7 +67,8 @@ export default function TeamSettings() {
 
   return (
     <SettingsLayout>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Team Members Section */}
         <Card className="hover-lift">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -103,6 +106,17 @@ export default function TeamSettings() {
             )}
           </CardContent>
         </Card>
+
+        {/* Role Permissions Section - Only for Admins */}
+        {canManagePermissions && organization && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-medium text-muted-foreground">Configurações de Cargos</h2>
+            </div>
+            <RolePermissionsManager organizationId={organization.id} />
+          </div>
+        )}
       </div>
     </SettingsLayout>
   );
