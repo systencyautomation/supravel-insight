@@ -454,6 +454,30 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          permission: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          permission: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          permission?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
       sales: {
         Row: {
           aprovado_em: string | null
@@ -646,11 +670,19 @@ export type Database = {
         Returns: undefined
       }
       cleanup_expired_verification_codes: { Args: never; Returns: undefined }
+      create_default_role_permissions: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
       create_organization_for_user: {
         Args: { p_name: string; p_slug: string }
         Returns: string
       }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      has_permission: {
+        Args: { _permission: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

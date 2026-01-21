@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Clock, Trash2, Users, RefreshCw, Copy } from 'lucide-react';
+import { Loader2, Clock, Trash2, Users, RefreshCw, Copy, Pencil } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { EditRoleDialog } from '@/components/team/EditRoleDialog';
 
 interface TeamMembersListProps {
   organizationId: string;
@@ -40,10 +42,36 @@ interface TeamMember {
 
 export function TeamMembersList({ organizationId, organizationName }: TeamMembersListProps) {
   const { toast } = useToast();
+  const { user, userRoles, effectiveOrgId, isMasterAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<MemberInvitation[]>([]);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+
+  const currentUserRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
+  
+  // Check if current user can edit a member's role
+  const canEditRole = (member: TeamMember): boolean => {
+    // Master admin can edit anyone except other admins
+    if (isMasterAdmin) return member.role !== 'admin' && member.role !== 'super_admin';
+    
+    // Can't edit your own role
+    if (member.user_id === user?.id) return false;
+    
+    // Can't edit admins
+    if (member.role === 'admin' || member.role === 'super_admin') return false;
+    
+    // Admin can edit manager, seller, representative
+    if (currentUserRole === 'admin') return true;
+    
+    // Manager can only edit seller and representative
+    if (currentUserRole === 'manager') {
+      return member.role === 'seller' || member.role === 'representative';
+    }
+    
+    return false;
+  };
 
   useEffect(() => {
     fetchData();
@@ -295,9 +323,26 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
                         </p>
                       </div>
                     </div>
-                    <Badge variant={getRoleBadgeVariant(member.role)}>
-                      {getRoleLabel(member.role)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getRoleBadgeVariant(member.role)}>
+                        {getRoleLabel(member.role)}
+                      </Badge>
+                      {canEditRole(member) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary"
+                              onClick={() => setEditingMember(member)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Alterar cargo</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -393,6 +438,15 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
             </div>
           </div>
         )}
+
+        {/* Edit Role Dialog */}
+        <EditRoleDialog
+          member={editingMember}
+          organizationId={organizationId}
+          currentUserRole={currentUserRole}
+          onClose={() => setEditingMember(null)}
+          onSuccess={fetchData}
+        />
       </div>
     </TooltipProvider>
   );
