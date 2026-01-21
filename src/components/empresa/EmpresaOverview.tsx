@@ -1,18 +1,14 @@
 import { KPICard } from '@/components/dashboard/KPICard';
 import { SalesAreaChart } from '@/components/dashboard/SalesAreaChart';
 import { ProductMixChart } from '@/components/dashboard/ProductMixChart';
-import { SalesListTable } from '@/components/vendas/SalesListTable';
 import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilter';
 import { CommandBar } from '@/components/dashboard/CommandBar';
 import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, DollarSign, Percent, HeartPulse } from 'lucide-react';
 import { SaleWithDetails, SalesMetrics } from '@/hooks/useSalesMetrics';
-import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 
 interface EmpresaOverviewProps {
   salesWithDetails: SaleWithDetails[];
-  salesWithCalculations: SaleWithCalculations[];
   metrics: SalesMetrics;
   dateRange: DateRange;
   onDateRangeChange: (range: DateRange) => void;
@@ -21,7 +17,6 @@ interface EmpresaOverviewProps {
 
 export function EmpresaOverview({
   salesWithDetails,
-  salesWithCalculations,
   metrics,
   dateRange,
   onDateRangeChange,
@@ -84,16 +79,6 @@ export function EmpresaOverview({
         <SalesAreaChart sales={salesWithDetails} className="lg:col-span-2" />
         <ProductMixChart sales={salesWithDetails} />
       </div>
-
-      {/* Sales DataTable */}
-      <Card className="bg-card/50 border-border/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold">Vendas Recentes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SalesListTable sales={salesWithCalculations} loading={loading} />
-        </CardContent>
-      </Card>
     </div>
   );
 }
