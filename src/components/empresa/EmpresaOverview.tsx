@@ -6,8 +6,7 @@ import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilt
 import { CommandBar } from '@/components/dashboard/CommandBar';
 import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { TrendingUp, DollarSign, Percent, HeartPulse, ArrowRight } from 'lucide-react';
+import { TrendingUp, DollarSign, Percent, HeartPulse } from 'lucide-react';
 import { SaleWithDetails, SalesMetrics } from '@/hooks/useSalesMetrics';
 import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 
@@ -18,7 +17,6 @@ interface EmpresaOverviewProps {
   dateRange: DateRange;
   onDateRangeChange: (range: DateRange) => void;
   loading: boolean;
-  onNavigateToVendas: () => void;
 }
 
 export function EmpresaOverview({
@@ -28,7 +26,6 @@ export function EmpresaOverview({
   dateRange,
   onDateRangeChange,
   loading,
-  onNavigateToVendas,
 }: EmpresaOverviewProps) {
   if (loading) {
     return <SkeletonDashboard />;
@@ -88,14 +85,10 @@ export function EmpresaOverview({
         <ProductMixChart sales={salesWithDetails} />
       </div>
 
-      {/* Sales DataTable with navigation */}
+      {/* Sales DataTable */}
       <Card className="bg-card/50 border-border/50">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold">Vendas Recentes</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onNavigateToVendas} className="gap-1">
-            Ver todas
-            <ArrowRight className="h-4 w-4" />
-          </Button>
         </CardHeader>
         <CardContent>
           <SalesDataTable sales={salesWithCalculations} loading={loading} />

@@ -8,17 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CommissionsTab } from '@/components/tabs/CommissionsTab';
 import { StockManagement } from '@/components/tabs/StockManagement';
 import { DateRange } from '@/components/dashboard/DateRangeFilter';
-import { EmpresaSidebar, EmpresaView } from '@/components/empresa/EmpresaSidebar';
 import { EmpresaOverview } from '@/components/empresa/EmpresaOverview';
 import { EmpresaVendas } from '@/components/empresa/EmpresaVendas';
-import { EmpresaEquipe } from '@/components/empresa/EmpresaEquipe';
-import { Building2, DollarSign, Package, Loader2, ArrowLeft } from 'lucide-react';
+import { Building2, DollarSign, Package, Loader2, ArrowLeft, LayoutDashboard, ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('empresa');
-  const [empresaView, setEmpresaView] = useState<EmpresaView>('overview');
   const [dateRange, setDateRange] = useState<DateRange>({
     start: startOfMonth(new Date()),
     end: endOfMonth(new Date()),
@@ -79,36 +76,6 @@ const Index = () => {
     representante: '',
   }));
 
-  const renderEmpresaContent = () => {
-    switch (empresaView) {
-      case 'overview':
-        return (
-          <EmpresaOverview
-            salesWithDetails={salesWithDetails}
-            salesWithCalculations={salesWithCalculations}
-            metrics={metrics}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-            loading={dataLoading}
-            onNavigateToVendas={() => setEmpresaView('vendas')}
-          />
-        );
-      case 'vendas':
-        return (
-          <EmpresaVendas
-            sales={salesWithCalculations}
-            loading={dataLoading}
-            onRefresh={refetch}
-          />
-        );
-      case 'gerentes':
-      case 'vendedores':
-      case 'representantes':
-        return <EmpresaEquipe view={empresaView} />;
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,12 +108,37 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="empresa" className="mt-6">
-            <div className="flex gap-6">
-              <EmpresaSidebar activeView={empresaView} onViewChange={setEmpresaView} />
-              <div className="flex-1 min-w-0">
-                {renderEmpresaContent()}
-              </div>
-            </div>
+            <Tabs defaultValue="dashboard" className="space-y-4">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="dashboard" className="gap-2">
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </TabsTrigger>
+                <TabsTrigger value="vendas" className="gap-2">
+                  <ListFilter className="h-4 w-4" />
+                  Vendas
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="dashboard">
+                <EmpresaOverview
+                  salesWithDetails={salesWithDetails}
+                  salesWithCalculations={salesWithCalculations}
+                  metrics={metrics}
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                  loading={dataLoading}
+                />
+              </TabsContent>
+
+              <TabsContent value="vendas">
+                <EmpresaVendas
+                  sales={salesWithCalculations}
+                  loading={dataLoading}
+                  onRefresh={refetch}
+                />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           <TabsContent value="comissoes" className="mt-6">
