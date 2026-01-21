@@ -236,18 +236,18 @@
     bottom: 0;
     width: 8px;
     cursor: col-resize;
-    background: transparent;
+    background: hsl(var(--border));
     z-index: 10;
     transition: background-color 0.15s ease;
   }
 
   .resize-handle:hover {
-    background: hsl(var(--primary) / 0.5);
+    background: hsl(var(--muted-foreground) / 0.5);
   }
 
   .resize-handle.resizing,
   .resize-handle:active {
-    background: hsl(var(--primary) / 0.7);
+    background: hsl(var(--muted-foreground) / 0.7);
   }
 
   .table-resizing {
