@@ -86,7 +86,7 @@ export function InvitationsCard({
           Enviar
         </Button>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 overflow-hidden">
         <TooltipProvider>
           {invitations.length === 0 ? (
             <div className="py-12 text-center">
