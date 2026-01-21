@@ -7,20 +7,18 @@ import { DashboardHeader } from '@/components/DashboardHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CommissionsTab } from '@/components/tabs/CommissionsTab';
 import { StockManagement } from '@/components/tabs/StockManagement';
-import { KPICard } from '@/components/dashboard/KPICard';
-import { SalesAreaChart } from '@/components/dashboard/SalesAreaChart';
-import { ProductMixChart } from '@/components/dashboard/ProductMixChart';
-import { SalesDataTable } from '@/components/dashboard/SalesDataTable';
-import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilter';
-import { CommandBar } from '@/components/dashboard/CommandBar';
-import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
-import { Building2, DollarSign, Package, Loader2, ArrowLeft, TrendingUp, Percent, HeartPulse } from 'lucide-react';
+import { DateRange } from '@/components/dashboard/DateRangeFilter';
+import { EmpresaSidebar, EmpresaView } from '@/components/empresa/EmpresaSidebar';
+import { EmpresaOverview } from '@/components/empresa/EmpresaOverview';
+import { EmpresaVendas } from '@/components/empresa/EmpresaVendas';
+import { EmpresaEquipe } from '@/components/empresa/EmpresaEquipe';
+import { Building2, DollarSign, Package, Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('empresa');
+  const [empresaView, setEmpresaView] = useState<EmpresaView>('overview');
   const [dateRange, setDateRange] = useState<DateRange>({
     start: startOfMonth(new Date()),
     end: endOfMonth(new Date()),
@@ -34,7 +32,7 @@ const Index = () => {
     impersonatedOrgName, 
     setImpersonatedOrg 
   } = useAuth();
-  const { sales: salesWithCalculations, loading: dataLoading } = useSalesWithCalculations();
+  const { sales: salesWithCalculations, loading: dataLoading, refetch } = useSalesWithCalculations();
   const navigate = useNavigate();
 
   // Cast sales to extended type for metrics and charts
@@ -81,6 +79,37 @@ const Index = () => {
     representante: '',
   }));
 
+  const renderEmpresaContent = () => {
+    switch (empresaView) {
+      case 'overview':
+        return (
+          <EmpresaOverview
+            salesWithDetails={salesWithDetails}
+            salesWithCalculations={salesWithCalculations}
+            metrics={metrics}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            loading={dataLoading}
+            onNavigateToVendas={() => setEmpresaView('vendas')}
+          />
+        );
+      case 'vendas':
+        return (
+          <EmpresaVendas
+            sales={salesWithCalculations}
+            loading={dataLoading}
+            onRefresh={refetch}
+          />
+        );
+      case 'gerentes':
+      case 'vendedores':
+      case 'representantes':
+        return <EmpresaEquipe view={empresaView} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader />
@@ -111,74 +140,13 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="empresa" className="mt-6 space-y-6">
-            {dataLoading ? (
-              <SkeletonDashboard />
-            ) : (
-              <>
-                {/* Filters Row */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <DateRangeFilter value={dateRange} onChange={setDateRange} />
-                  <CommandBar sales={salesWithDetails} />
-                </div>
-
-                {/* KPI Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <KPICard
-                    title="Vendas Brutas"
-                    value={metrics.vendasBrutas}
-                    format="currency"
-                    subtitle={`${metrics.totalVendas} NF-e processadas`}
-                    trend={{ value: metrics.vendasBrutasTrend, label: 'vs mês anterior' }}
-                    icon={TrendingUp}
-                    variant="primary"
-                    delay={0}
-                  />
-                  <KPICard
-                    title="Comissões a Pagar"
-                    value={metrics.comissoesAPagar}
-                    format="currency"
-                    subtitle="Over + Base"
-                    icon={DollarSign}
-                    variant="success"
-                    delay={100}
-                  />
-                  <KPICard
-                    title="Margem Over Price"
-                    value={metrics.margemOverPrice}
-                    format="percent"
-                    subtitle="Média do período"
-                    icon={Percent}
-                    variant="warning"
-                    delay={200}
-                  />
-                  <KPICard
-                    title="Saúde Recebimento"
-                    value={metrics.saudeRecebimento}
-                    format="percent"
-                    subtitle={`${metrics.vendasPagas}/${metrics.totalVendas} pagas`}
-                    icon={HeartPulse}
-                    delay={300}
-                  />
-                </div>
-
-                {/* Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <SalesAreaChart sales={salesWithDetails} className="lg:col-span-2" />
-                  <ProductMixChart sales={salesWithDetails} />
-                </div>
-
-                {/* Sales DataTable */}
-                <Card className="bg-card/50 border-border/50">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-semibold">Vendas Recentes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <SalesDataTable sales={salesWithCalculations} loading={dataLoading} />
-                  </CardContent>
-                </Card>
-              </>
-            )}
+          <TabsContent value="empresa" className="mt-6">
+            <div className="flex gap-6">
+              <EmpresaSidebar activeView={empresaView} onViewChange={setEmpresaView} />
+              <div className="flex-1 min-w-0">
+                {renderEmpresaContent()}
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="comissoes" className="mt-6">
