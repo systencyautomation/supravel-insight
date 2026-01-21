@@ -50,6 +50,7 @@ interface TeamMember {
     full_name: string | null;
     email: string | null;
   } | null;
+  hasCustomPermissions?: boolean;
 }
 
 export function TeamMembersList({ organizationId, organizationName }: TeamMembersListProps) {
@@ -113,6 +114,36 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
 
       if (rolesError) throw rolesError;
 
+      // Fetch role permission templates for this org
+      const { data: rolePermsData } = await supabase
+        .from('role_permissions')
+        .select('role, permission')
+        .eq('organization_id', organizationId);
+
+      // Build role templates map
+      const roleTemplates: Record<string, string[]> = {};
+      (rolePermsData || []).forEach(row => {
+        if (!roleTemplates[row.role]) {
+          roleTemplates[row.role] = [];
+        }
+        roleTemplates[row.role].push(row.permission);
+      });
+
+      // Fetch all user permissions for this org
+      const { data: userPermsData } = await supabase
+        .from('user_permissions')
+        .select('user_id, permission')
+        .eq('organization_id', organizationId);
+
+      // Build user permissions map
+      const userPermsMap: Record<string, string[]> = {};
+      (userPermsData || []).forEach(row => {
+        if (!userPermsMap[row.user_id]) {
+          userPermsMap[row.user_id] = [];
+        }
+        userPermsMap[row.user_id].push(row.permission);
+      });
+
       // Fetch profiles for each member
       const membersWithProfiles: TeamMember[] = [];
       for (const roleData of rolesData || []) {
@@ -122,10 +153,17 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
           .eq('id', roleData.user_id)
           .maybeSingle();
 
+        // Check if user has custom permissions (different from role template)
+        const userPerms = userPermsMap[roleData.user_id] || [];
+        const templatePerms = roleTemplates[roleData.role] || [];
+        const hasCustomPermissions = roleData.role !== 'admin' && 
+          JSON.stringify([...userPerms].sort()) !== JSON.stringify([...templatePerms].sort());
+
         membersWithProfiles.push({
           user_id: roleData.user_id,
           role: roleData.role,
           profile: profileData,
+          hasCustomPermissions,
         });
       }
       setMembers(membersWithProfiles);
@@ -383,6 +421,11 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
                       <Badge variant={getRoleBadgeVariant(member.role)}>
                         {getRoleLabel(member.role)}
                       </Badge>
+                      {member.hasCustomPermissions && (
+                        <Badge variant="outline" className="text-xs bg-primary/5 border-primary/20 text-primary">
+                          Customizado
+                        </Badge>
+                      )}
                       {canEditRole(member) && (
                         <>
                           <Tooltip>
