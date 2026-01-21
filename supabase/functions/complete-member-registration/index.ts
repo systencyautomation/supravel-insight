@@ -130,7 +130,26 @@ serve(async (req: Request) => {
       // Don't fail the registration, but log the error
     }
 
-    // Step 5: Update invitation status
+    // Step 5: Insert individual user permissions from invitation (skip for admin)
+    if (invitation.role !== 'admin' && invitation.permissions && invitation.permissions.length > 0) {
+      console.log('Inserting permissions:', invitation.permissions);
+      const permissionRows = invitation.permissions.map((permission: string) => ({
+        user_id: userId,
+        organization_id: invitation.organization_id,
+        permission,
+      }));
+
+      const { error: permError } = await supabaseAdmin
+        .from('user_permissions')
+        .insert(permissionRows);
+
+      if (permError) {
+        console.error('Error inserting permissions:', permError);
+        // Don't fail the registration
+      }
+    }
+
+    // Step 6: Update invitation status
     console.log('Updating invitation status...');
     const { error: updateError } = await supabaseAdmin
       .from('member_invitations')
@@ -141,7 +160,7 @@ serve(async (req: Request) => {
       console.error('Error updating invitation:', updateError);
     }
 
-    // Step 6: Create/update profile
+    // Step 7: Create/update profile
     console.log('Creating profile...');
     const { error: profileError } = await supabaseAdmin
       .from('profiles')

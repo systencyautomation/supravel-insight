@@ -9,8 +9,9 @@ interface CreateMemberRequest {
   email: string;
   password: string;
   fullName: string;
-  role: "manager" | "seller" | "representative";
+  role: "admin" | "manager" | "seller" | "representative";
   organizationId: string;
+  permissions?: string[];
 }
 
 Deno.serve(async (req: Request) => {
@@ -50,7 +51,7 @@ Deno.serve(async (req: Request) => {
 
     // Parse request body
     const body: CreateMemberRequest = await req.json();
-    const { email, password, fullName, role, organizationId } = body;
+    const { email, password, fullName, role, organizationId, permissions = [] } = body;
 
     // Validate required fields
     if (!email || !password || !fullName || !role || !organizationId) {
@@ -78,7 +79,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Validate role
-    const validRoles = ["manager", "seller", "representative"];
+    const validRoles = ["admin", "manager", "seller", "representative"];
     if (!validRoles.includes(role)) {
       return new Response(
         JSON.stringify({ error: "Cargo inválido" }),
@@ -165,7 +166,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Step 3: Create or update profile
+    // Step 3: Insert individual user permissions (skip for admin - they have all permissions)
+    if (role !== "admin" && permissions.length > 0) {
+      console.log(`Inserting ${permissions.length} permissions for user`);
+      const permissionRows = permissions.map(permission => ({
+        user_id: newUserId,
+        organization_id: organizationId,
+        permission,
+      }));
+
+      const { error: permError } = await supabaseAdmin
+        .from("user_permissions")
+        .insert(permissionRows);
+
+      if (permError) {
+        console.error("Error inserting permissions:", permError);
+        // Non-fatal, continue with member creation
+      }
+    }
+
+    // Step 4: Create or update profile
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .upsert({

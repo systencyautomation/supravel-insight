@@ -37,18 +37,26 @@ export function usePermissions() {
   const userRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
 
   const fetchPermissions = useCallback(async () => {
-    if (!effectiveOrgId || !userRole) {
+    if (!user || !effectiveOrgId) {
       setPermissions([]);
       setLoading(false);
       return;
     }
 
+    // Admin, super_admin, saas_admin always have all permissions
+    if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'saas_admin') {
+      setPermissions(AVAILABLE_PERMISSIONS.map(p => p.key));
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Fetch from user_permissions table (individual permissions)
       const { data, error } = await supabase
-        .from('role_permissions')
+        .from('user_permissions')
         .select('permission')
-        .eq('organization_id', effectiveOrgId)
-        .eq('role', userRole);
+        .eq('user_id', user.id)
+        .eq('organization_id', effectiveOrgId);
 
       if (error) throw error;
       
@@ -59,7 +67,7 @@ export function usePermissions() {
     } finally {
       setLoading(false);
     }
-  }, [effectiveOrgId, userRole]);
+  }, [user, effectiveOrgId, userRole]);
 
   useEffect(() => {
     fetchPermissions();
@@ -67,7 +75,7 @@ export function usePermissions() {
 
   const hasPermission = useCallback((permission: Permission): boolean => {
     if (isMasterAdmin) return true;
-    if (userRole === 'super_admin' || userRole === 'saas_admin') return true;
+    if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'saas_admin') return true;
     return permissions.includes(permission);
   }, [isMasterAdmin, userRole, permissions]);
 

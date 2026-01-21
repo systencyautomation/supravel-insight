@@ -348,6 +348,7 @@ export type Database = {
           invited_by: string
           last_sent_at: string | null
           organization_id: string
+          permissions: string[] | null
           role: Database["public"]["Enums"]["app_role"]
           status: string
           token: string
@@ -361,6 +362,7 @@ export type Database = {
           invited_by: string
           last_sent_at?: string | null
           organization_id: string
+          permissions?: string[] | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
           token?: string
@@ -374,6 +376,7 @@ export type Database = {
           invited_by?: string
           last_sent_at?: string | null
           organization_id?: string
+          permissions?: string[] | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
           token?: string
@@ -624,6 +627,38 @@ export type Database = {
           },
           {
             foreignKeyName: "sales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          permission: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          permission: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          permission?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
