@@ -78,7 +78,7 @@ const Index = () => {
 
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <DashboardHeader />
       
       {impersonatedOrgName && (
@@ -90,7 +90,7 @@ const Index = () => {
         </div>
       )}
       
-      <main className="container mx-auto px-6 py-6">
+      <main className="container mx-auto px-6 py-6 flex-1">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 h-auto p-0 bg-transparent gap-1">
             <TabsTrigger value="empresa" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
@@ -150,7 +150,7 @@ const Index = () => {
         </Tabs>
       </main>
 
-      <footer className="border-t border-border h-14 flex items-center mt-8">
+      <footer className="border-t border-border py-3 mt-auto">
         <div className="container mx-auto px-6 text-center">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
             Supravel © 2026 — Sistema de Gestão de Comissões
