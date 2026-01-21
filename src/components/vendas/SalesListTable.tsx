@@ -116,6 +116,12 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
   const [isResizing, setIsResizing] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  // Calculate total table width dynamically
+  const totalTableWidth = useMemo(() => 
+    Object.values(columnWidths).reduce((sum, width) => sum + width, 0),
+    [columnWidths]
+  );
+
   // Column resize handler with minimum width constraint
   const handleColumnResize = useCallback((columnKey: ColumnKey, startX: number, startWidth: number) => {
     setIsResizing(true);
@@ -261,7 +267,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
           isResizing && "table-resizing"
         )}
       >
-        <Table style={{ tableLayout: 'fixed', width: '100%' }}>
+        <Table style={{ tableLayout: 'fixed', width: totalTableWidth, minWidth: '100%' }}>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
               <ResizableHeader columnKey="emission_date">
