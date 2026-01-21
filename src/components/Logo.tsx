@@ -11,10 +11,10 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
   const { theme } = useTheme();
   
   const sizeClasses = {
-    sm: 'h-8',
-    md: 'h-10', 
-    lg: 'h-12',
-    xl: 'h-16'
+    sm: 'h-[42px]',
+    md: 'h-[50px]', 
+    lg: 'h-[58px]',
+    xl: 'h-[74px]'
   };
   
   const logoSrc = theme === 'dark' ? logoDark : logoLight;
