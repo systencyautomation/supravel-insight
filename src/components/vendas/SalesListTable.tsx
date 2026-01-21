@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Eye, BadgeCheck, FileText, X } from 'lucide-react';
@@ -33,6 +33,21 @@ import { useSalesFilters, ColumnFilters } from '@/hooks/useSalesFilters';
 import { ColumnFilterHeader } from './ColumnFilterHeader';
 import { SaleDetailSheet } from '@/components/dashboard/SaleDetailSheet';
 import { cn } from '@/lib/utils';
+
+type ColumnKey = 'emission_date' | 'nfe_number' | 'client_name' | 'produto' | 'total_value' | 'entrada' | 'percentual' | 'comissao' | 'status' | 'actions';
+
+const defaultColumnWidths: Record<ColumnKey, number> = {
+  emission_date: 110,
+  nfe_number: 90,
+  client_name: 220,
+  produto: 180,
+  total_value: 130,
+  entrada: 140,
+  percentual: 110,
+  comissao: 130,
+  status: 110,
+  actions: 50,
+};
 
 interface SalesListTableProps {
   sales: SaleWithCalculations[];
@@ -78,6 +93,59 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [selectedSale, setSelectedSale] = useState<SaleWithCalculations | null>(null);
+  const [columnWidths, setColumnWidths] = useState(defaultColumnWidths);
+  const [isResizing, setIsResizing] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Column resize handler
+  const handleColumnResize = useCallback((columnKey: ColumnKey, startX: number, startWidth: number) => {
+    setIsResizing(true);
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startX;
+      const newWidth = Math.max(50, startWidth + delta);
+      setColumnWidths(prev => ({ ...prev, [columnKey]: newWidth }));
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  // Resizable header component
+  const ResizableHeader = ({ 
+    columnKey, 
+    children, 
+    className 
+  }: { 
+    columnKey: ColumnKey; 
+    children?: React.ReactNode; 
+    className?: string;
+  }) => (
+    <TableHead 
+      className={cn('resizable-th', className)}
+      style={{ width: columnWidths[columnKey], minWidth: columnWidths[columnKey] }}
+    >
+      {children}
+      <div
+        className={cn('resize-handle', isResizing && 'resizing')}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleColumnResize(columnKey, e.clientX, columnWidths[columnKey]);
+        }}
+      />
+    </TableHead>
+  );
 
   // Pagination
   const totalPages = Math.ceil(filteredSales.length / pageSize);
@@ -157,11 +225,17 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
       </div>
 
       {/* Table */}
-      <div className="border border-border/50 rounded-lg overflow-hidden">
-        <Table>
+      <div 
+        ref={tableContainerRef}
+        className={cn(
+          "border border-border/50 rounded-lg overflow-x-auto",
+          isResizing && "table-resizing"
+        )}
+      >
+        <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
-              <TableHead className="w-[100px]">
+              <ResizableHeader columnKey="emission_date">
                 <ColumnFilterHeader
                   title="Data"
                   columnKey="emission_date"
@@ -173,8 +247,8 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortDirection={sortDirection}
                   type="date"
                 />
-              </TableHead>
-              <TableHead className="w-[80px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="nfe_number">
                 <ColumnFilterHeader
                   title="NF"
                   columnKey="nfe_number"
@@ -186,8 +260,8 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortDirection={sortDirection}
                   type="text"
                 />
-              </TableHead>
-              <TableHead className="min-w-[180px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="client_name">
                 <ColumnFilterHeader
                   title="Cliente"
                   columnKey="client_name"
@@ -199,8 +273,8 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortDirection={sortDirection}
                   type="text"
                 />
-              </TableHead>
-              <TableHead className="min-w-[150px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="produto">
                 <ColumnFilterHeader
                   title="Produto"
                   columnKey="produto_modelo"
@@ -212,28 +286,28 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortDirection={sortDirection}
                   type="text"
                 />
-              </TableHead>
-              <TableHead className="text-right w-[120px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="total_value" className="text-right">
                 <div className="flex items-center justify-end gap-1">
                   <span className="font-medium">Valor Total</span>
                 </div>
-              </TableHead>
-              <TableHead className="text-right w-[130px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="entrada" className="text-right">
                 <div className="flex items-center justify-end gap-1">
                   <span className="font-medium">Entrada</span>
                 </div>
-              </TableHead>
-              <TableHead className="text-right w-[100px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="percentual" className="text-right">
                 <div className="flex items-center justify-end gap-1">
                   <span className="font-medium">% Comissão</span>
                 </div>
-              </TableHead>
-              <TableHead className="text-right w-[130px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="comissao" className="text-right">
                 <div className="flex items-center justify-end gap-1">
                   <span className="font-medium">Comissão</span>
                 </div>
-              </TableHead>
-              <TableHead className="w-[100px]">
+              </ResizableHeader>
+              <ResizableHeader columnKey="status">
                 <ColumnFilterHeader
                   title="Status"
                   columnKey="status"
@@ -245,8 +319,8 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortDirection={sortDirection}
                   type="text"
                 />
-              </TableHead>
-              <TableHead className="w-[50px]" />
+              </ResizableHeader>
+              <ResizableHeader columnKey="actions" />
             </TableRow>
           </TableHeader>
           <TableBody>
