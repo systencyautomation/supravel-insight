@@ -1,4 +1,4 @@
-import { Moon, Sun, Sparkles, Settings, User, Building2, Users, LogOut, Plug } from 'lucide-react';
+import { Moon, Sun, Settings, User, Building2, Users, LogOut, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PendingSalesNotification } from '@/components/PendingSalesNotification';
+import { Logo } from '@/components/Logo';
 
 export function DashboardHeader() {
   const { theme, toggleTheme } = useTheme();
@@ -25,25 +26,10 @@ export function DashboardHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Modern Logo with gradient */}
+        <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
-              <span className="text-primary-foreground font-bold text-lg">S</span>
-            </div>
-            <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-success animate-pulse" />
-          </div>
-          
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                SUPRAVEL
-              </h1>
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-xs text-muted-foreground font-medium">
-              Sistema de Comissões
-            </p>
+            <Logo size="lg" />
+            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-success animate-pulse" />
           </div>
         </div>
         

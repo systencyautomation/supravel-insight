@@ -1,7 +1,8 @@
-import { Shield, ArrowLeft, LogOut, ShieldCheck, Moon, Sun } from 'lucide-react';
+import { ArrowLeft, LogOut, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useTheme } from '@/hooks/useTheme';
+import { Logo } from '@/components/Logo';
 
 interface MasterHeaderProps {
   userEmail: string | undefined;
@@ -25,18 +26,9 @@ export function MasterHeader({
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
-              {isMasterAdmin ? (
-                <Shield className="h-5 w-5 text-primary-foreground" />
-              ) : (
-                <ShieldCheck className="h-5 w-5 text-primary-foreground" />
-              )}
-            </div>
+            <Logo size="md" />
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-foreground">
-                  {isMasterAdmin ? 'Master Control' : 'Admin Control'}
-                </h1>
                 <Badge 
                   variant="outline" 
                   className={`text-[10px] uppercase tracking-wider ${

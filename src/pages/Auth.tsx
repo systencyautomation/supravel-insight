@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, LogIn, UserPlus, Mail, Lock, User, Sparkles } from 'lucide-react';
+import { Loader2, LogIn, UserPlus, Mail, Lock, User } from 'lucide-react';
 import { z } from 'zod';
+import { Logo } from '@/components/Logo';
 
 const emailSchema = z.string().email('Email inválido');
 const passwordSchema = z.string().min(6, 'Senha deve ter no mínimo 6 caracteres');
@@ -101,12 +102,9 @@ export default function Auth() {
       <div className="w-full max-w-md relative z-10 animate-fade-up">
         {/* Logo Section */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 shadow-xl shadow-primary/20 mb-4">
-            <span className="text-primary-foreground font-bold text-2xl">S</span>
+          <div className="flex justify-center mb-4">
+            <Logo size="xl" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            SUPRAVEL
-          </h1>
           <p className="text-muted-foreground mt-2">
             Sistema de Gestão de Comissões
           </p>
@@ -115,9 +113,8 @@ export default function Auth() {
         <Card className="shadow-xl border-border/50 backdrop-blur-sm">
           <CardContent className="p-8">
             <div className="mb-6 text-center">
-              <h2 className="text-xl font-semibold flex items-center justify-center gap-2">
+              <h2 className="text-xl font-semibold">
                 {isLogin ? 'Bem-vindo de volta' : 'Criar conta'}
-                <Sparkles className="h-5 w-5 text-primary" />
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {isLogin ? 'Entre com suas credenciais' : 'Preencha os dados abaixo'}
@@ -229,7 +226,7 @@ export default function Auth() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Supravel © 2026
+          Connect CRM © 2026
         </p>
       </div>
     </div>
