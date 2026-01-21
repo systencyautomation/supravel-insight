@@ -45,7 +45,7 @@ export function ColumnFilterHeader({
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       {/* Clickable title for quick sort */}
       <button
         className="flex items-center gap-1 font-medium hover:text-primary transition-colors cursor-pointer select-none"
