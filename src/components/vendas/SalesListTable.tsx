@@ -54,18 +54,18 @@ const defaultColumnWidths: Record<ColumnKey, number> = {
   actions: 50,
 };
 
-// Minimum widths to prevent columns from shrinking below their title size
+// Minimum widths to prevent columns from shrinking below their title size (reduced for px-2 padding)
 const minColumnWidths: Record<ColumnKey, number> = {
-  emission_date: 70,
-  nfe_number: 55,
-  client_name: 75,
-  produto: 75,
-  total_value: 100,
-  entrada: 75,
-  percentual: 60,
-  comissao: 90,
-  status: 65,
-  actions: 45,
+  emission_date: 62,
+  nfe_number: 47,
+  client_name: 67,
+  produto: 67,
+  total_value: 92,
+  entrada: 67,
+  percentual: 52,
+  comissao: 82,
+  status: 57,
+  actions: 40,
 };
 
 interface SalesListTableProps {
@@ -152,7 +152,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
     className?: string;
   }) => (
     <TableHead 
-      className={cn('resizable-th', className)}
+      className={cn('resizable-th px-2', className)}
       style={{ width: columnWidths[columnKey], minWidth: columnWidths[columnKey] }}
     >
       {children}
