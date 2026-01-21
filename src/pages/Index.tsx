@@ -150,10 +150,10 @@ const Index = () => {
         </Tabs>
       </main>
 
-      <footer className="border-t border-border py-4 mt-8">
+      <footer className="border-t border-border h-14 flex items-center mt-8">
         <div className="container mx-auto px-6 text-center">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Supravel © 2025 — Sistema de Gestão de Comissões
+            Supravel © 2026 — Sistema de Gestão de Comissões
           </p>
         </div>
       </footer>
