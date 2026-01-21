@@ -2,16 +2,30 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationData } from '@/hooks/useOrganizationData';
+import { useSalesMetrics, SaleWithDetails } from '@/hooks/useSalesMetrics';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CompanyCommissions } from '@/components/tabs/CompanyCommissions';
 import { CommissionsTab } from '@/components/tabs/CommissionsTab';
 import { StockManagement } from '@/components/tabs/StockManagement';
-import { Building2, DollarSign, Package, Loader2, ArrowLeft } from 'lucide-react';
+import { KPICard } from '@/components/dashboard/KPICard';
+import { SalesAreaChart } from '@/components/dashboard/SalesAreaChart';
+import { ProductMixChart } from '@/components/dashboard/ProductMixChart';
+import { SalesTable } from '@/components/dashboard/SalesTable';
+import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilter';
+import { CommandBar } from '@/components/dashboard/CommandBar';
+import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
+import { Building2, DollarSign, Package, Loader2, ArrowLeft, TrendingUp, Percent, HeartPulse } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('empresa');
+  const [dateRange, setDateRange] = useState<DateRange>({
+    start: startOfMonth(new Date()),
+    end: endOfMonth(new Date()),
+    label: 'Este Mês',
+  });
+  
   const { 
     user, 
     loading: authLoading, 
@@ -22,13 +36,15 @@ const Index = () => {
   const { sales, inventory, installments, loading: dataLoading } = useOrganizationData();
   const navigate = useNavigate();
 
+  // Cast sales to extended type
+  const salesWithDetails = sales as unknown as SaleWithDetails[];
+  const metrics = useSalesMetrics(salesWithDetails, { start: dateRange.start, end: dateRange.end });
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
       return;
     }
-
-    // Redirect Master Admin to master dashboard if not impersonating
     if (!authLoading && user && isMasterAdmin && !impersonatedOrgName) {
       navigate('/master');
     }
@@ -47,11 +63,9 @@ const Index = () => {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  // Map real data from database
+  // Map for legacy components
   const displaySales = sales.map(s => ({
     id: s.id,
     cliente: s.client_name || '',
@@ -72,12 +86,7 @@ const Index = () => {
       
       {impersonatedOrgName && (
         <div className="container mx-auto px-6 py-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleExitImpersonation}
-            className="gap-2 text-xs"
-          >
+          <Button variant="outline" size="sm" onClick={handleExitImpersonation} className="gap-2 text-xs">
             <ArrowLeft className="h-3 w-3" />
             Sair de {impersonatedOrgName}
           </Button>
@@ -87,31 +96,81 @@ const Index = () => {
       <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 h-auto p-0 bg-transparent gap-1">
-            <TabsTrigger 
-              value="empresa" 
-              className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
-            >
+            <TabsTrigger value="empresa" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               <span className="hidden sm:inline">Empresa</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="comissoes" 
-              className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
-            >
+            <TabsTrigger value="comissoes" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               <span className="hidden sm:inline">Comissões</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="tabela" 
-              className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2"
-            >
+            <TabsTrigger value="tabela" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Tabela</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="empresa" className="mt-6">
-            <CompanyCommissions sales={displaySales} />
+          <TabsContent value="empresa" className="mt-6 space-y-6">
+            {dataLoading ? (
+              <SkeletonDashboard />
+            ) : (
+              <>
+                {/* Filters Row */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <DateRangeFilter value={dateRange} onChange={setDateRange} />
+                  <CommandBar sales={salesWithDetails} />
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <KPICard
+                    title="Vendas Brutas"
+                    value={metrics.vendasBrutas}
+                    format="currency"
+                    subtitle={`${metrics.totalVendas} NF-e processadas`}
+                    trend={{ value: metrics.vendasBrutasTrend, label: 'vs mês anterior' }}
+                    icon={TrendingUp}
+                    variant="primary"
+                    delay={0}
+                  />
+                  <KPICard
+                    title="Comissões a Pagar"
+                    value={metrics.comissoesAPagar}
+                    format="currency"
+                    subtitle="Over + Base"
+                    icon={DollarSign}
+                    variant="success"
+                    delay={100}
+                  />
+                  <KPICard
+                    title="Margem Over Price"
+                    value={metrics.margemOverPrice}
+                    format="percent"
+                    subtitle="Média do período"
+                    icon={Percent}
+                    variant="warning"
+                    delay={200}
+                  />
+                  <KPICard
+                    title="Saúde Recebimento"
+                    value={metrics.saudeRecebimento}
+                    format="percent"
+                    subtitle={`${metrics.vendasPagas}/${metrics.totalVendas} pagas`}
+                    icon={HeartPulse}
+                    delay={300}
+                  />
+                </div>
+
+                {/* Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <SalesAreaChart sales={salesWithDetails} className="lg:col-span-2" />
+                  <ProductMixChart sales={salesWithDetails} />
+                </div>
+
+                {/* Sales Table */}
+                <SalesTable sales={salesWithDetails} limit={10} />
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="comissoes" className="mt-6">
@@ -121,7 +180,6 @@ const Index = () => {
           <TabsContent value="tabela" className="mt-6">
             <StockManagement />
           </TabsContent>
-
         </Tabs>
       </main>
 
