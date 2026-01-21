@@ -27,21 +27,6 @@ export function MasterHeader({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Logo size="md" />
-            <div>
-              <div className="flex items-center gap-2">
-                <Badge 
-                  variant="outline" 
-                  className={`text-[10px] uppercase tracking-wider ${
-                    isMasterAdmin 
-                      ? 'border-primary/30 text-primary' 
-                      : 'border-warning/30 text-warning'
-                  }`}
-                >
-                  {isMasterAdmin ? 'Master' : 'SaaS Admin'}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground font-mono">{userEmail}</p>
-            </div>
           </div>
           <div className="flex items-center gap-2">
             {impersonatedOrgName && (
