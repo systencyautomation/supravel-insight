@@ -21,6 +21,20 @@ export interface Sale {
   representative_id: string | null;
   emission_date: string | null;
   created_at: string | null;
+  // Additional fields
+  produto_modelo: string | null;
+  produto_descricao: string | null;
+  produto_marca: string | null;
+  produto_codigo: string | null;
+  produto_numero_serie: string | null;
+  percentual_comissao: number | null;
+  percentual_icms: number | null;
+  valor_entrada: number | null;
+  over_price_liquido: number | null;
+  observacoes: string | null;
+  motivo_rejeicao: string | null;
+  aprovado_por: string | null;
+  aprovado_em: string | null;
 }
 
 export interface InventoryItem {
