@@ -1,17 +1,29 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Clock, Trash2, Users, RefreshCw, Copy, Pencil } from 'lucide-react';
+import { Loader2, Clock, Trash2, Users, RefreshCw, Copy, Pencil, UserMinus } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { EditRoleDialog } from '@/components/team/EditRoleDialog';
 
 interface TeamMembersListProps {
@@ -50,6 +62,8 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   const currentUserRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
+  const { hasPermission } = usePermissions();
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   
   // Check if current user can edit a member's role
   const canEditRole = (member: TeamMember): boolean => {
@@ -71,6 +85,18 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
     }
     
     return false;
+  };
+
+  // Check if current user can remove a member
+  const canRemoveMember = (member: TeamMember): boolean => {
+    // Can't remove yourself
+    if (member.user_id === user?.id) return false;
+    
+    // Can't remove admins or super_admins
+    if (member.role === 'admin' || member.role === 'super_admin') return false;
+    
+    // Must have remove_members permission
+    return hasPermission('remove_members');
   };
 
   useEffect(() => {
@@ -257,6 +283,36 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
     }
   };
 
+  const handleRemoveMember = async (member: TeamMember) => {
+    setRemovingMemberId(member.user_id);
+    
+    try {
+      // Remove user_roles entry (doesn't delete the auth user)
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', member.user_id)
+        .eq('organization_id', organizationId);
+
+      if (error) throw error;
+
+      setMembers(prev => prev.filter(m => m.user_id !== member.user_id));
+      toast({
+        title: 'Membro removido',
+        description: `${member.profile?.full_name || member.profile?.email} foi removido da organização.`,
+      });
+    } catch (error) {
+      console.error('Error removing member:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível remover o membro.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
       super_admin: 'Super Admin',
@@ -341,6 +397,48 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
                           </TooltipTrigger>
                           <TooltipContent>Alterar cargo</TooltipContent>
                         </Tooltip>
+                      )}
+                      {canRemoveMember(member) && (
+                        <AlertDialog>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  disabled={removingMemberId === member.user_id}
+                                >
+                                  {removingMemberId === member.user_id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <UserMinus className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>Remover membro</TooltipContent>
+                          </Tooltip>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remover membro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover{' '}
+                                <strong>{member.profile?.full_name || member.profile?.email}</strong> da organização?
+                                Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleRemoveMember(member)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
                   </CardContent>
