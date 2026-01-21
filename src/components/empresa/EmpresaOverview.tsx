@@ -1,7 +1,7 @@
 import { KPICard } from '@/components/dashboard/KPICard';
 import { SalesAreaChart } from '@/components/dashboard/SalesAreaChart';
 import { ProductMixChart } from '@/components/dashboard/ProductMixChart';
-import { SalesDataTable } from '@/components/dashboard/SalesDataTable';
+import { SalesListTable } from '@/components/vendas/SalesListTable';
 import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilter';
 import { CommandBar } from '@/components/dashboard/CommandBar';
 import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
@@ -91,7 +91,7 @@ export function EmpresaOverview({
           <CardTitle className="text-lg font-semibold">Vendas Recentes</CardTitle>
         </CardHeader>
         <CardContent>
-          <SalesDataTable sales={salesWithCalculations} loading={loading} />
+          <SalesListTable sales={salesWithCalculations} loading={loading} />
         </CardContent>
       </Card>
     </div>

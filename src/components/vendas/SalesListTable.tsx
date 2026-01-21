@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Eye, BadgeCheck, FileText, X } from 'lucide-react';
+import { Eye, BadgeCheck, FileText, X, Calculator } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -28,8 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
 import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
-import { useSalesFilters, ColumnFilters } from '@/hooks/useSalesFilters';
+import { useSalesFilters, ColumnFilters, SortDirection } from '@/hooks/useSalesFilters';
 import { ColumnFilterHeader } from './ColumnFilterHeader';
 import { SaleDetailSheet } from '@/components/dashboard/SaleDetailSheet';
 import { cn } from '@/lib/utils';
@@ -147,6 +152,15 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
     </TableHead>
   );
 
+  // Quick sort toggle helper
+  const toggleQuickSort = useCallback((column: string) => {
+    const newDirection: SortDirection = 
+      sortColumn === column 
+        ? (sortDirection === 'asc' ? 'desc' : sortDirection === 'desc' ? null : 'asc')
+        : 'asc';
+    handleSort(column, newDirection);
+  }, [sortColumn, sortDirection, handleSort]);
+
   // Pagination
   const totalPages = Math.ceil(filteredSales.length / pageSize);
   const paginatedSales = useMemo(() => {
@@ -246,6 +260,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortColumn={sortColumn}
                   sortDirection={sortDirection}
                   type="date"
+                  onQuickSort={() => toggleQuickSort('emission_date')}
                 />
               </ResizableHeader>
               <ResizableHeader columnKey="nfe_number">
@@ -259,6 +274,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortColumn={sortColumn}
                   sortDirection={sortDirection}
                   type="text"
+                  onQuickSort={() => toggleQuickSort('nfe_number')}
                 />
               </ResizableHeader>
               <ResizableHeader columnKey="client_name">
@@ -272,6 +288,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortColumn={sortColumn}
                   sortDirection={sortDirection}
                   type="text"
+                  onQuickSort={() => toggleQuickSort('client_name')}
                 />
               </ResizableHeader>
               <ResizableHeader columnKey="produto">
@@ -285,27 +302,64 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortColumn={sortColumn}
                   sortDirection={sortDirection}
                   type="text"
+                  onQuickSort={() => toggleQuickSort('produto_modelo')}
                 />
               </ResizableHeader>
               <ResizableHeader columnKey="total_value" className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <span className="font-medium">Valor Total</span>
-                </div>
+                <ColumnFilterHeader
+                  title="Valor Total"
+                  columnKey="total_value"
+                  values={uniqueValorTotal}
+                  selectedValues={new Set()}
+                  onFilterChange={() => {}}
+                  onSort={(dir) => handleSort('total_value', dir)}
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  type="currency"
+                  onQuickSort={() => toggleQuickSort('total_value')}
+                />
               </ResizableHeader>
               <ResizableHeader columnKey="entrada" className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <span className="font-medium">Entrada</span>
-                </div>
+                <ColumnFilterHeader
+                  title="Entrada"
+                  columnKey="entradaCalculada"
+                  values={[]}
+                  selectedValues={new Set()}
+                  onFilterChange={() => {}}
+                  onSort={(dir) => handleSort('entradaCalculada', dir)}
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  type="currency"
+                  onQuickSort={() => toggleQuickSort('entradaCalculada')}
+                />
               </ResizableHeader>
               <ResizableHeader columnKey="percentual" className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <span className="font-medium">% Comissão</span>
-                </div>
+                <ColumnFilterHeader
+                  title="% Comissão"
+                  columnKey="percentualComissaoCalculado"
+                  values={[]}
+                  selectedValues={new Set()}
+                  onFilterChange={() => {}}
+                  onSort={(dir) => handleSort('percentualComissaoCalculado', dir)}
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  type="number"
+                  onQuickSort={() => toggleQuickSort('percentualComissaoCalculado')}
+                />
               </ResizableHeader>
               <ResizableHeader columnKey="comissao" className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <span className="font-medium">Comissão</span>
-                </div>
+                <ColumnFilterHeader
+                  title="Comissão"
+                  columnKey="valorComissaoCalculado"
+                  values={[]}
+                  selectedValues={new Set()}
+                  onFilterChange={() => {}}
+                  onSort={(dir) => handleSort('valorComissaoCalculado', dir)}
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  type="currency"
+                  onQuickSort={() => toggleQuickSort('valorComissaoCalculado')}
+                />
               </ResizableHeader>
               <ResizableHeader columnKey="status">
                 <ColumnFilterHeader
@@ -318,6 +372,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   sortColumn={sortColumn}
                   sortDirection={sortDirection}
                   type="text"
+                  onQuickSort={() => toggleQuickSort('status')}
                 />
               </ResizableHeader>
               <ResizableHeader columnKey="actions" />
@@ -333,91 +388,146 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
               </TableRow>
             ) : (
               paginatedSales.map((sale) => (
-                <TableRow
-                  key={sale.id}
-                  className="hover:bg-muted/20 transition-colors cursor-pointer"
-                  onClick={() => setSelectedSale(sale)}
-                >
-                  <TableCell className="font-mono text-sm">
-                    {sale.emission_date
-                      ? format(new Date(sale.emission_date), 'dd/MM/yyyy', { locale: ptBR })
-                      : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-mono">
-                      {sale.nfe_number || '-'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="truncate max-w-[180px] block">
-                          {sale.client_name || '-'}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{sale.client_name}</p>
-                        {sale.client_cnpj && (
-                          <p className="text-xs text-muted-foreground">CNPJ: {sale.client_cnpj}</p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    <span className="truncate max-w-[150px] block">
-                      {sale.produto_modelo || '-'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(Number(sale.total_value) || 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <span className="font-mono">{formatCurrency(sale.entradaCalculada)}</span>
-                      {sale.entradaVerificada && (
+                <HoverCard key={sale.id} openDelay={400} closeDelay={100}>
+                  <HoverCardTrigger asChild>
+                    <TableRow
+                      className="hover:bg-muted/20 transition-colors cursor-pointer"
+                      onClick={() => setSelectedSale(sale)}
+                    >
+                      <TableCell className="font-mono text-sm">
+                        {sale.emission_date
+                          ? format(new Date(sale.emission_date), 'dd/MM/yyyy', { locale: ptBR })
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono">
+                          {sale.nfe_number || '-'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <Tooltip>
-                          <TooltipTrigger>
-                            <BadgeCheck className="h-4 w-4 text-success" />
+                          <TooltipTrigger asChild>
+                            <span className="truncate max-w-[180px] block">
+                              {sale.client_name || '-'}
+                            </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Verificado via boletos</p>
-                            <p className="text-xs text-muted-foreground">
-                              {sale.qtdParcelas} parcelas de{' '}
-                              {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
-                            </p>
+                            <p>{sale.client_name}</p>
+                            {sale.client_cnpj && (
+                              <p className="text-xs text-muted-foreground">CNPJ: {sale.client_cnpj}</p>
+                            )}
                           </TooltipContent>
                         </Tooltip>
-                      )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="truncate max-w-[150px] block">
+                          {sale.produto_modelo || '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(Number(sale.total_value) || 0)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="font-mono">{formatCurrency(sale.entradaCalculada)}</span>
+                          {sale.entradaVerificada && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <BadgeCheck className="h-4 w-4 text-success" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Verificado via boletos</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {sale.qtdParcelas} parcelas de{' '}
+                                  {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {sale.percentualComissaoCalculado.toFixed(2)}%
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <span
+                            className={cn(
+                              'font-mono font-medium',
+                              sale.valorComissaoCalculado > 0 ? 'text-success' : 'text-muted-foreground'
+                            )}
+                          >
+                            {formatCurrency(sale.valorComissaoCalculado)}
+                          </span>
+                          <Calculator className="h-3.5 w-3.5 text-muted-foreground/50" />
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(sale.status)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSale(sale);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </HoverCardTrigger>
+                  <HoverCardContent 
+                    side="top" 
+                    align="end" 
+                    className="w-72 bg-popover border-border shadow-lg"
+                    sideOffset={8}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Calculator className="h-4 w-4 text-primary" />
+                        <h4 className="font-semibold text-sm">Cálculo Over Price</h4>
+                      </div>
+                      <div className="text-xs space-y-1.5 font-mono">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Valor Real (VP):</span>
+                          <span>{formatCurrency(sale.valorReal)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">(-) Valor Tabela:</span>
+                          <span>{formatCurrency(Number(sale.table_value) || 0)}</span>
+                        </div>
+                        <div className="border-t border-border/50 my-1.5" />
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Over Bruto:</span>
+                          <span className={sale.overPriceBruto >= 0 ? 'text-success' : 'text-destructive'}>
+                            {formatCurrency(sale.overPriceBruto)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground/80">
+                          <span>(-) ICMS:</span>
+                          <span className="text-destructive">-{formatCurrency(sale.deducaoIcms)}</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground/80">
+                          <span>(-) PIS/COFINS 9,25%:</span>
+                          <span className="text-destructive">-{formatCurrency(sale.deducaoPisCofins)}</span>
+                        </div>
+                        <div className="flex justify-between text-muted-foreground/80">
+                          <span>(-) IR/CSLL 34%:</span>
+                          <span className="text-destructive">-{formatCurrency(sale.deducaoIrCsll)}</span>
+                        </div>
+                        <div className="border-t border-border/50 my-1.5" />
+                        <div className="flex justify-between font-semibold">
+                          <span>Over Líquido:</span>
+                          <span className={sale.overPriceLiquido >= 0 ? 'text-success' : 'text-destructive'}>
+                            {formatCurrency(sale.overPriceLiquido)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {sale.percentualComissaoCalculado.toFixed(2)}%
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={cn(
-                        'font-mono font-medium',
-                        sale.valorComissaoCalculado > 0 ? 'text-success' : 'text-muted-foreground'
-                      )}
-                    >
-                      {formatCurrency(sale.valorComissaoCalculado)}
-                    </span>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(sale.status)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSale(sale);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                  </HoverCardContent>
+                </HoverCard>
               ))
             )}
           </TableBody>
