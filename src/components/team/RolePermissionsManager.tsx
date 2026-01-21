@@ -133,8 +133,11 @@ export function RolePermissionsManager({ organizationId }: RolePermissionsManage
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Permissões por Cargo</CardTitle>
-        <CardDescription>Configure o que cada cargo pode fazer na organização</CardDescription>
+        <CardTitle className="text-base">Permissões Padrão por Cargo</CardTitle>
+        <CardDescription>
+          Configure as permissões padrão que novos membros receberão ao serem adicionados com cada cargo.
+          Membros existentes não são afetados.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs value={selectedRole} onValueChange={(v) => setSelectedRole(v as AppRole)}>

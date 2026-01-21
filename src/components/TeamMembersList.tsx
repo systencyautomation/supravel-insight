@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Clock, Trash2, Users, RefreshCw, Copy, Pencil, UserMinus } from 'lucide-react';
+import { Loader2, Clock, Trash2, Users, RefreshCw, Copy, Pencil, UserMinus, Shield } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { EditRoleDialog } from '@/components/team/EditRoleDialog';
+import { EditPermissionsDialog } from '@/components/team/EditPermissionsDialog';
 
 interface TeamMembersListProps {
   organizationId: string;
@@ -60,6 +61,7 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
   const [invitations, setInvitations] = useState<MemberInvitation[]>([]);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [editingPermissionsMember, setEditingPermissionsMember] = useState<TeamMember | null>(null);
 
   const currentUserRole = userRoles.find(r => r.organization_id === effectiveOrgId)?.role;
   const { hasPermission } = usePermissions();
@@ -384,19 +386,36 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
                         {getRoleLabel(member.role)}
                       </Badge>
                       {canEditRole(member) && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-primary"
-                              onClick={() => setEditingMember(member)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Alterar cargo</TooltipContent>
-                        </Tooltip>
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                onClick={() => setEditingMember(member)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Alterar cargo</TooltipContent>
+                          </Tooltip>
+                          {member.role !== 'admin' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                  onClick={() => setEditingPermissionsMember(member)}
+                                >
+                                  <Shield className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar permissões</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </>
                       )}
                       {canRemoveMember(member) && (
                         <AlertDialog>
@@ -543,6 +562,14 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
           organizationId={organizationId}
           currentUserRole={currentUserRole}
           onClose={() => setEditingMember(null)}
+          onSuccess={fetchData}
+        />
+
+        {/* Edit Permissions Dialog */}
+        <EditPermissionsDialog
+          member={editingPermissionsMember}
+          organizationId={organizationId}
+          onClose={() => setEditingPermissionsMember(null)}
           onSuccess={fetchData}
         />
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -13,28 +13,48 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UserPlus, Mail, UserCog } from 'lucide-react';
+import { PermissionSelector } from '@/components/team/PermissionSelector';
+import { Permission, AVAILABLE_PERMISSIONS } from '@/hooks/usePermissions';
 
 interface InviteMemberDialogProps {
   organizationId: string;
   organizationName: string;
 }
 
-type AppRole = 'manager' | 'seller' | 'representative';
+type AppRole = 'admin' | 'manager' | 'seller' | 'representative';
 
 const roleLabels: Record<AppRole, string> = {
-  manager: 'Gerente',
+  admin: 'Gerente',
+  manager: 'Auxiliar',
   seller: 'Vendedor',
   representative: 'Representante',
+};
+
+// Default permissions for new members based on role
+const defaultRolePermissions: Record<AppRole, Permission[]> = {
+  admin: AVAILABLE_PERMISSIONS.map(p => p.key),
+  manager: [
+    'view_dashboard',
+    'view_sales',
+    'approve_sales',
+    'manage_inventory',
+    'view_commissions',
+    'view_all_commissions',
+    'manage_team',
+    'view_linked_representatives',
+  ],
+  seller: [
+    'view_dashboard',
+    'view_sales',
+    'view_commissions',
+    'view_linked_representatives',
+  ],
+  representative: [
+    'view_commissions',
+  ],
 };
 
 export function InviteMemberDialog({ organizationId, organizationName }: InviteMemberDialogProps) {
@@ -48,6 +68,7 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
   const [email, setEmail] = useState('');
   const [guestName, setGuestName] = useState('');
   const [role, setRole] = useState<AppRole>('seller');
+  const [permissions, setPermissions] = useState<Permission[]>(defaultRolePermissions.seller);
   const [loading, setLoading] = useState(false);
 
   // Direct create form state
@@ -56,17 +77,20 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
   const [directPassword, setDirectPassword] = useState('');
   const [directConfirmPassword, setDirectConfirmPassword] = useState('');
   const [directRole, setDirectRole] = useState<AppRole>('seller');
+  const [directPermissions, setDirectPermissions] = useState<Permission[]>(defaultRolePermissions.seller);
   const [directLoading, setDirectLoading] = useState(false);
 
   const resetForms = () => {
     setEmail('');
     setGuestName('');
     setRole('seller');
+    setPermissions(defaultRolePermissions.seller);
     setDirectEmail('');
     setDirectName('');
     setDirectPassword('');
     setDirectConfirmPassword('');
     setDirectRole('seller');
+    setDirectPermissions(defaultRolePermissions.seller);
   };
 
   const handleInvite = async () => {
@@ -91,6 +115,7 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
           organization_id: organizationId,
           invited_by: user.id,
           role: role,
+          permissions: role === 'admin' ? [] : permissions, // Admin gets all, no need to store
         })
         .select()
         .single();
@@ -213,6 +238,7 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
           fullName: directName.trim(),
           role: directRole,
           organizationId,
+          permissions: directRole === 'admin' ? [] : directPermissions,
         },
       });
 
@@ -264,7 +290,7 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
           Adicionar Membro
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adicionar Membro</DialogTitle>
           <DialogDescription>
@@ -307,19 +333,16 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
                   disabled={loading}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="invite-role">Cargo</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as AppRole)} disabled={loading}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cargo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manager">{roleLabels.manager}</SelectItem>
-                    <SelectItem value="seller">{roleLabels.seller}</SelectItem>
-                    <SelectItem value="representative">{roleLabels.representative}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              
+              <PermissionSelector
+                organizationId={organizationId}
+                selectedRole={role}
+                onRoleChange={setRole}
+                selectedPermissions={permissions}
+                onPermissionsChange={setPermissions}
+                disabled={loading}
+              />
+
               <p className="text-sm text-muted-foreground">
                 Um email será enviado com um link para o convidado criar sua conta.
               </p>
@@ -382,19 +405,16 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="direct-role">Cargo</Label>
-                <Select value={directRole} onValueChange={(v) => setDirectRole(v as AppRole)} disabled={directLoading}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cargo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manager">{roleLabels.manager}</SelectItem>
-                    <SelectItem value="seller">{roleLabels.seller}</SelectItem>
-                    <SelectItem value="representative">{roleLabels.representative}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              
+              <PermissionSelector
+                organizationId={organizationId}
+                selectedRole={directRole}
+                onRoleChange={setDirectRole}
+                selectedPermissions={directPermissions}
+                onPermissionsChange={setDirectPermissions}
+                disabled={directLoading}
+              />
+
               <p className="text-sm text-muted-foreground">
                 O membro será criado imediatamente e poderá fazer login com as credenciais definidas.
               </p>
