@@ -1,5 +1,6 @@
 import { useTheme } from '@/hooks/useTheme';
 import logoLight from '@/assets/logo-light.png';
+import logoDark from '@/assets/logo-dark.png';
 
 interface LogoProps {
   className?: string;
@@ -16,16 +17,13 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
     xl: 'h-12'
   };
   
-  // Para dark mode, aplicamos um filtro para inverter/clarear a logo
-  // Quando uma versão dark for fornecida, podemos trocar aqui
-  const darkModeFilter = theme === 'dark' ? 'brightness(0) invert(1)' : undefined;
+  const logoSrc = theme === 'dark' ? logoDark : logoLight;
   
   return (
     <img 
-      src={logoLight}
+      src={logoSrc}
       alt="Connect CRM"
       className={`${sizeClasses[size]} w-auto object-contain ${className}`}
-      style={{ filter: darkModeFilter }}
     />
   );
 }
