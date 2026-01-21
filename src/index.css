@@ -231,10 +231,10 @@
 
   .resize-handle {
     position: absolute;
-    right: -4px;
+    right: -1px;
     top: 0;
     bottom: 0;
-    width: 8px;
+    width: 2px;
     cursor: col-resize;
     background: hsl(var(--border));
     z-index: 10;
