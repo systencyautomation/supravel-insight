@@ -167,7 +167,7 @@ export function EditRoleDialog({
   // Determine which roles the current user can assign
   const getAvailableRoles = (): AppRole[] => {
     if (currentUserRole === 'admin') {
-      return ['manager', 'seller', 'representative'];
+      return ['admin', 'manager', 'seller', 'representative'];
     }
     if (currentUserRole === 'manager') {
       return ['seller', 'representative'];
