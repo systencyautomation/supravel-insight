@@ -1,4 +1,4 @@
-import { Moon, Sun, Sparkles, Settings, User, Building2, Users, LogOut, Plug } from 'lucide-react';
+import { Moon, Sun, Sparkles, Settings, User, Building2, Users, LogOut, Plug, ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -49,6 +49,16 @@ export function DashboardHeader() {
         
         <div className="flex items-center gap-2">
           <PendingSalesNotification />
+
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/vendas')} 
+            className="rounded-xl hover:bg-accent/80 gap-2"
+          >
+            <ListFilter className="h-4 w-4" />
+            <span className="hidden sm:inline">Vendas</span>
+          </Button>
 
           <Button 
             variant="ghost" 

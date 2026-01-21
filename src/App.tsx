@@ -14,6 +14,7 @@ import TeamSettings from "./pages/settings/TeamSettings";
 import IntegrationsSettings from "./pages/settings/IntegrationsSettings";
 import JoinOrganization from "./pages/JoinOrganization";
 import SalesApproval from "./pages/SalesApproval";
+import Vendas from "./pages/Vendas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/settings/team" element={<TeamSettings />} />
             <Route path="/settings/integrations" element={<IntegrationsSettings />} />
             <Route path="/aprovacao" element={<SalesApproval />} />
+            <Route path="/vendas" element={<Vendas />} />
             <Route path="/profile" element={<Navigate to="/settings/profile" replace />} />
             <Route path="/join" element={<JoinOrganization />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
