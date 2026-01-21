@@ -52,7 +52,7 @@ export function OrganizationsCard({
           Nova
         </Button>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 overflow-hidden">
         {organizations.length === 0 ? (
           <div className="py-12 text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
