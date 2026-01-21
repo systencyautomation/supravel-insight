@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -55,11 +55,26 @@ interface SalesDataTableProps {
 type SortField = 'emission_date' | 'nfe_number' | 'client_name' | 'total_value' | 'percentualComissaoCalculado' | 'valorComissaoCalculado';
 type SortDirection = 'asc' | 'desc';
 
+type ColumnKey = 'emission_date' | 'nfe_number' | 'client_name' | 'product' | 'total_value' | 'entrada' | 'percentual' | 'comissao' | 'status' | 'actions';
+
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   pendente: { label: 'Pendente', variant: 'secondary' },
   aprovado: { label: 'Aprovado', variant: 'default' },
   pago: { label: 'Pago', variant: 'outline' },
   rejeitado: { label: 'Rejeitado', variant: 'destructive' },
+};
+
+const defaultColumnWidths: Record<ColumnKey, number> = {
+  emission_date: 100,
+  nfe_number: 90,
+  client_name: 180,
+  product: 150,
+  total_value: 120,
+  entrada: 110,
+  percentual: 100,
+  comissao: 120,
+  status: 100,
+  actions: 50,
 };
 
 export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
@@ -74,6 +89,57 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedSale, setSelectedSale] = useState<SaleWithCalculations | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<ColumnKey, number>>(defaultColumnWidths);
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Column resize handler
+  const handleColumnResize = useCallback((columnKey: ColumnKey, startX: number, startWidth: number) => {
+    setIsResizing(true);
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startX;
+      const newWidth = Math.max(50, startWidth + delta);
+      setColumnWidths(prev => ({ ...prev, [columnKey]: newWidth }));
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  // Resizable header component
+  const ResizableHeader = ({ 
+    columnKey, 
+    children, 
+    className = '',
+    onClick,
+  }: { 
+    columnKey: ColumnKey; 
+    children: React.ReactNode; 
+    className?: string;
+    onClick?: () => void;
+  }) => (
+    <TableHead 
+      className={`resizable-th ${className}`}
+      style={{ width: columnWidths[columnKey], minWidth: 50 }}
+      onClick={onClick}
+    >
+      {children}
+      <div
+        className={`resize-handle ${isResizing ? 'resizing' : ''}`}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleColumnResize(columnKey, e.clientX, columnWidths[columnKey]);
+        }}
+      />
+    </TableHead>
+  );
 
   // Filter and sort data
   const filteredAndSortedSales = useMemo(() => {
@@ -202,11 +268,15 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
       </div>
 
       {/* Table */}
-      <div ref={tableContainerRef} className="rounded-lg border border-border/50 overflow-hidden bg-card/50">
-        <Table>
+      <div 
+        ref={tableContainerRef} 
+        className={`rounded-lg border border-border/50 overflow-hidden bg-card/50 overflow-x-auto ${isResizing ? 'table-resizing' : ''}`}
+      >
+        <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
           <TableHeader>
             <TableRow className="bg-muted/20 hover:bg-muted/20">
-              <TableHead 
+              <ResizableHeader 
+                columnKey="emission_date" 
                 className="cursor-pointer select-none"
                 onClick={() => handleSort('emission_date')}
               >
@@ -214,8 +284,10 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   Data
                   <SortIcon field="emission_date" />
                 </div>
-              </TableHead>
-              <TableHead 
+              </ResizableHeader>
+              
+              <ResizableHeader 
+                columnKey="nfe_number" 
                 className="cursor-pointer select-none"
                 onClick={() => handleSort('nfe_number')}
               >
@@ -223,8 +295,10 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   NF
                   <SortIcon field="nfe_number" />
                 </div>
-              </TableHead>
-              <TableHead 
+              </ResizableHeader>
+              
+              <ResizableHeader 
+                columnKey="client_name" 
                 className="cursor-pointer select-none"
                 onClick={() => handleSort('client_name')}
               >
@@ -232,9 +306,14 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   Cliente
                   <SortIcon field="client_name" />
                 </div>
-              </TableHead>
-              <TableHead>Produto</TableHead>
-              <TableHead 
+              </ResizableHeader>
+              
+              <ResizableHeader columnKey="product">
+                Produto
+              </ResizableHeader>
+              
+              <ResizableHeader 
+                columnKey="total_value" 
                 className="text-right cursor-pointer select-none"
                 onClick={() => handleSort('total_value')}
               >
@@ -242,9 +321,14 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   Valor Total
                   <SortIcon field="total_value" />
                 </div>
-              </TableHead>
-              <TableHead className="text-right">Entrada</TableHead>
-              <TableHead 
+              </ResizableHeader>
+              
+              <ResizableHeader columnKey="entrada" className="text-right">
+                Entrada
+              </ResizableHeader>
+              
+              <ResizableHeader 
+                columnKey="percentual" 
                 className="text-right cursor-pointer select-none"
                 onClick={() => handleSort('percentualComissaoCalculado')}
               >
@@ -252,8 +336,10 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   % Comissão
                   <SortIcon field="percentualComissaoCalculado" />
                 </div>
-              </TableHead>
-              <TableHead 
+              </ResizableHeader>
+              
+              <ResizableHeader 
+                columnKey="comissao" 
                 className="text-right cursor-pointer select-none"
                 onClick={() => handleSort('valorComissaoCalculado')}
               >
@@ -261,9 +347,13 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   Valor Comissão
                   <SortIcon field="valorComissaoCalculado" />
                 </div>
-              </TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              </ResizableHeader>
+              
+              <ResizableHeader columnKey="status" className="text-center">
+                Status
+              </ResizableHeader>
+              
+              <TableHead style={{ width: columnWidths.actions, minWidth: 50 }}></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -308,7 +398,7 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="truncate max-w-[150px] block cursor-help">
+                              <span className="truncate block cursor-help">
                                 {sale.client_name || 'N/A'}
                               </span>
                             </TooltipTrigger>
@@ -326,7 +416,7 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                       
                       {/* Produto */}
                       <TableCell>
-                        <span className="truncate max-w-[120px] block text-sm">
+                        <span className="truncate block text-sm">
                           {sale.produto_modelo || '-'}
                         </span>
                       </TableCell>
