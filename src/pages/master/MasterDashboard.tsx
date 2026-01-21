@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Send, Mail } from 'lucide-react';
+import { User, Send, Mail, LayoutDashboard, Building2, MailOpen } from 'lucide-react';
 import { z } from 'zod';
 
 import { MasterDashboardSkeleton } from '@/components/master/MasterDashboardSkeleton';
@@ -17,6 +17,8 @@ import { MasterKPICards } from '@/components/master/MasterKPICards';
 import { OrganizationsCard } from '@/components/master/OrganizationsCard';
 import { InvitationsCard } from '@/components/master/InvitationsCard';
 import { SaasAdminSection } from '@/components/master/SaasAdminSection';
+import { OrganizationsList } from '@/components/master/OrganizationsList';
+import { InvitationsList } from '@/components/master/InvitationsList';
 
 interface Organization {
   id: string;
@@ -34,6 +36,15 @@ interface Invitation {
   created_at: string;
   token: string;
   last_sent_at: string;
+}
+
+interface OrganizationMember {
+  id: string;
+  user_id: string;
+  role: string;
+  organization_id: string;
+  email?: string;
+  full_name?: string;
 }
 
 const orgSchema = z.object({
@@ -56,9 +67,11 @@ export default function MasterDashboard() {
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [members, setMembers] = useState<Record<string, OrganizationMember[]>>({});
   const [loadingData, setLoadingData] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createTab, setCreateTab] = useState<'manual' | 'invite'>('manual');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Manual creation form
   const [newOrgName, setNewOrgName] = useState('');
@@ -94,7 +107,7 @@ export default function MasterDashboard() {
 
   const fetchData = async () => {
     setLoadingData(true);
-    await Promise.all([fetchOrganizations(), fetchInvitations()]);
+    await Promise.all([fetchOrganizations(), fetchInvitations(), fetchMembers()]);
     setLoadingData(false);
   };
 
@@ -118,6 +131,48 @@ export default function MasterDashboard() {
     if (!error && data) {
       setInvitations(data);
     }
+  };
+
+  const fetchMembers = async () => {
+    // Fetch all user_roles with profile info
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('id, user_id, role, organization_id');
+
+    if (rolesError || !roles) return;
+
+    // Fetch profiles for these users
+    const userIds = [...new Set(roles.map(r => r.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email, full_name')
+      .in('id', userIds);
+
+    if (profilesError) return;
+
+    // Create a map of user_id to profile
+    const profileMap = new Map(profiles?.map(p => [p.id, p]));
+
+    // Group members by organization
+    const membersByOrg: Record<string, OrganizationMember[]> = {};
+    roles.forEach(role => {
+      if (!role.organization_id) return;
+      const profile = profileMap.get(role.user_id);
+      const member: OrganizationMember = {
+        id: role.id,
+        user_id: role.user_id,
+        role: role.role,
+        organization_id: role.organization_id,
+        email: profile?.email,
+        full_name: profile?.full_name,
+      };
+      if (!membersByOrg[role.organization_id]) {
+        membersByOrg[role.organization_id] = [];
+      }
+      membersByOrg[role.organization_id].push(member);
+    });
+
+    setMembers(membersByOrg);
   };
 
   const handleImpersonate = (org: Organization) => {
@@ -215,6 +270,7 @@ export default function MasterDashboard() {
       setDialogOpen(false);
       resetForm();
       fetchOrganizations();
+      fetchMembers();
     } catch (error: any) {
       toast({
         title: 'Erro',
@@ -396,9 +452,21 @@ export default function MasterDashboard() {
     }
   };
 
+  const openOrgDialog = () => {
+    setCreateTab('manual');
+    setDialogOpen(true);
+  };
+
+  const openInviteDialog = () => {
+    setCreateTab('invite');
+    setDialogOpen(true);
+  };
+
   if (loading || loadingData) {
     return <MasterDashboardSkeleton />;
   }
+
+  const pendingInvitationsCount = invitations.filter(i => i.status === 'pendente').length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -410,43 +478,94 @@ export default function MasterDashboard() {
         onSignOut={signOut}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* KPI Cards */}
-        <div className="animate-fade-in">
-          <MasterKPICards 
-            organizations={organizations} 
-            invitations={invitations} 
-          />
-        </div>
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Main Navigation Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="w-full justify-start border-b border-border/50 bg-transparent p-0 h-auto">
+            <TabsTrigger 
+              value="dashboard" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
+            >
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger 
+              value="organizations" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              Organizações
+              <span className="ml-2 bg-muted text-muted-foreground text-xs px-1.5 py-0.5 rounded-full">
+                {organizations.length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="invitations" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3"
+            >
+              <MailOpen className="h-4 w-4 mr-2" />
+              Convites
+              {pendingInvitationsCount > 0 && (
+                <span className="ml-2 bg-warning/20 text-warning text-xs px-1.5 py-0.5 rounded-full">
+                  {pendingInvitationsCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <OrganizationsCard
-            organizations={organizations}
-            onToggleActive={toggleActive}
-            onImpersonate={handleImpersonate}
-            onOpenDialog={() => {
-              setCreateTab('manual');
-              setDialogOpen(true);
-            }}
-          />
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard" className="space-y-6 animate-fade-in">
+            <MasterKPICards 
+              organizations={organizations} 
+              invitations={invitations} 
+            />
 
-          <InvitationsCard
-            invitations={invitations}
-            resendingId={resendingId}
-            deletingId={deletingId}
-            onResend={resendInvite}
-            onDelete={deleteInvite}
-            onOpenDialog={() => {
-              setCreateTab('invite');
-              setDialogOpen(true);
-            }}
-            getResendCooldown={getResendCooldown}
-          />
-        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <OrganizationsCard
+                organizations={organizations}
+                onToggleActive={toggleActive}
+                onImpersonate={handleImpersonate}
+                onOpenDialog={openOrgDialog}
+              />
 
-        {/* SaaS Admin Section - Only visible to Master Admin */}
-        {isMasterAdmin && <SaasAdminSection />}
+              <InvitationsCard
+                invitations={invitations}
+                resendingId={resendingId}
+                deletingId={deletingId}
+                onResend={resendInvite}
+                onDelete={deleteInvite}
+                onOpenDialog={openInviteDialog}
+                getResendCooldown={getResendCooldown}
+              />
+            </div>
+
+            {isMasterAdmin && <SaasAdminSection />}
+          </TabsContent>
+
+          {/* Organizations Tab */}
+          <TabsContent value="organizations" className="animate-fade-in">
+            <OrganizationsList
+              organizations={organizations}
+              members={members}
+              onToggleActive={toggleActive}
+              onImpersonate={handleImpersonate}
+              onOpenDialog={openOrgDialog}
+            />
+          </TabsContent>
+
+          {/* Invitations Tab */}
+          <TabsContent value="invitations" className="animate-fade-in">
+            <InvitationsList
+              invitations={invitations}
+              resendingId={resendingId}
+              deletingId={deletingId}
+              onResend={resendInvite}
+              onDelete={deleteInvite}
+              onOpenDialog={openInviteDialog}
+              getResendCooldown={getResendCooldown}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Create/Invite Dialog */}
