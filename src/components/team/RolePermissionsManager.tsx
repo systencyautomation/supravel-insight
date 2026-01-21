@@ -14,7 +14,7 @@ interface RolePermissionsManagerProps {
 }
 
 const roleLabels: Record<AppRole, string> = {
-  manager: 'Gerente',
+  manager: 'Auxiliar',
   seller: 'Vendedor',
   representative: 'Representante',
 };

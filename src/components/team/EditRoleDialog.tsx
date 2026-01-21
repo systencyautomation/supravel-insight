@@ -41,8 +41,8 @@ interface EditRoleDialogProps {
 }
 
 const roleLabels: Record<string, string> = {
-  admin: 'Administrador',
-  manager: 'Gerente',
+  admin: 'Gerente',
+  manager: 'Auxiliar',
   seller: 'Vendedor',
   representative: 'Representante',
 };
