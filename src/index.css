@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    /* Modern 2026 Light Theme - Slate Blue tones */
-    --background: 220 20% 97%;
+    /* Industrial Light Theme - Cinza Gelo para uso externo */
+    --background: 210 40% 98%;
     --foreground: 222 47% 11%;
     
     --card: 0 0% 100%;
@@ -14,36 +14,39 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     
-    /* Vibrant Rose/Coral Primary */
-    --primary: 350 89% 60%;
-    --primary-foreground: 0 0% 100%;
+    /* Brand Primary - Cyan Vibrante #00C2FF */
+    --primary: 195 100% 50%;
+    --primary-foreground: 222 47% 11%;
     
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
+    /* Brand Secondary - Navy #0A1128 */
+    --secondary: 226 63% 10%;
+    --secondary-foreground: 210 40% 98%;
     
-    --muted: 220 14% 96%;
+    --muted: 214 32% 91%;
     --muted-foreground: 215 16% 47%;
     
-    --accent: 220 14% 96%;
+    --accent: 195 100% 95%;
     --accent-foreground: 222 47% 11%;
     
+    /* Danger - #EF4444 */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     
+    /* Success - #10B981 */
     --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
     
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 350 89% 60%;
+    /* Border - #E2E8F0 */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 195 100% 50%;
     
-    /* Generous border radius for modern look */
     --radius: 0.75rem;
     
-    /* Modern shadows */
+    /* Modern shadows with Cyan glow */
     --shadow-2xs: 0 1px 2px 0 hsl(222 47% 11% / 0.02);
     --shadow-xs: 0 1px 3px 0 hsl(222 47% 11% / 0.04), 0 1px 2px -1px hsl(222 47% 11% / 0.04);
     --shadow-sm: 0 2px 4px 0 hsl(222 47% 11% / 0.05), 0 1px 3px -1px hsl(222 47% 11% / 0.05);
@@ -51,49 +54,49 @@
     --shadow-lg: 0 12px 24px -4px hsl(222 47% 11% / 0.08), 0 4px 8px -2px hsl(222 47% 11% / 0.04);
     --shadow-xl: 0 20px 40px -8px hsl(222 47% 11% / 0.1), 0 8px 16px -4px hsl(222 47% 11% / 0.05);
     --shadow-2xl: 0 32px 64px -12px hsl(222 47% 11% / 0.14);
-    --shadow-glow: 0 0 24px hsl(350 89% 60% / 0.15);
+    --shadow-glow: 0 0 24px hsl(195 100% 50% / 0.2);
     
-    /* Sidebar */
+    /* Sidebar Light */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 350 89% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;
+    --sidebar-primary: 195 100% 50%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 195 100% 95%;
     --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 350 89% 60%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 195 100% 50%;
     
-    /* Chart colors - vibrant palette */
-    --chart-1: 350 89% 60%;
-    --chart-2: 173 80% 40%;
-    --chart-3: 220 70% 50%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 38 92% 50%;
+    /* Chart colors - Industrial Palette */
+    --chart-1: 195 100% 50%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 226 63% 30%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 0 84% 60%;
   }
 
   .dark {
-    /* Modern 2026 Dark Theme - Deep Slate */
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
+    /* Industrial Dark Theme - Navy Profundo #020617 para OLED */
+    --background: 222 71% 4%;
+    --foreground: 210 40% 96%;
     
     --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --card-foreground: 210 40% 96%;
     
     --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: 210 40% 96%;
     
-    /* Lighter rose for dark mode */
-    --primary: 350 89% 65%;
-    --primary-foreground: 222 47% 8%;
+    /* Cyan mais vibrante no dark */
+    --primary: 195 100% 55%;
+    --primary-foreground: 222 71% 4%;
     
     --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: 210 40% 96%;
     
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
     
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 195 100% 15%;
+    --accent-foreground: 210 40% 96%;
     
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -102,13 +105,14 @@
     --success-foreground: 0 0% 100%;
     
     --warning: 38 92% 55%;
-    --warning-foreground: 222 47% 8%;
+    --warning-foreground: 222 71% 4%;
     
+    /* Border - #1E293B */
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 350 89% 65%;
+    --ring: 195 100% 55%;
     
-    /* Dark mode shadows with glow */
+    /* Dark mode shadows with Cyan glow */
     --shadow-2xs: 0 1px 2px 0 hsl(0 0% 0% / 0.1);
     --shadow-xs: 0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
     --shadow-sm: 0 2px 4px 0 hsl(0 0% 0% / 0.2), 0 1px 3px -1px hsl(0 0% 0% / 0.1);
@@ -116,24 +120,24 @@
     --shadow-lg: 0 12px 24px -4px hsl(0 0% 0% / 0.3), 0 4px 8px -2px hsl(0 0% 0% / 0.15);
     --shadow-xl: 0 20px 40px -8px hsl(0 0% 0% / 0.35), 0 8px 16px -4px hsl(0 0% 0% / 0.2);
     --shadow-2xl: 0 32px 64px -12px hsl(0 0% 0% / 0.4);
-    --shadow-glow: 0 0 32px hsl(350 89% 65% / 0.2);
+    --shadow-glow: 0 0 32px hsl(195 100% 55% / 0.25);
     
-    /* Sidebar - Dark */
+    /* Sidebar Dark */
     --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 350 89% 65%;
-    --sidebar-primary-foreground: 222 47% 8%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 195 100% 55%;
+    --sidebar-primary-foreground: 222 71% 4%;
+    --sidebar-accent: 195 100% 15%;
+    --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 350 89% 65%;
+    --sidebar-ring: 195 100% 55%;
     
-    /* Chart colors - dark mode */
-    --chart-1: 350 89% 65%;
-    --chart-2: 173 80% 50%;
-    --chart-3: 220 70% 60%;
-    --chart-4: 280 65% 70%;
-    --chart-5: 38 92% 60%;
+    /* Chart colors - Dark mode */
+    --chart-1: 195 100% 55%;
+    --chart-2: 160 84% 50%;
+    --chart-3: 226 63% 45%;
+    --chart-4: 38 92% 60%;
+    --chart-5: 0 72% 55%;
   }
 }
 
