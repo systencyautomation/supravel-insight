@@ -257,7 +257,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
       <div 
         ref={tableContainerRef}
         className={cn(
-          "border border-border/50 rounded-lg overflow-x-auto",
+          "border border-border/50 rounded-lg overflow-x-auto pr-1",
           isResizing && "table-resizing"
         )}
       >
@@ -390,7 +390,10 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                   onQuickSort={() => toggleQuickSort('status')}
                 />
               </ResizableHeader>
-              <ResizableHeader columnKey="actions" />
+              <TableHead 
+                className="px-2"
+                style={{ width: columnWidths.actions, minWidth: minColumnWidths.actions }}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
