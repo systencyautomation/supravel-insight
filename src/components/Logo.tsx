@@ -1,6 +1,6 @@
 import { useTheme } from '@/hooks/useTheme';
 import logoLightSvg from '@/assets/logo-light.svg';
-import logoDark from '@/assets/logo-dark.png';
+import logoDarkSvg from '@/assets/logo-dark.svg';
 
 interface LogoProps {
   className?: string;
@@ -17,7 +17,7 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
     xl: 'h-[74px]'
   };
   
-  const logoSrc = theme === 'dark' ? logoDark : logoLightSvg;
+  const logoSrc = theme === 'dark' ? logoDarkSvg : logoLightSvg;
   
   return (
     <img 
