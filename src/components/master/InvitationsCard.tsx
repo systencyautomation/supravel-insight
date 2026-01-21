@@ -105,13 +105,13 @@ export function InvitationsCard({
               </Button>
             </div>
           ) : (
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow className="hover:bg-transparent bg-muted/30">
-                  <TableHead className="text-xs">Email</TableHead>
-                  <TableHead className="text-xs hidden md:table-cell">Empresa</TableHead>
-                  <TableHead className="text-xs text-center">Status</TableHead>
-                  <TableHead className="text-xs text-right">Ações</TableHead>
+                  <TableHead className="text-xs w-[35%]">Email</TableHead>
+                  <TableHead className="text-xs hidden md:table-cell w-[25%]">Empresa</TableHead>
+                  <TableHead className="text-xs text-center w-[15%]">Status</TableHead>
+                  <TableHead className="text-xs text-right w-[25%]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -122,14 +122,14 @@ export function InvitationsCard({
 
                   return (
                     <TableRow key={invite.id} className="group">
-                      <TableCell className="font-mono text-xs">
-                        <span className="truncate max-w-[160px] block">{invite.email}</span>
-                        <span className="text-muted-foreground text-[10px] md:hidden">
+                      <TableCell className="font-mono text-xs min-w-0">
+                        <span className="truncate block">{invite.email}</span>
+                        <span className="text-muted-foreground text-[10px] md:hidden truncate block">
                           {invite.organization_name || '—'}
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm hidden md:table-cell">
-                        {invite.organization_name || '—'}
+                      <TableCell className="text-muted-foreground text-sm hidden md:table-cell min-w-0">
+                        <span className="truncate block">{invite.organization_name || '—'}</span>
                       </TableCell>
                       <TableCell className="text-center">
                         {getStatusBadge(invite.status || 'pendente')}
