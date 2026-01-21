@@ -42,15 +42,15 @@ import { cn } from '@/lib/utils';
 type ColumnKey = 'emission_date' | 'nfe_number' | 'client_name' | 'produto' | 'total_value' | 'entrada' | 'percentual' | 'comissao' | 'status' | 'actions';
 
 const defaultColumnWidths: Record<ColumnKey, number> = {
-  emission_date: 110,
-  nfe_number: 90,
-  client_name: 220,
-  produto: 180,
-  total_value: 130,
-  entrada: 140,
-  percentual: 110,
-  comissao: 130,
-  status: 110,
+  emission_date: 100,
+  nfe_number: 70,
+  client_name: 180,
+  produto: 150,
+  total_value: 120,
+  entrada: 110,
+  percentual: 100,
+  comissao: 110,
+  status: 100,
   actions: 50,
 };
 
@@ -261,7 +261,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
           isResizing && "table-resizing"
         )}
       >
-        <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
+        <Table style={{ tableLayout: 'fixed', width: '100%' }}>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
               <ResizableHeader columnKey="emission_date">
