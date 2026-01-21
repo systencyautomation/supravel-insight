@@ -669,6 +669,7 @@ export type Database = {
         Args: { p_invitation_id: string }
         Returns: undefined
       }
+      can_view_all_sales: { Args: { _user_id: string }; Returns: boolean }
       cleanup_expired_verification_codes: { Args: never; Returns: undefined }
       create_default_role_permissions: {
         Args: { p_org_id: string }

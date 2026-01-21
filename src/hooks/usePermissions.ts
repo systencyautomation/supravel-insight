@@ -8,19 +8,25 @@ export type Permission =
   | 'approve_sales'
   | 'manage_inventory'
   | 'view_commissions'
+  | 'view_all_commissions'
   | 'manage_team'
+  | 'remove_members'
   | 'manage_settings'
-  | 'manage_integrations';
+  | 'manage_integrations'
+  | 'view_linked_representatives';
 
 export const AVAILABLE_PERMISSIONS: { key: Permission; label: string; description: string }[] = [
   { key: 'view_dashboard', label: 'Ver Dashboard', description: 'Acesso ao dashboard e métricas' },
-  { key: 'view_sales', label: 'Ver Vendas', description: 'Visualizar lista de vendas' },
-  { key: 'approve_sales', label: 'Aprovar Vendas', description: 'Aprovar ou rejeitar vendas' },
-  { key: 'manage_inventory', label: 'Gerenciar Estoque', description: 'Adicionar e editar itens' },
-  { key: 'view_commissions', label: 'Ver Comissões', description: 'Visualizar comissões' },
-  { key: 'manage_team', label: 'Gerenciar Equipe', description: 'Convidar e editar membros' },
-  { key: 'manage_settings', label: 'Configurações', description: 'Editar configurações da org' },
-  { key: 'manage_integrations', label: 'Integrações', description: 'Gerenciar integrações' },
+  { key: 'view_sales', label: 'Ver Vendas', description: 'Visualizar vendas (próprias ou todas conforme cargo)' },
+  { key: 'approve_sales', label: 'Aprovar Pendências', description: 'Aprovar ou rejeitar vendas pendentes' },
+  { key: 'manage_inventory', label: 'Gerenciar Tabela', description: 'Adicionar e editar itens do estoque' },
+  { key: 'view_commissions', label: 'Ver Próprias Comissões', description: 'Visualizar suas comissões' },
+  { key: 'view_all_commissions', label: 'Ver Comissões de Outros', description: 'Visualizar comissões de toda a equipe' },
+  { key: 'manage_team', label: 'Adicionar Membros', description: 'Convidar novos membros para a equipe' },
+  { key: 'remove_members', label: 'Remover Membros', description: 'Remover membros da organização' },
+  { key: 'manage_settings', label: 'Configurar SMTP/Email', description: 'Editar configurações de email e integrações' },
+  { key: 'manage_integrations', label: 'Integrações', description: 'Gerenciar integrações externas' },
+  { key: 'view_linked_representatives', label: 'Ver Reps Linkados', description: 'Visualizar representantes vinculados' },
 ];
 
 export function usePermissions() {

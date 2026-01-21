@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useSalesWithCalculations } from '@/hooks/useSalesWithCalculations';
 import { useSalesMetrics, SaleWithDetails } from '@/hooks/useSalesMetrics';
 import { DashboardHeader } from '@/components/DashboardHeader';
@@ -15,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState('empresa');
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
   const [dateRange, setDateRange] = useState<DateRange>({
     start: startOfMonth(new Date()),
     end: endOfMonth(new Date()),
@@ -29,8 +30,14 @@ const Index = () => {
     impersonatedOrgName, 
     setImpersonatedOrg 
   } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { sales: salesWithCalculations, loading: dataLoading, refetch } = useSalesWithCalculations();
   const navigate = useNavigate();
+
+  // Permissões baseadas no cargo
+  const canViewDashboard = hasPermission('view_dashboard');
+  const canViewCommissions = hasPermission('view_commissions');
+  const canManageInventory = hasPermission('manage_inventory');
 
   // Cast sales to extended type for metrics and charts
   const salesWithDetails = salesWithCalculations as unknown as SaleWithDetails[];
@@ -51,7 +58,15 @@ const Index = () => {
     navigate('/master');
   };
 
-  if (authLoading) {
+  // Determinar aba inicial baseado em permissões
+  const getDefaultTab = () => {
+    if (canViewDashboard) return 'empresa';
+    if (canViewCommissions) return 'comissoes';
+    if (canManageInventory) return 'tabela';
+    return 'empresa';
+  };
+
+  if (authLoading || permissionsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -91,20 +106,26 @@ const Index = () => {
       )}
       
       <main className="container mx-auto px-6 py-6 flex-1">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 h-auto p-0 bg-transparent gap-1">
-            <TabsTrigger value="empresa" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Empresa</span>
-            </TabsTrigger>
-            <TabsTrigger value="comissoes" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              <span className="hidden sm:inline">Comissões</span>
-            </TabsTrigger>
-            <TabsTrigger value="tabela" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Tabela</span>
-            </TabsTrigger>
+        <Tabs value={activeTab || getDefaultTab()} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className={`grid w-full h-auto p-0 bg-transparent gap-1`} style={{ gridTemplateColumns: `repeat(${[canViewDashboard, canViewCommissions, canManageInventory].filter(Boolean).length}, 1fr)` }}>
+            {canViewDashboard && (
+              <TabsTrigger value="empresa" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Empresa</span>
+              </TabsTrigger>
+            )}
+            {canViewCommissions && (
+              <TabsTrigger value="comissoes" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span className="hidden sm:inline">Comissões</span>
+              </TabsTrigger>
+            )}
+            {canManageInventory && (
+              <TabsTrigger value="tabela" className="data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-b-primary border border-border bg-muted/30 rounded-none px-4 py-3 flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Tabela</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="empresa" className="mt-6">
