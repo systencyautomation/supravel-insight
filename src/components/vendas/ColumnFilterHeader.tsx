@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Filter, ArrowUp, ArrowDown } from 'lucide-react';
+import { Filter, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ColumnFilter } from './ColumnFilter';
 import { SortDirection } from '@/hooks/useSalesFilters';
@@ -15,6 +15,7 @@ interface ColumnFilterHeaderProps {
   sortColumn: string | null;
   sortDirection: SortDirection;
   type?: 'text' | 'number' | 'date' | 'currency';
+  onQuickSort?: () => void;
 }
 
 export function ColumnFilterHeader({
@@ -27,27 +28,34 @@ export function ColumnFilterHeader({
   sortColumn,
   sortDirection,
   type = 'text',
+  onQuickSort,
 }: ColumnFilterHeaderProps) {
   const [open, setOpen] = useState(false);
 
   const hasActiveFilter = selectedValues.size > 0;
   const isActiveSortColumn = sortColumn === columnKey;
 
+  const SortIcon = () => {
+    if (!isActiveSortColumn || !sortDirection) {
+      return <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3.5 w-3.5 text-primary" /> 
+      : <ArrowDown className="h-3.5 w-3.5 text-primary" />;
+  };
+
   return (
     <div className="flex items-center gap-1">
-      <span className="font-medium">{title}</span>
-      
-      {/* Sort indicator */}
-      {isActiveSortColumn && sortDirection && (
-        <span className="text-primary">
-          {sortDirection === 'asc' ? (
-            <ArrowUp className="h-3.5 w-3.5" />
-          ) : (
-            <ArrowDown className="h-3.5 w-3.5" />
-          )}
-        </span>
-      )}
+      {/* Clickable title for quick sort */}
+      <button
+        className="flex items-center gap-1 font-medium hover:text-primary transition-colors cursor-pointer select-none"
+        onClick={onQuickSort}
+      >
+        <span>{title}</span>
+        <SortIcon />
+      </button>
 
+      {/* Filter popover */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
