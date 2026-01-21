@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -63,6 +63,9 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
 };
 
 export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
+  // Refs
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  
   // States
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -199,7 +202,7 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border/50 overflow-hidden bg-card/50">
+      <div ref={tableContainerRef} className="rounded-lg border border-border/50 overflow-hidden bg-card/50">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/20 hover:bg-muted/20">
@@ -390,7 +393,13 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   </HoverCardTrigger>
                   
                   {/* Hover Card - Cálculo Over Price */}
-                  <HoverCardContent side="left" align="start" className="w-72">
+                  <HoverCardContent 
+                    side="top" 
+                    align="end" 
+                    sideOffset={8}
+                    collisionBoundary={tableContainerRef.current}
+                    className="w-72"
+                  >
                     <div className="space-y-2">
                       <h4 className="font-semibold text-sm">Cálculo Over Price</h4>
                       <div className="text-xs space-y-1 font-mono">
