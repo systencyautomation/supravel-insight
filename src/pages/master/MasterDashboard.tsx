@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { z } from 'zod';
+import { SaasAdminSection } from '@/components/master/SaasAdminSection';
 
 interface Organization {
   id: string;
@@ -59,7 +60,7 @@ const inviteSchema = z.object({
 });
 
 export default function MasterDashboard() {
-  const { user, loading, isMasterAdmin, impersonatedOrgName, setImpersonatedOrg, signOut } = useAuth();
+  const { user, loading, isMasterAdmin, isSaasAdmin, impersonatedOrgName, setImpersonatedOrg, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -91,15 +92,15 @@ export default function MasterDashboard() {
       return;
     }
 
-    if (!loading && user && !isMasterAdmin) {
+    if (!loading && user && !isMasterAdmin && !isSaasAdmin) {
       navigate('/');
       return;
     }
 
-    if (user && isMasterAdmin) {
+    if (user && (isMasterAdmin || isSaasAdmin)) {
       fetchData();
     }
-  }, [user, loading, isMasterAdmin, navigate]);
+  }, [user, loading, isMasterAdmin, isSaasAdmin, navigate]);
 
   const fetchData = async () => {
     setLoadingData(true);
@@ -777,6 +778,9 @@ export default function MasterDashboard() {
             </table>
           </div>
         </TooltipProvider>
+
+        {/* SaaS Admin Section - Only visible to Master Admin */}
+        {isMasterAdmin && <SaasAdminSection />}
       </main>
     </div>
   );

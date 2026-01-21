@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-type AppRole = 'super_admin' | 'admin' | 'manager' | 'seller' | 'representative';
+type AppRole = 'super_admin' | 'saas_admin' | 'admin' | 'manager' | 'seller' | 'representative';
 
 const MASTER_EMAIL = 'systency.automation@gmail.com';
 
@@ -18,6 +18,7 @@ interface AuthContextType {
   userRoles: UserRole[];
   organizationId: string | null;
   isSuperAdmin: boolean;
+  isSaasAdmin: boolean;
   isMasterAdmin: boolean;
   impersonatedOrgId: string | null;
   impersonatedOrgName: string | null;
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const organizationId = userRoles.find(r => r.organization_id)?.organization_id ?? null;
   const isSuperAdmin = userRoles.some(r => r.role === 'super_admin');
+  const isSaasAdmin = userRoles.some(r => r.role === 'saas_admin');
   const isMasterAdmin = user?.email === MASTER_EMAIL;
   
   // Effective org is impersonated org if set, otherwise user's actual org
@@ -133,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userRoles,
       organizationId,
       isSuperAdmin,
+      isSaasAdmin,
       isMasterAdmin,
       impersonatedOrgId,
       impersonatedOrgName,
