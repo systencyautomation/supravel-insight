@@ -219,4 +219,39 @@
   .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
   .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
   .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+
+  /* Resizable table columns */
+  .resizable-th {
+    position: relative;
+  }
+
+  .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 10;
+    transition: background-color 0.15s ease;
+  }
+
+  .resize-handle:hover {
+    background: hsl(var(--primary) / 0.3);
+  }
+
+  .resize-handle.resizing,
+  .resize-handle:active {
+    background: hsl(var(--primary) / 0.5);
+  }
+
+  .table-resizing {
+    cursor: col-resize !important;
+    user-select: none;
+  }
+
+  .table-resizing * {
+    cursor: col-resize !important;
+  }
 }
