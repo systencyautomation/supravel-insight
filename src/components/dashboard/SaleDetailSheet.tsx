@@ -1,21 +1,23 @@
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { X, BadgeCheck, Building2, FileText, Calendar, CreditCard, Percent, DollarSign, TrendingDown } from 'lucide-react';
+import { BadgeCheck, Building2, FileText, Percent, DollarSign, TrendingDown } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { SaleWithDetails } from '@/hooks/useSalesMetrics';
+import { Installment } from '@/hooks/useOrganizationData';
 import { useNavigate } from 'react-router-dom';
 
 interface SaleDetailSheetProps {
   sale: SaleWithDetails | null;
+  installments?: Installment[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function SaleDetailSheet({ sale, open, onOpenChange }: SaleDetailSheetProps) {
+export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }: SaleDetailSheetProps) {
   const navigate = useNavigate();
 
   if (!sale) return null;

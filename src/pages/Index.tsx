@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganizationData } from '@/hooks/useOrganizationData';
+import { useSalesWithCalculations } from '@/hooks/useSalesWithCalculations';
 import { useSalesMetrics, SaleWithDetails } from '@/hooks/useSalesMetrics';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,12 +10,13 @@ import { StockManagement } from '@/components/tabs/StockManagement';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { SalesAreaChart } from '@/components/dashboard/SalesAreaChart';
 import { ProductMixChart } from '@/components/dashboard/ProductMixChart';
-import { SalesTable } from '@/components/dashboard/SalesTable';
+import { SalesDataTable } from '@/components/dashboard/SalesDataTable';
 import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilter';
 import { CommandBar } from '@/components/dashboard/CommandBar';
 import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
 import { Building2, DollarSign, Package, Loader2, ArrowLeft, TrendingUp, Percent, HeartPulse } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
 const Index = () => {
@@ -33,11 +34,11 @@ const Index = () => {
     impersonatedOrgName, 
     setImpersonatedOrg 
   } = useAuth();
-  const { sales, inventory, installments, loading: dataLoading } = useOrganizationData();
+  const { sales: salesWithCalculations, loading: dataLoading } = useSalesWithCalculations();
   const navigate = useNavigate();
 
-  // Cast sales to extended type
-  const salesWithDetails = sales as unknown as SaleWithDetails[];
+  // Cast sales to extended type for metrics and charts
+  const salesWithDetails = salesWithCalculations as unknown as SaleWithDetails[];
   const metrics = useSalesMetrics(salesWithDetails, { start: dateRange.start, end: dateRange.end });
 
   useEffect(() => {
@@ -65,13 +66,13 @@ const Index = () => {
 
   if (!user) return null;
 
-  // Map for legacy components
-  const displaySales = sales.map(s => ({
+  // Map for legacy CommissionsTab component
+  const displaySales = salesWithCalculations.map(s => ({
     id: s.id,
     cliente: s.client_name || '',
     nfe: s.nfe_number || '',
-    valorTotal: s.total_value || 0,
-    valorTabela: s.table_value || 0,
+    valorTotal: Number(s.total_value) || 0,
+    valorTabela: Number(s.table_value) || 0,
     uf: s.uf_destiny || 'SP',
     formaPagamento: (s.payment_method === 'avista' ? 'avista' : 'boleto') as 'boleto' | 'avista',
     status: (s.status || 'pendente') as 'pago' | 'pendente' | 'parcial',
@@ -167,8 +168,15 @@ const Index = () => {
                   <ProductMixChart sales={salesWithDetails} />
                 </div>
 
-                {/* Sales Table */}
-                <SalesTable sales={salesWithDetails} limit={10} />
+                {/* Sales DataTable */}
+                <Card className="bg-card/50 border-border/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-semibold">Vendas Recentes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <SalesDataTable sales={salesWithCalculations} loading={dataLoading} />
+                  </CardContent>
+                </Card>
               </>
             )}
           </TabsContent>
