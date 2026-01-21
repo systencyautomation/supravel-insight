@@ -225,12 +225,16 @@
     position: relative;
   }
 
+  .resizable-th:hover {
+    background: hsl(var(--muted) / 0.2);
+  }
+
   .resize-handle {
     position: absolute;
-    right: 0;
+    right: -4px;
     top: 0;
     bottom: 0;
-    width: 4px;
+    width: 8px;
     cursor: col-resize;
     background: transparent;
     z-index: 10;
@@ -238,12 +242,12 @@
   }
 
   .resize-handle:hover {
-    background: hsl(var(--primary) / 0.3);
+    background: hsl(var(--primary) / 0.5);
   }
 
   .resize-handle.resizing,
   .resize-handle:active {
-    background: hsl(var(--primary) / 0.5);
+    background: hsl(var(--primary) / 0.7);
   }
 
   .table-resizing {
