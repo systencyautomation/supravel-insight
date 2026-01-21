@@ -22,7 +22,7 @@ export function MasterHeader({
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="border-b border-border/50 bg-gradient-to-r from-background via-background to-primary/5">
+    <header className="border-b border-border/50 bg-gradient-to-r from-background via-background to-primary/5 dark:from-slate-900/95 dark:via-slate-900/90 dark:to-slate-900/80">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
