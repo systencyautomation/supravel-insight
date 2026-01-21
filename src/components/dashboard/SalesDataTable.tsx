@@ -390,7 +390,7 @@ export function SalesDataTable({ sales, loading }: SalesDataTableProps) {
                   </HoverCardTrigger>
                   
                   {/* Hover Card - Cálculo Over Price */}
-                  <HoverCardContent side="left" className="w-72">
+                  <HoverCardContent side="left" align="start" className="w-72">
                     <div className="space-y-2">
                       <h4 className="font-semibold text-sm">Cálculo Over Price</h4>
                       <div className="text-xs space-y-1 font-mono">
