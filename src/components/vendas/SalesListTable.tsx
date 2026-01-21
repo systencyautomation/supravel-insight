@@ -54,6 +54,20 @@ const defaultColumnWidths: Record<ColumnKey, number> = {
   actions: 50,
 };
 
+// Minimum widths to prevent columns from shrinking below their title size
+const minColumnWidths: Record<ColumnKey, number> = {
+  emission_date: 70,
+  nfe_number: 55,
+  client_name: 75,
+  produto: 75,
+  total_value: 100,
+  entrada: 75,
+  percentual: 60,
+  comissao: 90,
+  status: 65,
+  actions: 45,
+};
+
 interface SalesListTableProps {
   sales: SaleWithCalculations[];
   loading?: boolean;
@@ -102,13 +116,14 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
   const [isResizing, setIsResizing] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Column resize handler
+  // Column resize handler with minimum width constraint
   const handleColumnResize = useCallback((columnKey: ColumnKey, startX: number, startWidth: number) => {
     setIsResizing(true);
+    const minWidth = minColumnWidths[columnKey];
     
     const handleMouseMove = (e: MouseEvent) => {
       const delta = e.clientX - startX;
-      const newWidth = Math.max(50, startWidth + delta);
+      const newWidth = Math.max(minWidth, startWidth + delta);
       setColumnWidths(prev => ({ ...prev, [columnKey]: newWidth }));
     };
     
@@ -404,10 +419,10 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                           {sale.nfe_number || '-'}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell style={{ width: columnWidths.client_name, maxWidth: columnWidths.client_name }}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="truncate max-w-[180px] block">
+                            <span className="truncate block">
                               {sale.client_name || '-'}
                             </span>
                           </TooltipTrigger>
@@ -419,8 +434,8 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
-                      <TableCell>
-                        <span className="truncate max-w-[150px] block">
+                      <TableCell style={{ width: columnWidths.produto, maxWidth: columnWidths.produto }}>
+                        <span className="truncate block">
                           {sale.produto_modelo || '-'}
                         </span>
                       </TableCell>
