@@ -119,12 +119,11 @@ export function OrganizationsCard({
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => onImpersonate(org)}
-                      className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <Eye className="h-3 w-3 mr-1" />
-                      Visualizar
+                      <Eye className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
