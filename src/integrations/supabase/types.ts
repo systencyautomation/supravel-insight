@@ -457,6 +457,50 @@ export type Database = {
         }
         Relationships: []
       }
+      representatives: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          document: string | null
+          email: string | null
+          id: string
+          name: string
+          organization_id: string
+          phone: string | null
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          document?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          document?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          phone?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "representatives_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string | null
