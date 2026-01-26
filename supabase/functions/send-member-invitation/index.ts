@@ -36,7 +36,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const roleLabels: Record<string, string> = {
       admin: "Gerente",
-      manager: "Auxiliar",
+      manager: "Analista",
       seller: "Vendedor",
       representative: "Representante",
     };

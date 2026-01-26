@@ -35,7 +35,7 @@ interface EditPermissionsDialogProps {
 
 const roleLabels: Record<string, string> = {
   admin: 'Gerente',
-  manager: 'Auxiliar',
+  manager: 'Analista',
   seller: 'Vendedor',
   representative: 'Representante',
 };
