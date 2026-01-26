@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -22,24 +21,23 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { CreateMemberData } from '@/hooks/useCompanyMembers';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  phone: z.string().min(8, 'Telefone é obrigatório'),
-  is_technical: z.boolean().default(false),
+  phone: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
 interface AddMemberDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   companyName: string;
   onAdd: (data: CreateMemberData) => Promise<unknown>;
 }
 
-export function AddMemberDialog({ companyName, onAdd }: AddMemberDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AddMemberDialog({ open, onOpenChange, companyName, onAdd }: AddMemberDialogProps) {
   const [loading, setLoading] = useState(false);
 
   const form = useForm<FormData>({
@@ -47,9 +45,14 @@ export function AddMemberDialog({ companyName, onAdd }: AddMemberDialogProps) {
     defaultValues: {
       name: '',
       phone: '',
-      is_technical: false,
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      form.reset();
+    }
+  }, [open, form]);
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
@@ -57,29 +60,23 @@ export function AddMemberDialog({ companyName, onAdd }: AddMemberDialogProps) {
       name: data.name,
       phone: data.phone || undefined,
       role: 'funcionario',
-      is_technical: data.is_technical,
+      is_technical: false,
     });
     setLoading(false);
 
     if (result) {
       form.reset();
-      setOpen(false);
+      onOpenChange(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="ghost" className="gap-1 h-7 text-xs">
-          <Plus className="h-3 w-3" />
-          Funcionário
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Adicionar Funcionário</DialogTitle>
+          <DialogTitle>Adicionar Membro</DialogTitle>
           <DialogDescription>
-            Adicione um funcionário à empresa {companyName}.
+            Adicione um membro à empresa {companyName}.
           </DialogDescription>
         </DialogHeader>
 
@@ -104,7 +101,7 @@ export function AddMemberDialog({ companyName, onAdd }: AddMemberDialogProps) {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Telefone *</FormLabel>
+                  <FormLabel>Telefone</FormLabel>
                   <FormControl>
                     <Input placeholder="(11) 99999-0000" {...field} />
                   </FormControl>
@@ -113,26 +110,8 @@ export function AddMemberDialog({ companyName, onAdd }: AddMemberDialogProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="is_technical"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <FormLabel className="cursor-pointer font-normal">
-                    É técnico
-                  </FormLabel>
-                </FormItem>
-              )}
-            />
-
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading}>
