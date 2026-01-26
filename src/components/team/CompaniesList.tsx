@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Building2, Wrench, MoreVertical, Trash2, Edit } from 'lucide-react';
+import { ChevronDown, ChevronRight, Building2, Wrench, MoreVertical, Trash2, Edit, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,6 +45,7 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
   const [isOpen, setIsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const { members, loading, createMember, updateMember, refetch } = useCompanyMembers(company.id);
   const { toast } = useToast();
 
@@ -166,6 +167,15 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
+                            setAddMemberDialogOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Adicionar Membro
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditDialogOpen(true);
                           }}
                         >
@@ -226,15 +236,9 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                     ))}
                     {funcionarios.length === 0 && (
                       <div className="text-sm text-muted-foreground text-center py-2">
-                        Nenhum funcionário cadastrado
+                        Nenhum membro cadastrado
                       </div>
                     )}
-                    <div className="px-4 pt-2">
-                      <AddMemberDialog
-                        companyName={company.name}
-                        onAdd={handleAddMember}
-                      />
-                    </div>
                   </>
                 )}
               </div>
@@ -268,6 +272,14 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
         company={company}
         responsavel={responsavel}
         onSave={handleSaveEdit}
+      />
+
+      {/* Add Member Dialog */}
+      <AddMemberDialog
+        open={addMemberDialogOpen}
+        onOpenChange={setAddMemberDialogOpen}
+        companyName={company.name}
+        onAdd={handleAddMember}
       />
     </>
   );
