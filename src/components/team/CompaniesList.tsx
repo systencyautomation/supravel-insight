@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Building2, Wrench, MoreVertical, Trash2, Edit } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, Building2, Wrench, MoreVertical, Trash2, Edit, Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,29 +19,33 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { RepresentativeCompany } from '@/hooks/useRepresentativeCompanies';
+import { RepresentativeCompany, RepresentativePosition } from '@/hooks/useRepresentativeCompanies';
 import { CompanyMember, useCompanyMembers, CreateMemberData } from '@/hooks/useCompanyMembers';
 import { CompanyMemberRow } from './CompanyMemberRow';
 import { AddMemberDialog } from './AddMemberDialog';
+import { EditCompanyDialog } from './EditCompanyDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface CompaniesListProps {
   companies: RepresentativeCompany[];
   onDeleteCompany: (id: string) => Promise<boolean>;
+  onUpdateCompany: (id: string, data: Partial<{ name: string; cnpj: string; sede: string; position: RepresentativePosition; is_technical: boolean }>) => Promise<boolean>;
   onRefetch: () => void;
 }
 
 interface CompanyItemProps {
   company: RepresentativeCompany;
   onDelete: (id: string) => Promise<boolean>;
+  onUpdate: (id: string, data: Partial<{ name: string; cnpj: string; sede: string; position: RepresentativePosition; is_technical: boolean }>) => Promise<boolean>;
   onMembersChange: () => void;
 }
 
-function CompanyItem({ company, onDelete, onMembersChange }: CompanyItemProps) {
+function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const { members, loading, createMember, refetch } = useCompanyMembers(company.id);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { members, loading, createMember, updateMember, refetch } = useCompanyMembers(company.id);
   const { toast } = useToast();
 
   const handleAddMember = async (data: CreateMemberData) => {
@@ -59,96 +63,207 @@ function CompanyItem({ company, onDelete, onMembersChange }: CompanyItemProps) {
     }
   };
 
+  const handleSaveEdit = async (
+    companyData: {
+      name: string;
+      cnpj?: string;
+      sede?: string;
+      position: RepresentativePosition;
+      is_technical: boolean;
+    },
+    responsavelData?: {
+      name: string;
+      phone?: string;
+      email?: string;
+      is_technical: boolean;
+    }
+  ) => {
+    // Update company
+    const companySuccess = await onUpdate(company.id, {
+      name: companyData.name,
+      cnpj: companyData.cnpj || '',
+      sede: companyData.sede || '',
+      position: companyData.position,
+      is_technical: companyData.is_technical,
+    });
+
+    if (!companySuccess) return false;
+
+    // Update responsável if exists
+    if (responsavelData && responsavel) {
+      const memberSuccess = await updateMember(responsavel.id, {
+        name: responsavelData.name,
+        phone: responsavelData.phone,
+        email: responsavelData.email,
+        is_technical: responsavelData.is_technical,
+      });
+
+      if (!memberSuccess) return false;
+    }
+
+    onMembersChange();
+    return true;
+  };
+
+  const handleUpdateMember = async (memberId: string, data: { name: string; phone?: string; is_technical: boolean }) => {
+    const success = await updateMember(memberId, data);
+    if (success) {
+      onMembersChange();
+    }
+    return success;
+  };
+
   const responsavel = members.find(m => m.role === 'responsavel');
   const funcionarios = members.filter(m => m.role === 'funcionario');
+  const hasFuncionarios = funcionarios.length > 0;
 
   const positionLabel = company.position === 'indicador' ? 'Indicador' : 'Representante';
   const positionVariant = company.position === 'indicador' ? 'secondary' : 'default';
+  const isMei = company.company_type === 'mei';
 
   return (
     <>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <div className="border rounded-lg overflow-hidden">
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-4 hover:bg-muted/50 cursor-pointer transition-colors">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
-                  {isOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </Button>
-                <Building2 className="h-5 w-5 text-muted-foreground" />
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{company.name}</span>
-                  {company.company_type === 'mei' && (
-                    <Badge variant="outline" className="text-xs">MEI</Badge>
-                  )}
-                  <Badge variant={positionVariant as any} className="text-xs">
-                    {positionLabel}
-                  </Badge>
-                  {company.is_technical && (
-                    <Badge variant="secondary" className="text-xs gap-1">
-                      <Wrench className="h-3 w-3" />
-                      Técnico
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {company.sede && (
-                  <span className="text-sm text-muted-foreground">{company.sede}</span>
-                )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteDialogOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="border-t bg-muted/20 p-2">
-              {loading ? (
-                <div className="text-sm text-muted-foreground text-center py-4">
-                  Carregando...
-                </div>
-              ) : (
-                <>
-                  {responsavel && <CompanyMemberRow member={responsavel} />}
-                  {funcionarios.map((member) => (
-                    <CompanyMemberRow key={member.id} member={member} />
-                  ))}
-                  {company.company_type === 'empresa' && (
-                    <div className="px-4 pt-2">
-                      <AddMemberDialog
-                        companyName={company.name}
-                        onAdd={handleAddMember}
-                      />
+          <div className="flex flex-col">
+            {/* Header clickable area */}
+            <CollapsibleTrigger asChild disabled={!hasFuncionarios && company.company_type !== 'empresa'}>
+              <div 
+                className={`flex flex-col p-4 transition-colors ${hasFuncionarios || company.company_type === 'empresa' ? 'hover:bg-muted/50 cursor-pointer' : ''}`}
+              >
+                {/* Line 1: Company info */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {/* Expansion arrow - only if has funcionarios or is empresa */}
+                    {hasFuncionarios || company.company_type === 'empresa' ? (
+                      <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                    ) : (
+                      <div className="w-6" />
+                    )}
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{company.name}</span>
+                      {isMei && (
+                        <Badge variant="outline" className="text-xs">MEI</Badge>
+                      )}
+                      <Badge variant={positionVariant as any} className="text-xs">
+                        {positionLabel}
+                      </Badge>
+                      {company.is_technical && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Wrench className="h-3 w-3" />
+                          Técnico
+                        </Badge>
+                      )}
                     </div>
-                  )}
-                </>
-              )}
-            </div>
-          </CollapsibleContent>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {company.sede && (
+                      <span className="text-sm text-muted-foreground">{company.sede}</span>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* Line 2: Responsável info (always visible) */}
+                {!loading && (
+                  <div className="flex items-center gap-2 ml-14 mt-1 text-sm text-muted-foreground">
+                    {responsavel ? (
+                      <>
+                        <span>{responsavel.name}</span>
+                        {responsavel.is_technical && (
+                          <Badge variant="secondary" className="text-xs gap-1 py-0 h-5">
+                            <Wrench className="h-2.5 w-2.5" />
+                            técnico
+                          </Badge>
+                        )}
+                        {responsavel.phone && (
+                          <>
+                            <span>•</span>
+                            <Phone className="h-3 w-3" />
+                            <span>{responsavel.phone}</span>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <span className="italic">Sem responsável cadastrado</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CollapsibleTrigger>
+
+            {/* Collapsible content - only funcionários */}
+            <CollapsibleContent>
+              <div className="border-t bg-muted/20 p-2">
+                {loading ? (
+                  <div className="text-sm text-muted-foreground text-center py-4">
+                    Carregando...
+                  </div>
+                ) : (
+                  <>
+                    {funcionarios.map((member) => (
+                      <CompanyMemberRow 
+                        key={member.id} 
+                        member={member}
+                        onUpdate={handleUpdateMember}
+                      />
+                    ))}
+                    {funcionarios.length === 0 && (
+                      <div className="text-sm text-muted-foreground text-center py-2">
+                        Nenhum funcionário cadastrado
+                      </div>
+                    )}
+                    {company.company_type === 'empresa' && (
+                      <div className="px-4 pt-2">
+                        <AddMemberDialog
+                          companyName={company.name}
+                          onAdd={handleAddMember}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </CollapsibleContent>
+          </div>
         </div>
       </Collapsible>
 
+      {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -165,11 +280,20 @@ function CompanyItem({ company, onDelete, onMembersChange }: CompanyItemProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Dialog */}
+      <EditCompanyDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        company={company}
+        responsavel={responsavel}
+        onSave={handleSaveEdit}
+      />
     </>
   );
 }
 
-export function CompaniesList({ companies, onDeleteCompany, onRefetch }: CompaniesListProps) {
+export function CompaniesList({ companies, onDeleteCompany, onUpdateCompany, onRefetch }: CompaniesListProps) {
   if (companies.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -185,6 +309,7 @@ export function CompaniesList({ companies, onDeleteCompany, onRefetch }: Compani
           key={company.id}
           company={company}
           onDelete={onDeleteCompany}
+          onUpdate={onUpdateCompany}
           onMembersChange={onRefetch}
         />
       ))}
