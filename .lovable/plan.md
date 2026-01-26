@@ -1,123 +1,89 @@
 
 
-## Plano: Cadastro de Representantes sem Acesso (Pré-cadastro)
+## Plano: Expandir Campos do Cadastro de Representantes
 
-### Contexto do Problema
+### Objetivo
+Adicionar os campos **Sede**, **Empresa** e **Posição** ao formulário e tabela de representantes, permitindo um cadastro mais completo.
 
-Atualmente, para ter um representante no sistema você precisa:
-1. Criar um usuário com login via "Adicionar Membro"
-2. Isso envia email ou cria credenciais de acesso
+### Novos Campos
 
-Você quer cadastrar ~30 representantes apenas para fins de **registro interno**, sem que eles tenham acesso ao sistema por enquanto.
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `sede` | TEXT | Localização/filial do representante |
+| `company` | TEXT | Empresa que o representante representa |
+| `position` | ENUM | Tipo: 'indicador' ou 'representante' |
 
-### Solução Proposta
+### Alterações Necessárias
 
-Criar uma nova tabela `representatives` para armazenar representantes externos que:
-- Não têm login no sistema
-- Podem ser vinculados às vendas para cálculo de comissões
-- Futuramente podem ser "ativados" com um usuário de acesso
-
-### Estrutura do Banco de Dados
-
-```text
-+-------------------+
-|  representatives  |
-+-------------------+
-| id (uuid)         |
-| organization_id   |
-| name              |
-| email (opcional)  |
-| phone (opcional)  |
-| document (CPF)    |
-| active            |
-| user_id (null)    |  <- quando ativar, vincula ao usuário
-| created_at        |
-+-------------------+
-```
-
-### Funcionalidades a Implementar
-
-1. **Nova Seção em Team Settings**
-   - Card "Representantes Externos" separado dos membros ativos
-   - Lista de representantes cadastrados
-   - Botão "Adicionar Representante"
-
-2. **Dialog de Cadastro Simples**
-   - Campos: Nome, Email (opcional), Telefone (opcional), CPF (opcional)
-   - Sem necessidade de senha ou convite
-   - Salva direto na tabela `representatives`
-
-3. **Vinculação às Vendas**
-   - O campo `representative_id` nas vendas passa a referenciar esta tabela
-   - Dropdown para selecionar representante ao aprovar vendas
-
-4. **Ativação Futura**
-   - Botão "Fornecer Acesso" em cada representante
-   - Cria usuário + vincula o `user_id` na tabela `representatives`
-   - O representante passa a aparecer também nos "Membros Ativos"
-
-### Fluxo Visual
-
-```text
-Configurações > Equipe
-├── Membros Ativos (com login)
-│   └── Gerentes, Auxiliares, Vendedores...
-│
-├── Representantes Externos (sem login)
-│   ├── João Silva - joao@email.com
-│   ├── Maria Santos - (11) 99999-0000
-│   └── [+ Adicionar Representante]
-│
-└── Convites Pendentes
-```
-
-### Migração SQL Necessária
-
+#### 1. Migração do Banco de Dados
 ```sql
--- Tabela para representantes externos
-CREATE TABLE public.representatives (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  document TEXT,
-  active BOOLEAN DEFAULT true,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+-- Criar enum para posição
+CREATE TYPE public.representative_position AS ENUM ('indicador', 'representante');
 
--- RLS
-ALTER TABLE public.representatives ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view representatives in their org"
-ON public.representatives FOR SELECT TO authenticated
-USING (organization_id = get_user_org_id(auth.uid()));
-
-CREATE POLICY "Admins can manage representatives"
-ON public.representatives FOR ALL TO authenticated
-USING (organization_id = get_user_org_id(auth.uid()) 
-  AND (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager')))
-WITH CHECK (organization_id = get_user_org_id(auth.uid()) 
-  AND (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager')));
+-- Adicionar novos campos
+ALTER TABLE public.representatives 
+  ADD COLUMN sede TEXT,
+  ADD COLUMN company TEXT,
+  ADD COLUMN position representative_position DEFAULT 'representante';
 ```
 
-### Componentes a Criar
+#### 2. Atualizar Hook `useRepresentatives.ts`
+- Adicionar `sede`, `company` e `position` na interface `Representative`
+- Adicionar campos em `CreateRepresentativeData`
+- Incluir novos campos nas operações de insert
 
-| Arquivo | Descrição |
+#### 3. Atualizar Dialog `AddRepresentativeDialog.tsx`
+- Adicionar campos no schema Zod:
+  - `sede` (opcional)
+  - `company` (opcional)
+  - `position` (obrigatório, com select)
+- Adicionar inputs no formulário:
+  - Input para Sede
+  - Input para Empresa
+  - Select para Posição (Indicador / Representante)
+
+#### 4. Atualizar Lista `RepresentativesList.tsx`
+- Exibir badge com a posição (Indicador/Representante)
+- Mostrar empresa e sede quando disponíveis
+
+### Layout do Formulário Atualizado
+
+```text
+┌─────────────────────────────────────┐
+│  Adicionar Representante            │
+├─────────────────────────────────────┤
+│  Nome *         [________________]  │
+│  E-mail         [________________]  │
+│  Telefone       [________________]  │
+│  Sede           [________________]  │
+│  Empresa        [________________]  │
+│  Posição *      [▼ Representante ]  │
+│                  ├─ Indicador       │
+│                  └─ Representante   │
+├─────────────────────────────────────┤
+│          [Cancelar]  [Cadastrar]    │
+└─────────────────────────────────────┘
+```
+
+### Exibição na Lista
+
+```text
+┌──────────────────────────────────────────────┐
+│ João Silva          [Representante] [Ativo]  │
+│ 📧 joao@email.com  📞 (11) 99999             │
+│ 🏢 Empresa ABC  📍 São Paulo                 │
+└──────────────────────────────────────────────┘
+```
+
+### Arquivos a Modificar
+
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/components/team/RepresentativesList.tsx` | Lista de representantes externos |
-| `src/components/team/AddRepresentativeDialog.tsx` | Dialog para cadastro simples |
-| `src/hooks/useRepresentatives.ts` | Hook para CRUD de representantes |
+| Migração SQL | Adicionar colunas `sede`, `company`, `position` |
+| `src/hooks/useRepresentatives.ts` | Expandir interfaces e operações |
+| `src/components/team/AddRepresentativeDialog.tsx` | Adicionar novos campos ao form |
+| `src/components/team/RepresentativesList.tsx` | Exibir novos dados na lista |
 
-### Benefícios desta Abordagem
-
-- Separação clara entre usuários com acesso e representantes externos
-- Cadastro rápido em massa (nome + email opcional)
-- Flexibilidade para ativar acesso quando necessário
-- Relatórios de comissões podem referenciar estes representantes
-
-### Alternativa Mais Simples
-
-Se preferir uma solução ainda mais rápida, posso apenas criar a tabela e um formulário simples de cadastro, sem a funcionalidade de "ativar acesso" por enquanto. Isso permite cadastrar os 30 representantes imediatamente.
+### Observação sobre CPF
+O campo `document` (CPF) será **removido do formulário** conforme solicitado, mantendo apenas: Nome, E-mail, Telefone, Sede, Empresa e Posição.
 
