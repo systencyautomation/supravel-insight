@@ -36,7 +36,8 @@ export default function TeamSettings() {
     loading: repsLoading, 
     createRepresentative, 
     updateRepresentative, 
-    deleteRepresentative 
+    deleteRepresentative,
+    refetch: refetchRepresentatives 
   } = useRepresentatives(effectiveOrgId);
 
   useEffect(() => {
@@ -143,8 +144,10 @@ export default function TeamSettings() {
               ) : (
                 <RepresentativesList 
                   representatives={representatives}
+                  organizationId={effectiveOrgId!}
                   onUpdate={updateRepresentative}
                   onDelete={deleteRepresentative}
+                  onRefetch={refetchRepresentatives}
                 />
               )}
             </CardContent>

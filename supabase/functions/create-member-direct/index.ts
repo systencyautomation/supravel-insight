@@ -12,6 +12,7 @@ interface CreateMemberRequest {
   role: "admin" | "manager" | "seller" | "representative";
   organizationId: string;
   permissions?: string[];
+  representativeId?: string; // Optional: link to existing representative record
 }
 
 Deno.serve(async (req: Request) => {
@@ -51,7 +52,7 @@ Deno.serve(async (req: Request) => {
 
     // Parse request body
     const body: CreateMemberRequest = await req.json();
-    const { email, password, fullName, role, organizationId, permissions = [] } = body;
+    const { email, password, fullName, role, organizationId, permissions = [], representativeId } = body;
 
     // Validate required fields
     if (!email || !password || !fullName || !role || !organizationId) {
@@ -197,6 +198,21 @@ Deno.serve(async (req: Request) => {
     if (profileError) {
       console.error("Error creating profile:", profileError);
       // Non-fatal, profile might be created by trigger
+    }
+
+    // Step 5: Link to representative record if provided
+    if (representativeId) {
+      console.log(`Linking user to representative: ${representativeId}`);
+      const { error: repLinkError } = await supabaseAdmin
+        .from("representatives")
+        .update({ user_id: newUserId })
+        .eq("id", representativeId)
+        .eq("organization_id", organizationId);
+
+      if (repLinkError) {
+        console.error("Error linking representative:", repLinkError);
+        // Non-fatal, continue with success response
+      }
     }
 
     console.log(`Member created successfully: ${email}`);

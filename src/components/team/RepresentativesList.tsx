@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Phone, MoreVertical, Trash2, UserCheck, UserX, Building2, MapPin } from 'lucide-react';
+import { Mail, Phone, MoreVertical, Trash2, UserCheck, UserX, Building2, MapPin, Pencil, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -19,17 +19,37 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Representative } from '@/hooks/useRepresentatives';
+import { Representative, RepresentativePosition } from '@/hooks/useRepresentatives';
+import { EditRepresentativeDialog } from './EditRepresentativeDialog';
+import { CreateAccessDialog } from './CreateAccessDialog';
 import { cn } from '@/lib/utils';
 
 interface RepresentativesListProps {
   representatives: Representative[];
-  onUpdate: (id: string, data: { active: boolean }) => Promise<boolean>;
+  organizationId: string;
+  onUpdate: (id: string, data: Partial<{
+    name: string;
+    email: string;
+    phone: string;
+    sede: string;
+    company: string;
+    position: RepresentativePosition;
+    active: boolean;
+  }>) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
+  onRefetch: () => void;
 }
 
-export function RepresentativesList({ representatives, onUpdate, onDelete }: RepresentativesListProps) {
+export function RepresentativesList({ 
+  representatives, 
+  organizationId,
+  onUpdate, 
+  onDelete,
+  onRefetch 
+}: RepresentativesListProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editRep, setEditRep] = useState<Representative | null>(null);
+  const [accessRep, setAccessRep] = useState<Representative | null>(null);
 
   const handleToggleActive = async (rep: Representative) => {
     await onUpdate(rep.id, { active: !rep.active });
@@ -113,6 +133,17 @@ export function RepresentativesList({ representatives, onUpdate, onDelete }: Rep
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditRep(rep)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+                {!rep.user_id && (
+                  <DropdownMenuItem onClick={() => setAccessRep(rep)}>
+                    <Key className="h-4 w-4 mr-2" />
+                    Criar Acesso
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleToggleActive(rep)}>
                   {rep.active ? (
                     <>
@@ -156,6 +187,21 @@ export function RepresentativesList({ representatives, onUpdate, onDelete }: Rep
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditRepresentativeDialog
+        representative={editRep}
+        open={!!editRep}
+        onOpenChange={(open) => !open && setEditRep(null)}
+        onSave={onUpdate}
+      />
+
+      <CreateAccessDialog
+        representative={accessRep}
+        organizationId={organizationId}
+        open={!!accessRep}
+        onOpenChange={(open) => !open && setAccessRep(null)}
+        onSuccess={onRefetch}
+      />
     </>
   );
 }
