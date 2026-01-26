@@ -341,6 +341,7 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
                 selectedPermissions={permissions}
                 onPermissionsChange={setPermissions}
                 disabled={loading}
+                hideAdminRole={false}
               />
 
               <p className="text-sm text-muted-foreground">
@@ -413,6 +414,7 @@ export function InviteMemberDialog({ organizationId, organizationName }: InviteM
                 selectedPermissions={directPermissions}
                 onPermissionsChange={setDirectPermissions}
                 disabled={directLoading}
+                hideAdminRole={false}
               />
 
               <p className="text-sm text-muted-foreground">
