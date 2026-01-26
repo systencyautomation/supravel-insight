@@ -354,8 +354,8 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
       super_admin: 'Super Admin',
-      admin: 'Administrador',
-      manager: 'Gerente',
+      admin: 'Gerente',
+      manager: 'Auxiliar',
       seller: 'Vendedor',
       representative: 'Representante',
     };
