@@ -1,56 +1,17 @@
 
 
-## Plano: Simplificar Formulário de Cadastro de Empresas
+## Plano: Corrigir Adição de Membros às Empresas
 
-### O que será removido
+### Problemas Identificados
 
-| Campo | Motivo |
-|-------|--------|
-| Tipo de Empresa (MEI/CNPJ) | Não necessário - todos são tratados igual |
-| Telefone do responsável | Não solicitado |
-| Sede/Cidade | Não solicitado |
+1. **Telefone está obrigatório** - O formulário exige telefone com mínimo de 8 caracteres
+2. **Botão inacessível** - O botão "Funcionário" só aparece dentro da área expandida, que só abre se já existem funcionários
 
-### Campos finais do formulário
+### Solução
 
-**Dados da Empresa:**
-1. Nome da Empresa *
-2. CNPJ (opcional)
-3. Posição * (Indicador/Representante)
-4. Empresa técnica (checkbox)
-
-**Dados do Responsável:**
-5. Nome *
-6. E-mail (opcional)
-7. É técnico (checkbox)
-
----
-
-### Visualização do novo formulário
-
-```text
-┌─────────────────────────────────────────────────┐
-│ Cadastrar Empresa                           X   │
-├─────────────────────────────────────────────────┤
-│ Nome da Empresa *         [________________]    │
-│                                                 │
-│ CNPJ (opcional)           [________________]    │
-│                                                 │
-│ Posição *                                       │
-│ [▼ Representante                          ]     │
-│                                                 │
-│ [✓] Empresa presta serviços técnicos           │
-├─────────────────────────────────────────────────┤
-│ RESPONSÁVEL                                     │
-│                                                 │
-│ Nome *                    [________________]    │
-│                                                 │
-│ Email (opcional)          [________________]    │
-│                                                 │
-│ [✓] É técnico                                  │
-├─────────────────────────────────────────────────┤
-│                     [Cancelar]  [Cadastrar]     │
-└─────────────────────────────────────────────────┘
-```
+#### Campos do formulário simplificado:
+- **Nome** * (obrigatório)
+- **Telefone** (opcional)
 
 ---
 
@@ -58,68 +19,80 @@
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/team/AddCompanyDialog.tsx` | Remover campos: company_type, sede, responsavel_phone |
-| `src/components/team/EditCompanyDialog.tsx` | Remover campos: sede, responsavelPhone; remover lógica MEI |
-| `src/components/team/CompaniesList.tsx` | Remover exibição de sede e telefone; remover lógica MEI |
+| `src/components/team/AddMemberDialog.tsx` | Tornar telefone opcional, remover checkbox técnico |
+| `src/components/team/CompaniesList.tsx` | Mover botão de adicionar membro para o menu da empresa |
 
 ---
 
 ### Detalhes Técnicos
 
-#### AddCompanyDialog.tsx
+#### AddMemberDialog.tsx
 
-**Schema simplificado:**
+**Schema atualizado:**
 ```typescript
 const formSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  cnpj: z.string().optional(),
-  position: z.enum(['indicador', 'representante'] as const),
-  is_technical: z.boolean().default(false),
-  responsavel_name: z.string().min(2, 'Nome do responsável é obrigatório'),
-  responsavel_email: z.string().email('Email inválido').optional().or(z.literal('')),
-  responsavel_is_technical: z.boolean().default(false),
+  phone: z.string().optional(),  // Antes: min(8) obrigatório
 });
 ```
 
 **Remover:**
-- Campo `company_type` (radio MEI/Empresa)
-- Campo `sede`
-- Campo `responsavel_phone`
-- Lógica `isMei` para nome da empresa
+- Campo `is_technical` (checkbox)
+- Referências a `is_technical` no submit
 
-#### EditCompanyDialog.tsx
-
-**Remover:**
-- Estado `sede` e campo relacionado
-- Estado `responsavelPhone` e campo relacionado
-- Referências a `isMei` e `company.company_type`
-- Título dinâmico MEI/Empresa (usar sempre "Empresa")
+**Formulário final:**
+- Nome * (input)
+- Telefone (input opcional)
 
 #### CompaniesList.tsx
 
-**Remover:**
-- Badge "MEI" 
-- Exibição de `company.sede`
-- Exibição do telefone do responsável
-- Referências a `isMei`
+**Adicionar opção no menu dropdown:**
+```tsx
+<DropdownMenuItem onClick={() => /* abrir dialog adicionar membro */}>
+  <Plus className="h-4 w-4 mr-2" />
+  Adicionar Membro
+</DropdownMenuItem>
+```
 
-**Nova visualização do card:**
+**Mudança no fluxo:**
+1. O `AddMemberDialog` será controlado por estado (não mais pelo Trigger interno)
+2. O menu da empresa terá opção "Adicionar Membro" que abre o dialog
+3. O botão na área expandida permanece como alternativa
+
+---
+
+### Nova Interface
+
+**Menu da empresa:**
 ```text
-┌────────────────────────────────────────────────────────────────┐
-│ ▶ GCO Parts                              [Indicador] [Técnico] ⋮│
-│   Odacir Franco                                                │
-├────────────────────────────────────────────────────────────────┤
-│ ▶ Patromak                               [Indicador]          ⋮│
-│   Domingos [técnico]                                           │
-└────────────────────────────────────────────────────────────────┘
+┌─────────────────┐
+│ + Adicionar Membro │
+│ ✏ Editar         │
+│ 🗑 Excluir        │
+└─────────────────┘
+```
+
+**Formulário de adicionar membro:**
+```text
+┌─────────────────────────────────────────────────┐
+│ Adicionar Membro                            X   │
+├─────────────────────────────────────────────────┤
+│ Adicione um membro à empresa GCO Parts          │
+│                                                 │
+│ Nome *              [____________________]      │
+│                                                 │
+│ Telefone            [____________________]      │
+│                     (opcional)                  │
+├─────────────────────────────────────────────────┤
+│                     [Cancelar]  [Adicionar]     │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
 
 ### Resultado Esperado
 
-1. Formulário simplificado com apenas 7 campos
-2. Sem distinção MEI/Empresa na interface
-3. Lista mais limpa sem telefone e sede
-4. Edição também simplificada com mesmos campos
+1. **Acesso fácil** - Adicionar membro pelo menu da empresa (sempre acessível)
+2. **Formulário simples** - Apenas nome (obrigatório) e telefone (opcional)
+3. **Sem bloqueio** - Não precisa ter funcionários para poder adicionar o primeiro
 
