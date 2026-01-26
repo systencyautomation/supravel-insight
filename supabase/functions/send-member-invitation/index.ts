@@ -35,7 +35,8 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending member invitation to ${email} for org ${organizationName}`);
 
     const roleLabels: Record<string, string> = {
-      manager: "Gerente",
+      admin: "Gerente",
+      manager: "Auxiliar",
       seller: "Vendedor",
       representative: "Representante",
     };
