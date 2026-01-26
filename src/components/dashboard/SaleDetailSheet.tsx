@@ -51,7 +51,7 @@ export function SaleDetailSheet({ sale, open, onOpenChange }: SaleDetailSheetPro
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader className="space-y-1">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between w-full">
             <SheetTitle className="text-xl">Detalhes da Venda</SheetTitle>
             {sale.status === 'aprovado' || sale.status === 'pago' ? (
               <Badge variant="outline" className="bg-success/10 text-success border-success/30">
