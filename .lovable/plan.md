@@ -1,61 +1,103 @@
 
+## Plano: Editar Cálculos de Vendas Aprovadas
 
-## Plano: Corrigir Mapeamento de Cargos no ProfileHero
+### Objetivo
+Permitir que vendas já aprovadas possam ser reeditadas através da calculadora de comissão para corrigir valores incorretos.
 
-### Problema Identificado
+### Fluxo Atual vs. Novo Fluxo
 
-| Banco de Dados | Exibido Atualmente | Deveria Exibir |
-|----------------|-------------------|----------------|
-| `manager`      | "Gerente" ❌       | "Auxiliar" ✓   |
-| `admin`        | "Administrador" ❌ | "Gerente" ✓    |
-
-O perfil da Lidiane está armazenado corretamente como `manager` no banco, mas o frontend está exibindo "Gerente" em vez de "Auxiliar".
+| Situação | Atual | Novo |
+|----------|-------|------|
+| Venda **Pendente** | Aparece na fila de aprovação, pode ser editada | Sem mudança |
+| Venda **Aprovada** | Apenas visualização no Sheet | Botão "Editar Cálculos" → abre calculadora |
+| Venda **Paga** | Apenas visualização | Botão "Editar Cálculos" → abre calculadora |
 
 ---
 
-### Arquivo a Modificar
+### Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/profile/ProfileHero.tsx` | Linhas 13-19: Corrigir mapeamento de roles |
+| `src/pages/SalesApproval.tsx` | Aceitar vendas de qualquer status (não só pendentes) via query param |
+| `src/components/dashboard/SaleDetailSheet.tsx` | Adicionar botão "Editar Cálculos" para vendas aprovadas/pagas |
+| `src/components/vendas/SalesListTable.tsx` | Adicionar ação rápida "Editar" na coluna de ações |
+| `src/hooks/usePendingSales.ts` | Criar função auxiliar para carregar venda específica por ID |
 
 ---
 
-### Mudança de Código
+### Mudanças Detalhadas
 
-**De (linhas 12-21):**
-```typescript
-const getRoleLabel = (role: string) => {
-  const labels: Record<string, string> = {
-    super_admin: 'Super Administrador',
-    admin: 'Administrador',
-    manager: 'Gerente',
-    seller: 'Vendedor',
-    representative: 'Representante',
-  };
-  return labels[role] || role;
-};
+#### 1. SaleDetailSheet.tsx
+Adicionar botão "Editar Cálculos" para vendas com status "aprovado" ou "pago":
+
+```text
+┌─────────────────────────────────────┐
+│  Detalhes da Venda      [Aprovado]  │
+├─────────────────────────────────────┤
+│  Cliente: ...                       │
+│  Produto: ...                       │
+│  Valor: ...                         │
+│  ...                                │
+├─────────────────────────────────────┤
+│  [🔧 Editar Cálculos]   << NOVO     │
+└─────────────────────────────────────┘
 ```
 
-**Para:**
-```typescript
-const getRoleLabel = (role: string) => {
-  const labels: Record<string, string> = {
-    super_admin: 'Super Administrador',
-    admin: 'Gerente',
-    manager: 'Auxiliar',
-    seller: 'Vendedor',
-    representative: 'Representante',
-  };
-  return labels[role] || role;
-};
+Ao clicar, navega para `/aprovacao?saleId=X&mode=edit`
+
+#### 2. SalesApproval.tsx
+- Aceitar parâmetro `mode=edit` na URL
+- Quando em modo edição:
+  - Carregar a venda específica (mesmo que não seja pendente)
+  - Mostrar header indicando "Modo Edição"
+  - Manter a mesma calculadora
+  - Ao salvar, atualizar os campos mas manter o status atual
+
+#### 3. SalesListTable.tsx
+Adicionar ícone de edição (lápis) na coluna de ações para vendas aprovadas:
+
+```text
+| ... | Status   | Ações    |
+|-----|----------|----------|
+| ... | Aprovado | 👁️  ✏️  |
 ```
+
+---
+
+### Lógica de Permissões
+- Apenas usuários com permissão de aprovação (`admin`, `manager`) poderão editar
+- Manter registro de quem editou (`aprovado_por`) e quando (`aprovado_em`)
 
 ---
 
 ### Resultado Esperado
+1. Na tabela de vendas, clicar no ícone ✏️ de uma venda aprovada
+2. Abre a página de aprovação em modo edição
+3. Ajustar os valores na calculadora (Valor Tabela, %, ICMS, etc.)
+4. Clicar "Salvar Alterações"
+5. Venda mantém status atual mas com cálculos corrigidos
 
-- Lidiane (cargo `manager`) será exibida como **"Auxiliar"** no perfil
-- Usuários com cargo `admin` serão exibidos como **"Gerente"**
-- Alinhamento com a nomenclatura padrão do sistema
+---
 
+### Seção Técnica
+
+**Novo hook: `useEditableSale.ts`**
+- Carrega venda específica por ID independente do status
+- Reutiliza lógica de installments existente
+
+**Modificação em SalesApproval:**
+- Detectar `mode=edit` nos search params
+- Se modo edição: buscar venda por ID diretamente
+- Botão de ação muda de "Aprovar" para "Salvar Alterações"
+
+**Modificação em handleApprove (renomeado para handleSave):**
+```typescript
+// Em modo edição, NÃO atualizar status
+const updateData = {
+  table_value: calculationData.valorTabela,
+  percentual_comissao: calculationData.percentualComissao,
+  // ... demais campos de cálculo
+  // Se modo edição, manter status atual
+  ...(isEditMode ? {} : { status: 'aprovado', aprovado_por: user.id })
+};
+```
