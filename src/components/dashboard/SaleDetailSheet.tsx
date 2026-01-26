@@ -1,6 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BadgeCheck, Building2, FileText, Percent, DollarSign, TrendingDown } from 'lucide-react';
+import { BadgeCheck, Building2, FileText, Percent, DollarSign, TrendingDown, Pencil } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils';
 import { SaleWithDetails } from '@/hooks/useSalesMetrics';
 import { Installment } from '@/hooks/useOrganizationData';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SaleDetailSheetProps {
   sale: SaleWithDetails | null;
@@ -19,11 +20,16 @@ interface SaleDetailSheetProps {
 
 export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }: SaleDetailSheetProps) {
   const navigate = useNavigate();
+  const { isSuperAdmin, userRoles } = useAuth();
 
   if (!sale) return null;
 
   const overPrice = (sale.total_value || 0) - (sale.table_value || 0);
   const hasVerifiedEntry = sale.valor_entrada !== null && sale.valor_entrada !== undefined;
+
+  // Check if user can edit (admin/manager)
+  const canEdit = isSuperAdmin || userRoles.some(role => role.role === 'admin' || role.role === 'manager');
+  const isApprovedOrPaid = sale.status === 'aprovado' || sale.status === 'pago';
 
   // Calculate deductions
   const deductions = {
@@ -39,6 +45,11 @@ export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }:
   const handleGoToApproval = () => {
     onOpenChange(false);
     navigate(`/sales/${sale.id}/approval`);
+  };
+
+  const handleEditCalculations = () => {
+    onOpenChange(false);
+    navigate(`/aprovacao?saleId=${sale.id}&mode=edit`);
   };
 
   return (
@@ -229,13 +240,19 @@ export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }:
           )}
 
           {/* Actions */}
-          {sale.status === 'pendente' && (
-            <div className="pt-4">
+          <div className="pt-4 space-y-2">
+            {sale.status === 'pendente' && (
               <Button onClick={handleGoToApproval} className="w-full">
                 Ir para Aprovação
               </Button>
-            </div>
-          )}
+            )}
+            {isApprovedOrPaid && canEdit && (
+              <Button onClick={handleEditCalculations} variant="outline" className="w-full gap-2">
+                <Pencil className="h-4 w-4" />
+                Editar Cálculos
+              </Button>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

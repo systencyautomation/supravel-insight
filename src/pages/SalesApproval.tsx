@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Bell, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bell, ArrowLeft, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSales } from '@/hooks/usePendingSales';
+import { useEditableSale } from '@/hooks/useEditableSale';
 import { CommissionCalculator, CalculationData, type Installment } from '@/components/approval/CommissionCalculator';
 import { ApprovalActions } from '@/components/approval/ApprovalActions';
 import { DashboardHeader } from '@/components/DashboardHeader';
@@ -14,13 +15,22 @@ import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
 import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaleInfoHeader } from '@/components/approval/SaleInfoHeader';
+import { Badge } from '@/components/ui/badge';
+
 export default function SalesApproval() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { user, effectiveOrgId, isSuperAdmin, userRoles } = useAuth();
   
-  const { pendingSales, count, loading, refetch } = usePendingSales();
+  // Check if we're in edit mode (editing an already approved sale)
+  const isEditMode = searchParams.get('mode') === 'edit';
+  const editSaleId = isEditMode ? searchParams.get('saleId') : null;
+  
+  // Use separate hooks for pending sales vs edit mode
+  const { pendingSales, count: pendingCount, loading: pendingLoading, refetch: refetchPending } = usePendingSales();
+  const { sale: editableSale, installments: editableInstallments, loading: editableLoading, refetch: refetchEditable } = useEditableSale(editSaleId);
+  
   const [currentIndex, setCurrentIndex] = useState(0);
   const [calculationData, setCalculationData] = useState<CalculationData | null>(null);
   const [fipeDocument, setFipeDocument] = useState<FipeDocument | null>(null);
@@ -34,10 +44,17 @@ export default function SalesApproval() {
     return userRoles.some(role => role.role === 'admin' || role.role === 'manager');
   }, [isSuperAdmin, userRoles]);
 
-  // Current sale
+  // Current sale - either from edit mode or pending queue
   const currentSale = useMemo(() => {
+    if (isEditMode && editableSale) {
+      return editableSale;
+    }
     return pendingSales[currentIndex] || null;
-  }, [pendingSales, currentIndex]);
+  }, [isEditMode, editableSale, pendingSales, currentIndex]);
+
+  // Total count for navigation
+  const count = isEditMode ? 1 : pendingCount;
+  const loading = isEditMode ? editableLoading : pendingLoading;
 
   // Load FIPE document
   useEffect(() => {
@@ -60,6 +77,11 @@ export default function SalesApproval() {
 
   // Load installments for current sale
   useEffect(() => {
+    if (isEditMode && editableInstallments.length > 0) {
+      setInstallments(editableInstallments);
+      return;
+    }
+    
     const fetchInstallments = async () => {
       if (!currentSale?.id) {
         setInstallments([]);
@@ -81,11 +103,15 @@ export default function SalesApproval() {
       setInstallments(data || []);
     };
     
-    fetchInstallments();
-  }, [currentSale?.id]);
+    if (!isEditMode) {
+      fetchInstallments();
+    }
+  }, [currentSale?.id, isEditMode, editableInstallments]);
 
-  // Navigate to specific sale from URL param
+  // Navigate to specific sale from URL param (only for pending mode)
   useEffect(() => {
+    if (isEditMode) return;
+    
     const saleId = searchParams.get('saleId');
     if (saleId && pendingSales.length > 0) {
       const index = pendingSales.findIndex(s => s.id === saleId);
@@ -93,51 +119,63 @@ export default function SalesApproval() {
         setCurrentIndex(index);
       }
     }
-  }, [searchParams, pendingSales]);
+  }, [searchParams, pendingSales, isEditMode]);
 
   const handleCalculationChange = useCallback((data: CalculationData) => {
     setCalculationData(data);
   }, []);
 
-  const handleApprove = async () => {
+  const handleSave = async () => {
     if (!currentSale || !user || !calculationData) return;
+
+    const updateData: Record<string, unknown> = {
+      table_value: calculationData.valorTabela,
+      percentual_comissao: calculationData.percentualComissao,
+      percentual_icms: calculationData.icmsDestino,
+      payment_method: calculationData.tipoPagamento,
+      over_price: calculationData.overPrice,
+      over_price_liquido: calculationData.overPriceLiquido,
+      commission_calculated: calculationData.comissaoTotal,
+      valor_entrada: calculationData.valorEntrada,
+      aprovado_por: user.id,
+      aprovado_em: new Date().toISOString(),
+    };
+
+    // Only update status if NOT in edit mode
+    if (!isEditMode) {
+      updateData.status = 'aprovado';
+    }
 
     const { error } = await supabase
       .from('sales')
-      .update({
-        status: 'aprovado',
-        table_value: calculationData.valorTabela,
-        percentual_comissao: calculationData.percentualComissao,
-        percentual_icms: calculationData.icmsDestino,
-        payment_method: calculationData.tipoPagamento,
-        over_price: calculationData.overPrice,
-        over_price_liquido: calculationData.overPriceLiquido,
-        commission_calculated: calculationData.comissaoTotal,
-        valor_entrada: calculationData.valorEntrada,
-        aprovado_por: user.id,
-        aprovado_em: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', currentSale.id);
 
     if (error) {
       toast({
         title: 'Erro',
-        description: 'Não foi possível aprovar a venda',
+        description: isEditMode ? 'Não foi possível salvar as alterações' : 'Não foi possível aprovar a venda',
         variant: 'destructive',
       });
       throw error;
     }
 
     toast({
-      title: 'Venda aprovada',
-      description: `NFe ${currentSale.nfe_number} aprovada com sucesso`,
+      title: isEditMode ? 'Alterações salvas' : 'Venda aprovada',
+      description: isEditMode 
+        ? `NFe ${currentSale.nfe_number} atualizada com sucesso`
+        : `NFe ${currentSale.nfe_number} aprovada com sucesso`,
     });
 
-    await refetch();
-    
-    // Go to next or stay at same index (which will show next item)
-    if (currentIndex >= pendingSales.length - 1) {
-      setCurrentIndex(Math.max(0, pendingSales.length - 2));
+    if (isEditMode) {
+      await refetchEditable();
+      navigate(-1); // Go back to previous page
+    } else {
+      await refetchPending();
+      // Go to next or stay at same index (which will show next item)
+      if (currentIndex >= pendingSales.length - 1) {
+        setCurrentIndex(Math.max(0, pendingSales.length - 2));
+      }
     }
   };
 
@@ -167,7 +205,7 @@ export default function SalesApproval() {
       variant: 'destructive',
     });
 
-    await refetch();
+    await refetchPending();
     
     if (currentIndex >= pendingSales.length - 1) {
       setCurrentIndex(Math.max(0, pendingSales.length - 2));
@@ -189,14 +227,17 @@ export default function SalesApproval() {
         <div className="flex items-center justify-center h-[calc(100vh-80px)]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Carregando vendas pendentes...</p>
+            <p className="text-muted-foreground">
+              {isEditMode ? 'Carregando venda...' : 'Carregando vendas pendentes...'}
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (count === 0) {
+  // Show empty state only for pending mode
+  if (!isEditMode && pendingCount === 0) {
     return (
       <div className="min-h-screen bg-background">
         <DashboardHeader />
@@ -215,6 +256,25 @@ export default function SalesApproval() {
     );
   }
 
+  // Show error if edit mode but sale not found
+  if (isEditMode && !editableSale) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardHeader />
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)]">
+          <h2 className="text-2xl font-semibold mb-2">Venda não encontrada</h2>
+          <p className="text-muted-foreground mb-6">
+            A venda solicitada não foi encontrada ou você não tem permissão para acessá-la.
+          </p>
+          <Button onClick={() => navigate('/')} variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar ao Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <DashboardHeader />
@@ -223,41 +283,55 @@ export default function SalesApproval() {
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-warning" />
-              <span className="font-semibold">Vendas Pendentes</span>
-              <span className="bg-warning/20 text-warning-foreground px-2 py-0.5 rounded-full text-sm font-medium">
-                {count}
-              </span>
+              {isEditMode ? (
+                <>
+                  <Pencil className="h-5 w-5 text-primary" />
+                  <span className="font-semibold">Editar Cálculos</span>
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                    {currentSale?.status === 'pago' ? 'Pago' : 'Aprovado'}
+                  </Badge>
+                </>
+              ) : (
+                <>
+                  <Bell className="h-5 w-5 text-warning" />
+                  <span className="font-semibold">Vendas Pendentes</span>
+                  <span className="bg-warning/20 text-warning-foreground px-2 py-0.5 rounded-full text-sm font-medium">
+                    {pendingCount}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToPrevious}
-              disabled={currentIndex === 0}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Anterior
-            </Button>
-            <span className="text-sm text-muted-foreground px-2">
-              {currentIndex + 1} de {count}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToNext}
-              disabled={currentIndex >= count - 1}
-            >
-              Próximo
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
+          {!isEditMode && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPrevious}
+                disabled={currentIndex === 0}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                {currentIndex + 1} de {pendingCount}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNext}
+                disabled={currentIndex >= pendingCount - 1}
+              >
+                Próximo
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -308,11 +382,22 @@ export default function SalesApproval() {
 
       {/* Actions */}
       {canApprove ? (
-        <ApprovalActions
-          onApprove={handleApprove}
-          onReject={handleReject}
-          disabled={!currentSale}
-        />
+        isEditMode ? (
+          <div className="p-4 border-t bg-card flex justify-end gap-3">
+            <Button variant="outline" onClick={() => navigate(-1)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={!currentSale}>
+              Salvar Alterações
+            </Button>
+          </div>
+        ) : (
+          <ApprovalActions
+            onApprove={handleSave}
+            onReject={handleReject}
+            disabled={!currentSale}
+          />
+        )
       ) : (
         <div className="p-4 border-t bg-muted/50 text-center text-muted-foreground">
           Você não tem permissão para aprovar vendas. Apenas administradores e gerentes podem aprovar.
