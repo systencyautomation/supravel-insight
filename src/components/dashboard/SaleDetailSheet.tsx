@@ -1,46 +1,41 @@
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BadgeCheck, Building2, FileText, Percent, DollarSign, TrendingDown, Pencil } from 'lucide-react';
+import { BadgeCheck, Building2, FileText, Percent, DollarSign, TrendingDown, Pencil, CreditCard } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { SaleWithDetails } from '@/hooks/useSalesMetrics';
-import { Installment } from '@/hooks/useOrganizationData';
+import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SaleDetailSheetProps {
-  sale: SaleWithDetails | null;
-  installments?: Installment[];
+  sale: SaleWithCalculations | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }: SaleDetailSheetProps) {
+export function SaleDetailSheet({ sale, open, onOpenChange }: SaleDetailSheetProps) {
   const navigate = useNavigate();
   const { isSuperAdmin, userRoles } = useAuth();
 
   if (!sale) return null;
 
-  const overPrice = (sale.total_value || 0) - (sale.table_value || 0);
-  const hasVerifiedEntry = sale.valor_entrada !== null && sale.valor_entrada !== undefined;
+  const overPrice = sale.overPriceBruto;
+  const hasVerifiedEntry = sale.entradaVerificada;
 
   // Check if user can edit (admin/manager)
   const canEdit = isSuperAdmin || userRoles.some(role => role.role === 'admin' || role.role === 'manager');
   const isApprovedOrPaid = sale.status === 'aprovado' || sale.status === 'pago';
 
-  // Calculate deductions
+  // Use pre-calculated deductions
   const deductions = {
-    icms: sale.icms || 0,
-    pisCofins: sale.pis_cofins || 0,
-    irCsll: sale.ir_csll || 0,
-    total: (sale.icms || 0) + (sale.pis_cofins || 0) + (sale.ir_csll || 0),
+    icms: sale.deducaoIcms,
+    pisCofins: sale.deducaoPisCofins,
+    irCsll: sale.deducaoIrCsll,
+    total: sale.deducaoIcms + sale.deducaoPisCofins + sale.deducaoIrCsll,
   };
-
-  const overPriceLiquido = sale.over_price_liquido || (overPrice - deductions.total);
-  const comissaoTotal = overPriceLiquido + (sale.commission_calculated || 0);
 
   const handleGoToApproval = () => {
     onOpenChange(false);
@@ -144,21 +139,68 @@ export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }:
                 <span className="text-muted-foreground">Valor Tabela</span>
                 <span className="font-mono">{formatCurrency(sale.table_value || 0)}</span>
               </div>
-
-              <div className="flex justify-between py-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Entrada</span>
-                  {hasVerifiedEntry && (
-                    <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
-                      <BadgeCheck className="h-3 w-3 mr-1" />
-                      Verificado via Boleto
-                    </Badge>
-                  )}
-                </div>
-                <span className="font-mono">{formatCurrency(sale.valor_entrada || 0)}</span>
-              </div>
             </div>
           </div>
+
+          {/* Installments Section */}
+          {sale.qtdParcelas > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <CreditCard className="h-4 w-4" />
+                  Parcelamento
+                </div>
+                
+                <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Entrada</span>
+                      {hasVerifiedEntry && (
+                        <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
+                          <BadgeCheck className="h-3 w-3 mr-1" />
+                          Verificado
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="font-mono">{formatCurrency(sale.entradaCalculada)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Parcelas</span>
+                    <span className="font-mono">
+                      {sale.qtdParcelas}x {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Parcelado</span>
+                    <span className="font-mono">{formatCurrency(sale.somaParcelas)}</span>
+                  </div>
+                  
+                  {sale.installments.length > 0 && (
+                    <>
+                      <Separator className="my-2" />
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Detalhes das Parcelas</p>
+                      <div className="space-y-1 text-sm">
+                        {sale.installments.map((inst, idx) => (
+                          <div key={inst.id} className="flex justify-between text-muted-foreground">
+                            <span>Parcela {idx + 1}</span>
+                            <div className="flex gap-4 items-center">
+                              {inst.due_date && (
+                                <span className="text-xs">
+                                  {format(parseISO(inst.due_date), 'dd/MM/yyyy')}
+                                </span>
+                              )}
+                              <span className="font-mono w-24 text-right">{formatCurrency(Number(inst.value))}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 
@@ -183,7 +225,7 @@ export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }:
               
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>ICMS ({sale.percentual_icms || 0}%)</span>
+                  <span>ICMS ({sale.percentual_icms || 12}%)</span>
                   <span className="text-destructive">-{formatCurrency(deductions.icms)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
@@ -200,7 +242,7 @@ export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }:
 
               <div className="flex justify-between font-semibold">
                 <span>Over Price Líquido</span>
-                <span className="text-success">{formatCurrency(overPriceLiquido)}</span>
+                <span className="text-success">{formatCurrency(sale.overPriceLiquido)}</span>
               </div>
             </div>
           </div>
@@ -215,18 +257,23 @@ export function SaleDetailSheet({ sale, installments = [], open, onOpenChange }:
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Comissão Base ({sale.percentual_comissao || 0}%)</span>
-                <span className="font-mono">{formatCurrency(sale.commission_calculated || 0)}</span>
+                <span className="font-mono">{formatCurrency(sale.comissaoPedido)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Over Price Líquido</span>
-                <span className="font-mono">{formatCurrency(overPriceLiquido)}</span>
+                <span className="font-mono">{formatCurrency(sale.overPriceLiquido)}</span>
               </div>
               
               <Separator className="my-2" />
               
               <div className="flex justify-between text-lg font-bold">
-                <span>Comissão Total</span>
-                <span className="text-primary">{formatCurrency(comissaoTotal)}</span>
+                <div className="flex items-center gap-2">
+                  <span>Comissão Total</span>
+                  <Badge variant="outline" className="text-xs font-normal">
+                    {sale.percentualComissaoCalculado.toFixed(2)}%
+                  </Badge>
+                </div>
+                <span className="text-primary">{formatCurrency(sale.valorComissaoCalculado)}</span>
               </div>
             </div>
           </div>

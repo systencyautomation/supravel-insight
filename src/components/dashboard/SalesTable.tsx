@@ -10,18 +10,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { formatCurrency } from '@/lib/utils';
-import { SaleWithDetails } from '@/hooks/useSalesMetrics';
+import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 import { SaleDetailSheet } from './SaleDetailSheet';
 
 interface SalesTableProps {
-  sales: SaleWithDetails[];
+  sales: SaleWithCalculations[];
   className?: string;
   limit?: number;
 }
 
 export function SalesTable({ sales, className, limit = 10 }: SalesTableProps) {
   const navigate = useNavigate();
-  const [selectedSale, setSelectedSale] = useState<SaleWithDetails | null>(null);
+  const [selectedSale, setSelectedSale] = useState<SaleWithCalculations | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const displaySales = limit ? sales.slice(0, limit) : sales;
@@ -59,7 +59,7 @@ export function SalesTable({ sales, className, limit = 10 }: SalesTableProps) {
     }
   };
 
-  const handleViewSale = (sale: SaleWithDetails) => {
+  const handleViewSale = (sale: SaleWithCalculations) => {
     setSelectedSale(sale);
     setSheetOpen(true);
   };
