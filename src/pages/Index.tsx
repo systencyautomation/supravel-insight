@@ -11,7 +11,8 @@ import { StockManagement } from '@/components/tabs/StockManagement';
 import { DateRange } from '@/components/dashboard/DateRangeFilter';
 import { EmpresaOverview } from '@/components/empresa/EmpresaOverview';
 import { EmpresaVendas } from '@/components/empresa/EmpresaVendas';
-import { Building2, DollarSign, Package, Loader2, ArrowLeft, LayoutDashboard, ListFilter } from 'lucide-react';
+import { EmpresaRecebimentos } from '@/components/empresa/EmpresaRecebimentos';
+import { Building2, DollarSign, Package, Loader2, ArrowLeft, LayoutDashboard, ListFilter, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
@@ -130,7 +131,7 @@ const Index = () => {
 
           <TabsContent value="empresa" className="mt-6">
             <Tabs defaultValue="dashboard" className="space-y-4">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className="grid w-full max-w-lg grid-cols-3">
                 <TabsTrigger value="dashboard" className="gap-2">
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
@@ -138,6 +139,10 @@ const Index = () => {
                 <TabsTrigger value="vendas" className="gap-2">
                   <ListFilter className="h-4 w-4" />
                   Vendas
+                </TabsTrigger>
+                <TabsTrigger value="recebimentos" className="gap-2">
+                  <Receipt className="h-4 w-4" />
+                  Recebimentos
                 </TabsTrigger>
               </TabsList>
 
@@ -153,6 +158,14 @@ const Index = () => {
 
               <TabsContent value="vendas">
                 <EmpresaVendas
+                  sales={salesWithCalculations}
+                  loading={dataLoading}
+                  onRefresh={refetch}
+                />
+              </TabsContent>
+
+              <TabsContent value="recebimentos">
+                <EmpresaRecebimentos
                   sales={salesWithCalculations}
                   loading={dataLoading}
                   onRefresh={refetch}
