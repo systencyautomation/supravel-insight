@@ -21,14 +21,23 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { CreateRepresentativeData } from '@/hooks/useRepresentatives';
+import { CreateRepresentativeData, RepresentativePosition } from '@/hooks/useRepresentatives';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   phone: z.string().optional(),
-  document: z.string().optional(),
+  sede: z.string().optional(),
+  company: z.string().optional(),
+  position: z.enum(['indicador', 'representante'] as const),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -47,7 +56,9 @@ export function AddRepresentativeDialog({ onAdd }: AddRepresentativeDialogProps)
       name: '',
       email: '',
       phone: '',
-      document: '',
+      sede: '',
+      company: '',
+      position: 'representante',
     },
   });
 
@@ -57,7 +68,9 @@ export function AddRepresentativeDialog({ onAdd }: AddRepresentativeDialogProps)
       name: data.name,
       email: data.email || undefined,
       phone: data.phone || undefined,
-      document: data.document || undefined,
+      sede: data.sede || undefined,
+      company: data.company || undefined,
+      position: data.position as RepresentativePosition,
     });
     setLoading(false);
 
@@ -129,13 +142,49 @@ export function AddRepresentativeDialog({ onAdd }: AddRepresentativeDialogProps)
 
             <FormField
               control={form.control}
-              name="document"
+              name="sede"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>CPF</FormLabel>
+                  <FormLabel>Sede</FormLabel>
                   <FormControl>
-                    <Input placeholder="000.000.000-00" {...field} />
+                    <Input placeholder="Ex: São Paulo" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="company"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Empresa</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nome da empresa" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="position"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Posição *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a posição" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="representante">Representante</SelectItem>
+                      <SelectItem value="indicador">Indicador</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

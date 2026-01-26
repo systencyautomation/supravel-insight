@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export type RepresentativePosition = 'indicador' | 'representante';
+
 export interface Representative {
   id: string;
   organization_id: string;
@@ -9,6 +11,9 @@ export interface Representative {
   email: string | null;
   phone: string | null;
   document: string | null;
+  sede: string | null;
+  company: string | null;
+  position: RepresentativePosition | null;
   active: boolean;
   user_id: string | null;
   created_at: string;
@@ -18,7 +23,9 @@ export interface CreateRepresentativeData {
   name: string;
   email?: string;
   phone?: string;
-  document?: string;
+  sede?: string;
+  company?: string;
+  position: RepresentativePosition;
 }
 
 export function useRepresentatives(organizationId: string | null) {
@@ -61,7 +68,9 @@ export function useRepresentatives(organizationId: string | null) {
           name: data.name,
           email: data.email || null,
           phone: data.phone || null,
-          document: data.document || null,
+          sede: data.sede || null,
+          company: data.company || null,
+          position: data.position,
         })
         .select()
         .single();

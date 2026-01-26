@@ -460,6 +460,7 @@ export type Database = {
       representatives: {
         Row: {
           active: boolean | null
+          company: string | null
           created_at: string | null
           document: string | null
           email: string | null
@@ -467,10 +468,15 @@ export type Database = {
           name: string
           organization_id: string
           phone: string | null
+          position:
+            | Database["public"]["Enums"]["representative_position"]
+            | null
+          sede: string | null
           user_id: string | null
         }
         Insert: {
           active?: boolean | null
+          company?: string | null
           created_at?: string | null
           document?: string | null
           email?: string | null
@@ -478,10 +484,15 @@ export type Database = {
           name: string
           organization_id: string
           phone?: string | null
+          position?:
+            | Database["public"]["Enums"]["representative_position"]
+            | null
+          sede?: string | null
           user_id?: string | null
         }
         Update: {
           active?: boolean | null
+          company?: string | null
           created_at?: string | null
           document?: string | null
           email?: string | null
@@ -489,6 +500,10 @@ export type Database = {
           name?: string
           organization_id?: string
           phone?: string | null
+          position?:
+            | Database["public"]["Enums"]["representative_position"]
+            | null
+          sede?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -779,6 +794,7 @@ export type Database = {
         | "seller"
         | "representative"
         | "saas_admin"
+      representative_position: "indicador" | "representante"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -914,6 +930,7 @@ export const Constants = {
         "representative",
         "saas_admin",
       ],
+      representative_position: ["indicador", "representante"],
     },
   },
 } as const
