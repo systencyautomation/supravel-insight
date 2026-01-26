@@ -30,22 +30,17 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { CreateCompanyData, CompanyType, RepresentativePosition } from '@/hooks/useRepresentativeCompanies';
+import { CreateCompanyData, RepresentativePosition } from '@/hooks/useRepresentativeCompanies';
 import { CreateMemberData } from '@/hooks/useCompanyMembers';
 
 const formSchema = z.object({
-  company_type: z.enum(['mei', 'empresa'] as const),
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   cnpj: z.string().optional(),
-  sede: z.string().optional(),
   position: z.enum(['indicador', 'representante'] as const),
   is_technical: z.boolean().default(false),
   // Responsável fields
   responsavel_name: z.string().min(2, 'Nome do responsável é obrigatório'),
-  responsavel_phone: z.string().min(8, 'Telefone do responsável é obrigatório'),
   responsavel_email: z.string().email('Email inválido').optional().or(z.literal('')),
   responsavel_is_technical: z.boolean().default(false),
 });
@@ -64,34 +59,24 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      company_type: 'empresa',
       name: '',
       cnpj: '',
-      sede: '',
       position: 'representante',
       is_technical: false,
       responsavel_name: '',
-      responsavel_phone: '',
       responsavel_email: '',
       responsavel_is_technical: false,
     },
   });
 
-  const companyType = form.watch('company_type');
-  const isMei = companyType === 'mei';
-
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     
-    // Para MEI, o nome do responsável é o mesmo da empresa
-    const companyName = isMei ? data.responsavel_name : data.name;
-    
     // Criar empresa
     const company = await onAddCompany({
-      name: companyName,
+      name: data.name,
       cnpj: data.cnpj || undefined,
-      company_type: data.company_type as CompanyType,
-      sede: data.sede || undefined,
+      company_type: 'empresa',
       position: data.position as RepresentativePosition,
       is_technical: data.is_technical,
     });
@@ -100,7 +85,6 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
       // Criar responsável
       await onAddMember(company.id, {
         name: data.responsavel_name,
-        phone: data.responsavel_phone || undefined,
         email: data.responsavel_email || undefined,
         role: 'responsavel',
         is_technical: data.responsavel_is_technical,
@@ -131,50 +115,19 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Tipo de empresa */}
             <FormField
               control={form.control}
-              name="company_type"
+              name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo de Empresa *</FormLabel>
+                  <FormLabel>Nome da Empresa *</FormLabel>
                   <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="mei" id="mei" />
-                        <Label htmlFor="mei" className="cursor-pointer">MEI - Pessoa única</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="empresa" id="empresa" />
-                        <Label htmlFor="empresa" className="cursor-pointer">Empresa - Com funcionários</Label>
-                      </div>
-                    </RadioGroup>
+                    <Input placeholder="Nome da empresa" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            {/* Nome da empresa (apenas se não for MEI) */}
-            {!isMei && (
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome da Empresa *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome da empresa" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
 
             <FormField
               control={form.control}
@@ -184,20 +137,6 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
                   <FormLabel>CNPJ (opcional)</FormLabel>
                   <FormControl>
                     <Input placeholder="00.000.000/0000-00" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="sede"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sede/Cidade</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: São Paulo" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -258,20 +197,6 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
                     <FormLabel>Nome *</FormLabel>
                     <FormControl>
                       <Input placeholder="Nome completo" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="responsavel_phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="(11) 99999-0000" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
