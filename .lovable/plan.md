@@ -1,156 +1,184 @@
 
-## Plano: Recalcular Valor da Parcela ao Alterar Número de Parcelas
+
+## Plano: Corrigir Cálculo de ICMS na Calculadora de Comissão
 
 ### Problema Identificado
 
-Atualmente, quando você edita o número de parcelas, o valor da parcela permanece fixo porque:
-1. O sistema carrega o valor das parcelas dos boletos existentes (`valorParcelaReal`)
-2. Esse valor tem prioridade sobre o cálculo automático
-3. Resultado: `Entrada + (Parcelas × Valor Fixo) ≠ Valor Faturado`
+| Situação | Comportamento Atual | Comportamento Esperado |
+|----------|---------------------|------------------------|
+| Editar venda aprovada | ICMS Tabela volta para 12% (baseado na UF) | Manter o ICMS que foi salvo (ex: 4%) |
+| Produto importado (coluna 4%) | Busca sempre coluna "Valor 12%" | Verificar se produto tem valor na coluna 4% e usar esse ICMS |
+| Salvar ICMS Tabela | Não é salvo no banco | Salvar o campo para recuperar depois |
 
-**Exemplo do problema:**
-| Campo | Valor Atual |
-|-------|-------------|
-| Valor Faturado | R$ 23.088,05 |
-| Entrada | R$ 8.996,00 |
-| 3 parcelas | 3 × R$ 4.697,35 = R$ 14.092,05 |
-| **Total** | R$ 23.088,05 ✓ |
-
-Se mudar para 4 parcelas mantendo R$ 4.697,35:
-| 4 parcelas | 4 × R$ 4.697,35 = R$ 18.789,40 |
-| **Total** | R$ 27.785,40 ✗ (não fecha!) |
+**Exemplo do seu caso:**
+- Produto CDD12J tem valor na coluna **4%** (importado)
+- Você salvou com 4%, mas `percentual_icms` guarda o ICMS destino
+- Ao reabrir, sistema calcula `getIcmsRate('SC') = 12%`
 
 ---
 
 ### Solução Proposta
 
-Recalcular automaticamente o valor da parcela quando o número de parcelas for alterado manualmente.
+#### 1. Adicionar campo `icms_tabela` no banco de dados
 
-**Comportamento esperado:**
-| Campo | Valor Corrigido |
-|-------|-----------------|
-| Valor Faturado | R$ 23.088,05 |
-| Entrada | R$ 8.996,00 |
-| Restante | R$ 14.092,05 |
-| 4 parcelas | R$ 14.092,05 ÷ 4 = **R$ 3.523,01** |
+Nova coluna para persistir o ICMS da origem/tabela:
+
+```sql
+ALTER TABLE sales ADD COLUMN icms_tabela NUMERIC(5,2);
+```
+
+#### 2. Melhorar lógica de busca na planilha para detectar ICMS
+
+Verificar em qual coluna o produto tem valor (12%, 7% ou 4%) e usar o ICMS correspondente:
+
+```text
+Planilha:
+| Código | Valor 12% | Valor 7% | Valor 4% | Comissão |
+|--------|-----------|----------|----------|----------|
+| CDD12J |           |          | 20.991   | 8%       |
+
+Lógica:
+1. Se tem valor na coluna "4%" → ICMS = 4%
+2. Se tem valor na coluna "7%" → ICMS = 7%
+3. Se tem valor na coluna "12%" → ICMS = 12%
+```
+
+#### 3. No modo edição, priorizar valores salvos
+
+Alterar o `useEffect` que carrega os dados:
+
+```text
+Atual:
+  setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);  // SEMPRE 12%
+
+Novo:
+  if (sale.icms_tabela != null) {
+    setIcmsTabela(sale.icms_tabela);  // Usar valor salvo
+  } else {
+    // Fallback para detecção automática pela planilha
+  }
+```
 
 ---
 
-### Arquivo a Modificar
+### Arquivos a Modificar
 
-`src/components/approval/CommissionCalculator.tsx`
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/migrations/` | Adicionar coluna `icms_tabela` |
+| `src/components/approval/CommissionCalculator.tsx` | Melhorar busca na planilha para detectar coluna de ICMS |
+| `src/components/approval/CommissionCalculator.tsx` | Carregar `icms_tabela` salvo no modo edição |
+| `src/pages/SalesApproval.tsx` | Salvar `icms_tabela` junto com os outros campos |
+| `src/hooks/useEditableSale.ts` | Incluir `icms_tabela` na query |
+| `src/integrations/supabase/types.ts` | Atualizado automaticamente |
 
 ---
 
 ### Mudanças Detalhadas
 
-#### 1. Adicionar flag para indicar edição manual do número de parcelas
+#### 1. Nova lógica de busca na planilha (matchedFipeRow)
+
+O código atual busca apenas a coluna "Valor 12%". A nova lógica vai:
 
 ```typescript
-// Estado atual
-const [qtdParcelas, setQtdParcelas] = useState(0);
-const [valorParcelaReal, setValorParcelaReal] = useState(0);
+// Encontrar índices das três colunas de valor
+const valor12Index = headerRow.findIndex(cell => 
+  value.includes('valor') && value.includes('12%'));
+const valor7Index = headerRow.findIndex(cell => 
+  value.includes('valor') && value.includes('7%'));
+const valor4Index = headerRow.findIndex(cell => 
+  value.includes('valor') && value.includes('4%'));
 
-// Adicionar flag para saber se o usuário alterou manualmente
-const [parcelasEditadasManualmente, setParcelasEditadasManualmente] = useState(false);
+// Ao encontrar o produto, verificar qual coluna tem valor
+const valor4 = parseFloat(row[valor4Index]?.value) || 0;
+const valor7 = parseFloat(row[valor7Index]?.value) || 0;
+const valor12 = parseFloat(row[valor12Index]?.value) || 0;
+
+// Prioridade: 4% > 7% > 12%
+if (valor4 > 0) {
+  return { valorTabela: valor4, icmsTabela: 4, comissao: ... };
+} else if (valor7 > 0) {
+  return { valorTabela: valor7, icmsTabela: 7, comissao: ... };
+} else {
+  return { valorTabela: valor12, icmsTabela: 12, comissao: ... };
+}
 ```
 
-#### 2. Modificar lógica de cálculo do valor da parcela
-
-Atualizar o `useMemo` de `valorParcela` para recalcular quando parcelas forem editadas manualmente:
+#### 2. Carregar ICMS salvo no modo edição
 
 ```typescript
-const valorParcela = useMemo(() => {
-  // Se usuário editou manualmente as parcelas, recalcular
-  if (parcelasEditadasManualmente) {
-    if (qtdParcelas <= 0) return 0;
-    const valorRestante = valorFaturado - valorEntrada;
-    return valorRestante / qtdParcelas;
+useEffect(() => {
+  if (sale) {
+    // ... outros campos ...
+    
+    // ICMS Tabela: priorizar valor salvo
+    if (sale.icms_tabela != null) {
+      setIcmsTabela(sale.icms_tabela);
+    } else if (matchedFipeRow?.icmsTabela) {
+      // Fallback: detectar pela planilha
+      setIcmsTabela(matchedFipeRow.icmsTabela);
+    } else {
+      // Último fallback: UF do emitente
+      setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);
+    }
   }
-  
-  // Se tem valor real (dos boletos) e não foi editado, usar ele
-  if (valorParcelaReal > 0) return valorParcelaReal;
-  
-  // Fallback: calcular automaticamente
-  if (qtdParcelas <= 0) return 0;
-  const valorRestante = valorFaturado - valorEntrada;
-  return valorRestante / qtdParcelas;
-}, [valorFaturado, valorEntrada, qtdParcelas, valorParcelaReal, parcelasEditadasManualmente]);
+}, [sale, matchedFipeRow]);
 ```
 
-#### 3. Handler do campo Número de Parcelas
+#### 3. Salvar ICMS Tabela
 
-Modificar o `onChange` para marcar que foi editado manualmente:
-
-```typescript
-<Input
-  id="qtdParcelas"
-  type="number"
-  min="0"
-  value={qtdParcelas}
-  onChange={(e) => {
-    setQtdParcelas(parseInt(e.target.value, 10) || 0);
-    setParcelasEditadasManualmente(true);
-  }}
-  className="h-9"
-/>
-```
-
-#### 4. Também recalcular quando a entrada mudar
-
-Quando o usuário editar a entrada, o valor da parcela também deve se ajustar:
+No `handleSave` do `SalesApproval.tsx`:
 
 ```typescript
-<CurrencyInput
-  id="valorEntrada"
-  value={valorEntrada}
-  onChange={(newValue) => {
-    setValorEntrada(newValue);
-    setParcelasEditadasManualmente(true);
-  }}
-  className="font-mono h-9"
-/>
+const updateData = {
+  table_value: calculationData.valorTabela,
+  percentual_comissao: calculationData.percentualComissao,
+  percentual_icms: calculationData.icmsDestino,
+  icms_tabela: calculationData.icmsTabela,  // NOVO
+  // ... demais campos
+};
 ```
 
 ---
 
-### Resultado Esperado
-
-1. Usuário abre venda com 3 parcelas de R$ 4.697,35
-2. Muda para 4 parcelas
-3. Valor da parcela recalcula automaticamente para R$ 3.523,01
-4. Total continua fechando: R$ 8.996,00 + (4 × R$ 3.523,01) ≈ R$ 23.088,05
-
----
-
-### Seção Técnica
-
-**Diagrama de fluxo do cálculo:**
+### Fluxo Esperado Após Implementação
 
 ```text
-┌─────────────────────────────┐
-│ Usuário altera qtdParcelas  │
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ setParcelasEditadasManualmente(true)
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ useMemo(valorParcela)       │
-│ detecta flag = true         │
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ valorParcela =              │
-│ (valorFaturado - entrada)   │
-│        / qtdParcelas        │
-└─────────────────────────────┘
+1. Sistema lê planilha e encontra CDD12J
+2. Verifica: coluna 4% tem valor? → SIM (R$ 20.991,67)
+3. Define: valorTabela = 20.991,67, icmsTabela = 4%
+4. Usuário aprova/salva venda
+5. Banco salva: icms_tabela = 4
+6. Usuário abre para editar
+7. Sistema lê: sale.icms_tabela = 4
+8. Campo ICMS Tabela mostra 4% ✓
 ```
 
-**Dependências do useMemo:**
+---
+
+### Seção Tecnica
+
+**Migração SQL:**
+```sql
+ALTER TABLE public.sales 
+ADD COLUMN icms_tabela NUMERIC(5,2);
+
+COMMENT ON COLUMN public.sales.icms_tabela IS 
+'ICMS da origem/tabela (4%, 7% ou 12%) detectado pela planilha FIPE';
+```
+
+**Interface matchedFipeRow atualizada:**
 ```typescript
-[valorFaturado, valorEntrada, qtdParcelas, valorParcelaReal, parcelasEditadasManualmente]
+interface MatchedFipeRow {
+  rowIndex: number;
+  valorTabela: number;
+  icmsTabela: number;  // NOVO: 4, 7 ou 12
+  comissao: number;
+}
 ```
 
-A flag garante que valores originais dos boletos sejam respeitados na carga inicial, mas qualquer edição manual força o recálculo para manter a consistência matemática.
+**Ordem de prioridade para ICMS Tabela:**
+1. Valor salvo no banco (`sale.icms_tabela`)
+2. Detecção automática pela planilha (qual coluna tem valor)
+3. Fallback pela UF do emitente (`getIcmsRate`)
+
