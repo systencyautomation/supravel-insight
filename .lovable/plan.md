@@ -1,44 +1,73 @@
 
 
-## Plano: Corrigir Mapeamento de Cargos no Email de Convite
+## Plano: Corrigir Navegação do Master Admin nas Configurações
 
 ### Problema Identificado
 
-Na Edge Function `send-member-invitation`, o mapeamento de roles está **invertido**:
+O Master Admin está sendo redirecionado incorretamente para `/settings/profile` ao navegar pela aplicação porque:
 
-| Role no DB | Exibido no Email | Deveria Exibir |
-|------------|------------------|----------------|
-| `manager`  | "Gerente" ❌     | "Auxiliar" ✓   |
-| `admin`    | (não mapeado)    | "Gerente" ✓    |
+1. O botão "Voltar" no `SettingsSidebar.tsx` sempre navega para `/`
+2. A página `Index.tsx` tenta redirecionar Master Admin para `/master`, mas há uma condição de corrida
+3. O estado `isMasterAdmin` pode não estar carregado no momento do redirecionamento
 
-### Código Atual (Linha 37-41)
+### Solução
 
-```typescript
-const roleLabels: Record<string, string> = {
-  manager: "Gerente",       // ❌ Invertido
-  seller: "Vendedor",
-  representative: "Representante",
-};
-```
+Modificar o botão "Voltar" para ser **contextual**:
+- Se for **Master Admin sem organização impersonada**: navegar para `/master`
+- Se for **usuário normal ou Master Admin impersonando**: navegar para `/`
 
-### Código Corrigido
+---
 
-```typescript
-const roleLabels: Record<string, string> = {
-  admin: "Gerente",         // ✓ Corrigido
-  manager: "Auxiliar",      // ✓ Corrigido  
-  seller: "Vendedor",
-  representative: "Representante",
-};
-```
-
-### Arquivo a Modificar
+### Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/send-member-invitation/index.ts` | Linhas 37-41: Corrigir mapeamento de roles |
+| `src/components/settings/SettingsSidebar.tsx` | Linha 35: Adicionar lógica condicional no botão "Voltar" |
 
-### Observação
+---
 
-Este é o mesmo padrão de nomenclatura usado no frontend (`InviteMemberDialog.tsx` linha 29-34), que já está correto. A Edge Function precisa ser alinhada com essa nomenclatura.
+### Mudança de Código
+
+**Arquivo**: `src/components/settings/SettingsSidebar.tsx`
+
+**De (linha 32-40):**
+```typescript
+<Button 
+  variant="ghost" 
+  size="sm"
+  onClick={() => navigate('/')}
+  className="justify-start gap-2 mb-6 hover:bg-accent/80"
+>
+  <ArrowLeft className="h-4 w-4" />
+  Voltar
+</Button>
+```
+
+**Para:**
+```typescript
+<Button 
+  variant="ghost" 
+  size="sm"
+  onClick={() => {
+    // Master Admin sem organização impersonada vai para /master
+    if (isMasterAdmin && !effectiveOrgId) {
+      navigate('/master');
+    } else {
+      navigate('/');
+    }
+  }}
+  className="justify-start gap-2 mb-6 hover:bg-accent/80"
+>
+  <ArrowLeft className="h-4 w-4" />
+  Voltar
+</Button>
+```
+
+---
+
+### Resultado Esperado
+
+- O Master Admin será direcionado corretamente para `/master` ao clicar em "Voltar"
+- Usuários normais continuarão indo para `/` (dashboard principal)
+- Master Admin impersonando uma organização irá para `/` (para ver o dashboard da organização impersonada)
 
