@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,7 +21,8 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { RepresentativeCompany, RepresentativePosition } from '@/hooks/useRepresentativeCompanies';
-import { CompanyMember } from '@/hooks/useCompanyMembers';
+import { CompanyMember, CreateMemberData } from '@/hooks/useCompanyMembers';
+import { AddMemberDialog } from './AddMemberDialog';
 
 interface EditCompanyDialogProps {
   open: boolean;
@@ -41,6 +43,7 @@ interface EditCompanyDialogProps {
       is_technical: boolean;
     }
   ) => Promise<boolean>;
+  onAddMember: (data: CreateMemberData) => Promise<unknown>;
 }
 
 export function EditCompanyDialog({
@@ -49,6 +52,7 @@ export function EditCompanyDialog({
   company,
   responsavel,
   onSave,
+  onAddMember,
 }: EditCompanyDialogProps) {
   const [companyName, setCompanyName] = useState(company.name);
   const [cnpj, setCnpj] = useState(company.cnpj || '');
@@ -61,6 +65,7 @@ export function EditCompanyDialog({
   const [responsavelTechnical, setResponsavelTechnical] = useState(responsavel?.is_technical || false);
 
   const [saving, setSaving] = useState(false);
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
 
   const handleSave = async () => {
     if (!companyName.trim()) return;
@@ -202,15 +207,34 @@ export function EditCompanyDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
+        <DialogFooter className="flex-row justify-between sm:justify-between">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => setAddMemberDialogOpen(true)}
+            disabled={saving}
+            className="gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar Membro
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Salvando...' : 'Salvar'}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
+
+      <AddMemberDialog
+        open={addMemberDialogOpen}
+        onOpenChange={setAddMemberDialogOpen}
+        companyName={company.name}
+        onAdd={onAddMember}
+      />
     </Dialog>
   );
 }
