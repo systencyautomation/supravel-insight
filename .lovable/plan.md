@@ -1,35 +1,71 @@
 
 
-## Plano: Corrigir Exibição de Entrada/Parcelas e % Comissão na Tabela
+## Plano: Adicionar Informações de Parcelas e % Comissão no Detalhes da Venda
 
-### Problema Identificado
+### Objetivo
 
-A tabela de vendas mostra valores incorretos:
-
-| Campo | Valor Atual (Errado) | Valor Esperado |
-|-------|---------------------|----------------|
-| Entrada | -R$ 0,00 | R$ 8.996,00 |
-| Parcelas | 4x R$ 5.772,01 | 3x R$ 4.697,35 |
-| % Comissão | 9,28% | 11,00% |
-| Comissão | R$ 2.143,34 | R$ 2.540,87 |
-
-**Causa raiz:** A entrada (R$ 8.996,00) está sendo salva na tabela `installments` como `installment_number = 1`, fazendo o sistema calcular:
-- `somaParcelas` = 8.996 + 4.697,35×3 = R$ 23.088,05 (inclui entrada)
-- `entradaCalculada` = 23.088,05 - 23.088,05 = R$ 0,00
-- `qtdParcelas` = 4 (ao invés de 3)
-
-Mas o banco de dados **já tem os valores corretos salvos**:
-- `valor_entrada`: R$ 8.996,00
-- `commission_calculated`: R$ 2.540,87
+Atualizar o componente `SaleDetailSheet` para mostrar:
+1. **Seção de Parcelamento** com detalhes das parcelas (quantidade, valor, datas)
+2. **Percentual da Comissão Total** na seção de comissão (ex: 11,00%)
 
 ---
 
-### Solução Proposta
+### Problema Atual
 
-Modificar o hook `useSalesWithCalculations.ts` para:
-1. **Usar `sale.valor_entrada`** do banco quando disponível
-2. **Excluir a primeira parcela** do cálculo de parcelas (ela é a entrada)
-3. **Usar `sale.commission_calculated`** e recalcular o percentual a partir dele
+O `SaleDetailSheet` recebe `SaleWithDetails` que não tem os campos calculados:
+- `installments` (parcelas)
+- `percentualComissaoCalculado` (11,00%)
+- `valorComissaoCalculado` (R$ 2.540,87)
+
+Mas na `SalesListTable`, o componente recebe `selectedSale` que é do tipo `SaleWithCalculations` (já tem todos os dados necessários).
+
+---
+
+### Solução
+
+1. Atualizar a interface do `SaleDetailSheet` para aceitar `SaleWithCalculations`
+2. Adicionar seção de **Parcelamento** após o Resumo Financeiro
+3. Atualizar seção de **Comissão** para mostrar o percentual total (11,00%)
+
+---
+
+### Nova Seção de Parcelamento
+
+Adicionar entre o "Resumo Financeiro" e o "Cálculo do Over Price":
+
+```text
+┌─────────────────────────────────────┐
+│ 💳 Parcelamento                      │
+├─────────────────────────────────────┤
+│ Entrada           R$ 8.996,00       │
+│ Parcelas          3x R$ 4.697,35    │
+│ Total Parcelado   R$ 14.092,05      │
+│                                     │
+│ Parcela 1  16/02/2026  R$ 4.697,35  │
+│ Parcela 2  16/03/2026  R$ 4.697,35  │
+│ Parcela 3  16/04/2026  R$ 4.697,35  │
+└─────────────────────────────────────┘
+```
+
+---
+
+### Atualização da Seção de Comissão
+
+De:
+```text
+Comissão Base (8%)          R$ 1.679,33
+Over Price Líquido          R$ 861,53
+────────────────────────────────────────
+Comissão Total              R$ 2.540,87
+```
+
+Para:
+```text
+Comissão Base (8%)          R$ 1.679,33
+Over Price Líquido          R$ 861,53
+────────────────────────────────────────
+Comissão Total  11,00%      R$ 2.540,87
+```
 
 ---
 
@@ -37,122 +73,190 @@ Modificar o hook `useSalesWithCalculations.ts` para:
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/useSalesWithCalculations.ts` | Priorizar valores salvos e filtrar entrada das parcelas |
-| `src/components/vendas/SalesListTable.tsx` | Formatar % com 2 casas decimais |
+| `src/components/dashboard/SaleDetailSheet.tsx` | Atualizar interface e adicionar seção de parcelamento |
+| `src/components/vendas/SalesListTable.tsx` | Nenhuma (já passa `SaleWithCalculations`) |
 
 ---
 
 ### Mudanças Detalhadas
 
-#### 1. Corrigir `useSalesWithCalculations.ts`
-
-Separar entrada das parcelas e usar dados salvos:
+#### 1. Atualizar Interface do Componente
 
 De:
 ```typescript
-const saleInstallments = installments.filter(i => i.sale_id === sale.id);
-const somaParcelas = saleInstallments.reduce((acc, i) => acc + Number(i.value || 0), 0);
-const qtdParcelas = saleInstallments.length;
-const entradaCalculada = totalValue - somaParcelas;
+import { SaleWithDetails } from '@/hooks/useSalesMetrics';
+
+interface SaleDetailSheetProps {
+  sale: SaleWithDetails | null;
+  installments?: Installment[];
+  // ...
+}
 ```
 
 Para:
 ```typescript
-// Buscar todas as parcelas da venda
-const saleInstallments = installments.filter(i => i.sale_id === sale.id);
+import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 
-// A entrada já existe no campo valor_entrada da venda
-// Verificar se a primeira parcela é a entrada (valor igual a valor_entrada)
-const valorEntradaSalvo = Number(sale.valor_entrada) || 0;
-
-// Filtrar apenas as parcelas (excluindo a entrada se estiver nas installments)
-const parcelasReais = saleInstallments.filter((i, idx) => {
-  // Se o valor da parcela é igual ao valor_entrada, provavelmente é a entrada
-  if (idx === 0 && valorEntradaSalvo > 0 && Math.abs(Number(i.value) - valorEntradaSalvo) < 0.01) {
-    return false; // Excluir - é a entrada
-  }
-  return true;
-});
-
-const somaParcelas = parcelasReais.reduce((acc, i) => acc + Number(i.value || 0), 0);
-const qtdParcelas = parcelasReais.length;
-
-// Usar valor_entrada salvo OU calcular
-const entradaCalculada = valorEntradaSalvo > 0 
-  ? valorEntradaSalvo 
-  : totalValue - somaParcelas;
-```
-
-#### 2. Usar comissão salva quando disponível
-
-Se a venda já foi aprovada, usar `commission_calculated`:
-
-```typescript
-// Verificar se tem comissão já calculada/aprovada
-const comissaoSalva = Number(sale.commission_calculated) || 0;
-
-if (comissaoSalva > 0) {
-  // Venda já processada - usar valores salvos
-  const percentualFinal = totalValue > 0 ? (comissaoSalva / totalValue) * 100 : 0;
-  
-  return {
-    ...saleWithDetails,
-    // ... outros campos
-    valorComissaoCalculado: comissaoSalva,
-    percentualComissaoCalculado: percentualFinal,
-    // ...
-  };
+interface SaleDetailSheetProps {
+  sale: SaleWithCalculations | null;
+  // installments já está dentro de SaleWithCalculations
+  // ...
 }
 ```
 
-#### 3. Formatar % Comissão com 2 casas decimais
-
-No `SalesListTable.tsx`, já está usando `toFixed(2)`:
+#### 2. Adicionar Nova Seção de Parcelamento
 
 ```tsx
-<TableCell className="text-right font-mono">
-  {sale.percentualComissaoCalculado.toFixed(2)}%
-</TableCell>
+{/* Payment/Installments Section */}
+{sale.qtdParcelas > 0 && (
+  <div className="space-y-3">
+    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+      <CreditCard className="h-4 w-4" />
+      Parcelamento
+    </div>
+    
+    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Entrada</span>
+        <span className="font-mono">{formatCurrency(sale.entradaCalculada)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Parcelas</span>
+        <span className="font-mono">
+          {sale.qtdParcelas}x {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
+        </span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Total Parcelado</span>
+        <span className="font-mono">{formatCurrency(sale.somaParcelas)}</span>
+      </div>
+      
+      <Separator className="my-2" />
+      
+      <p className="text-xs text-muted-foreground uppercase tracking-wide">Detalhes das Parcelas</p>
+      <div className="space-y-1 text-sm">
+        {sale.installments.map((inst, idx) => (
+          <div key={inst.id} className="flex justify-between text-muted-foreground">
+            <span>Parcela {idx + 1}</span>
+            <div className="flex gap-4">
+              {inst.due_date && (
+                <span className="text-xs">
+                  {format(parseISO(inst.due_date), 'dd/MM/yyyy')}
+                </span>
+              )}
+              <span className="font-mono">{formatCurrency(Number(inst.value))}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+```
+
+#### 3. Atualizar Seção de Comissão com Percentual
+
+De:
+```tsx
+<div className="flex justify-between text-lg font-bold">
+  <span>Comissão Total</span>
+  <span className="text-primary">{formatCurrency(comissaoTotal)}</span>
+</div>
+```
+
+Para:
+```tsx
+<div className="flex justify-between text-lg font-bold">
+  <div className="flex items-center gap-2">
+    <span>Comissão Total</span>
+    <Badge variant="outline" className="text-xs font-normal">
+      {sale.percentualComissaoCalculado.toFixed(2)}%
+    </Badge>
+  </div>
+  <span className="text-primary">{formatCurrency(sale.valorComissaoCalculado)}</span>
+</div>
 ```
 
 ---
 
-### Fluxo Corrigido
+### Resultado Visual Esperado
 
 ```text
-Venda NF 770:
-1. Installments no banco: [8996, 4697.35, 4697.35, 4697.35]
-2. Primeira parcela = valor_entrada? 8996 === 8996 ✓
-3. Filtrar: parcelas reais = [4697.35, 4697.35, 4697.35]
-4. somaParcelas = 14.092,05
-5. qtdParcelas = 3
-6. entradaCalculada = 8996 (do banco)
-7. commission_calculated = 2540.87 (do banco)
-8. percentual = 2540.87 / 23088.05 × 100 = 11.00%
+┌──────────────────────────────────────────┐
+│ 📋 Detalhes da Venda           [Aprovado]│
+│ NF-e 770 • 16 de Janeiro de 2026         │
+├──────────────────────────────────────────┤
+│ 🏢 Cliente                               │
+│ CLEBER JOAO VICENZI                      │
+│ CNPJ: 07.147.100/0001-14                 │
+│ UF Destino: SC                           │
+├──────────────────────────────────────────┤
+│ 📄 Produto                               │
+│ CDD12J                                   │
+│ Código: CDD12J - N                       │
+├──────────────────────────────────────────┤
+│ 💰 Resumo Financeiro                     │
+│ Valor Nominal (NF)        R$ 23.088,05   │
+│ Valor Tabela              R$ 20.991,67   │
+├──────────────────────────────────────────┤
+│ 💳 Parcelamento                          │
+│ Entrada                   R$ 8.996,00    │
+│ Parcelas                  3x R$ 4.697,35 │
+│ Total Parcelado           R$ 14.092,05   │
+│ ──────────────────────────────────────   │
+│ DETALHES DAS PARCELAS                    │
+│ Parcela 1   16/02/2026    R$ 4.697,35    │
+│ Parcela 2   16/03/2026    R$ 4.697,35    │
+│ Parcela 3   16/04/2026    R$ 4.697,35    │
+├──────────────────────────────────────────┤
+│ 📉 Cálculo do Over Price                 │
+│ Over Price Bruto          R$ 2.096,38    │
+│ ──────────────────────────────────────   │
+│ DEDUÇÕES                                 │
+│ ICMS (12%)                -R$ 251,57     │
+│ PIS/COFINS (9,25%)        -R$ 193,92     │
+│ IR/CSLL (34%)             -R$ 789,37     │
+│ ──────────────────────────────────────   │
+│ Over Price Líquido        R$ 861,53      │
+├──────────────────────────────────────────┤
+│ 📊 Comissão                              │
+│ Comissão Base (8%)        R$ 1.679,33    │
+│ Over Price Líquido        R$ 861,53      │
+│ ──────────────────────────────────────   │
+│ Comissão Total [11,00%]   R$ 2.540,87    │
+└──────────────────────────────────────────┘
 ```
-
-**Resultado na tabela:**
-| Pagamento | % Comissão | Comissão |
-|-----------|------------|----------|
-| R$ 8.996,00<br/>3x R$ 4.697,35 | 11,00% | R$ 2.540,87 |
 
 ---
 
 ### Seção Técnica
 
-**Lógica de detecção da entrada:**
+**Mudança de tipagem:**
 ```typescript
-// Detectar se installment[0] é entrada comparando com valor_entrada
-const isEntrada = (installment: Installment, valorEntrada: number): boolean => {
-  return valorEntrada > 0 && Math.abs(Number(installment.value) - valorEntrada) < 0.01;
-};
+// Antes
+interface SaleDetailSheetProps {
+  sale: SaleWithDetails | null;
+  installments?: Installment[];
+}
+
+// Depois
+interface SaleDetailSheetProps {
+  sale: SaleWithCalculations | null;
+}
 ```
 
-**Prioridade de cálculo:**
-1. Se `sale.commission_calculated > 0`: usar valor salvo
-2. Senão: recalcular com `calculateApprovalCommission`
+**Novos imports necessários:**
+```typescript
+import { CreditCard } from 'lucide-react';
+import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
+```
 
-**Prioridade para entrada:**
-1. Se `sale.valor_entrada > 0`: usar valor salvo
-2. Senão: calcular `totalValue - somaParcelas`
+**Remover import não utilizado:**
+```typescript
+// Remover
+import { Installment } from '@/hooks/useOrganizationData';
+```
+
+**Ajuste para pagamento à vista:**
+Se `qtdParcelas === 0`, não mostrar a seção de parcelamento (mantém comportamento atual).
 
