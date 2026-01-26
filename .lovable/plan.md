@@ -1,184 +1,160 @@
 
 
-## Plano: Corrigir Cálculo de ICMS na Calculadora de Comissão
+## Plano: Atualizar Tabela de Vendas da Empresa
 
-### Problema Identificado
+### Objetivo
 
-| Situação | Comportamento Atual | Comportamento Esperado |
-|----------|---------------------|------------------------|
-| Editar venda aprovada | ICMS Tabela volta para 12% (baseado na UF) | Manter o ICMS que foi salvo (ex: 4%) |
-| Produto importado (coluna 4%) | Busca sempre coluna "Valor 12%" | Verificar se produto tem valor na coluna 4% e usar esse ICMS |
-| Salvar ICMS Tabela | Não é salvo no banco | Salvar o campo para recuperar depois |
-
-**Exemplo do seu caso:**
-- Produto CDD12J tem valor na coluna **4%** (importado)
-- Você salvou com 4%, mas `percentual_icms` guarda o ICMS destino
-- Ao reabrir, sistema calcula `getIcmsRate('SC') = 12%`
+Ajustar a exibição das colunas na tabela de vendas para mostrar:
+1. **% Comissão**: 11,0051% (total R$ 2.540,87 / Valor Faturado R$ 23.088,05)
+2. **Comissão**: R$ 2.540,87 (soma de Pedido R$ 1.679,33 + Over R$ 861,53)
+3. **Entrada/Parcelas**: Combinar entrada + parcelas em uma coluna
 
 ---
 
-### Solução Proposta
+### Mudanças na Coluna de Entrada
 
-#### 1. Adicionar campo `icms_tabela` no banco de dados
+Atualmente a coluna "Entrada" mostra apenas o valor (R$ 8.996,00). O novo formato mostrará ambas as informações:
 
-Nova coluna para persistir o ICMS da origem/tabela:
+| Antes | Depois |
+|-------|--------|
+| R$ 8.996,00 | R$ 8.996,00<br/>3x R$ 4.697,35 |
 
-```sql
-ALTER TABLE sales ADD COLUMN icms_tabela NUMERIC(5,2);
-```
+**Se não houver parcelas** (pagamento à vista):
+| Formato |
+|---------|
+| À Vista |
 
-#### 2. Melhorar lógica de busca na planilha para detectar ICMS
+---
 
-Verificar em qual coluna o produto tem valor (12%, 7% ou 4%) e usar o ICMS correspondente:
+### Verificação dos Cálculos
 
-```text
-Planilha:
-| Código | Valor 12% | Valor 7% | Valor 4% | Comissão |
-|--------|-----------|----------|----------|----------|
-| CDD12J |           |          | 20.991   | 8%       |
-
-Lógica:
-1. Se tem valor na coluna "4%" → ICMS = 4%
-2. Se tem valor na coluna "7%" → ICMS = 7%
-3. Se tem valor na coluna "12%" → ICMS = 12%
-```
-
-#### 3. No modo edição, priorizar valores salvos
-
-Alterar o `useEffect` que carrega os dados:
+Os cálculos do arquivo `useSalesWithCalculations.ts` já estão corretos:
 
 ```text
-Atual:
-  setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);  // SEMPRE 12%
+valorComissaoCalculado = comissaoTotal = comissaoPedido + overLiquido
+                       = R$ 1.679,33 + R$ 861,53
+                       = R$ 2.540,87 ✓
 
-Novo:
-  if (sale.icms_tabela != null) {
-    setIcmsTabela(sale.icms_tabela);  // Usar valor salvo
-  } else {
-    // Fallback para detecção automática pela planilha
-  }
+percentualComissaoCalculado = percentualFinal
+                            = (comissaoTotal / valorFaturado) × 100
+                            = (2.540,87 / 23.088,05) × 100
+                            = 11,0051% ✓
 ```
 
 ---
 
 ### Arquivos a Modificar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/migrations/` | Adicionar coluna `icms_tabela` |
-| `src/components/approval/CommissionCalculator.tsx` | Melhorar busca na planilha para detectar coluna de ICMS |
-| `src/components/approval/CommissionCalculator.tsx` | Carregar `icms_tabela` salvo no modo edição |
-| `src/pages/SalesApproval.tsx` | Salvar `icms_tabela` junto com os outros campos |
-| `src/hooks/useEditableSale.ts` | Incluir `icms_tabela` na query |
-| `src/integrations/supabase/types.ts` | Atualizado automaticamente |
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/vendas/SalesListTable.tsx` | Atualizar célula da coluna "Entrada" para mostrar parcelas |
 
 ---
 
-### Mudanças Detalhadas
+### Mudanças no Código
 
-#### 1. Nova lógica de busca na planilha (matchedFipeRow)
+#### Atualizar a célula da coluna Entrada
 
-O código atual busca apenas a coluna "Valor 12%". A nova lógica vai:
+De (linha ~456-472):
+```tsx
+<TableCell className="text-right">
+  <div className="flex items-center justify-end gap-1">
+    <span className="font-mono">{formatCurrency(sale.entradaCalculada)}</span>
+    {sale.entradaVerificada && (
+      <Tooltip>
+        <TooltipTrigger>
+          <BadgeCheck className="h-4 w-4 text-success" />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Verificado via boletos</p>
+          <p className="text-xs text-muted-foreground">
+            {sale.qtdParcelas} parcelas de{' '}
+            {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    )}
+  </div>
+</TableCell>
+```
 
+Para:
+```tsx
+<TableCell className="text-right">
+  <div className="flex flex-col items-end">
+    {sale.qtdParcelas > 0 ? (
+      <>
+        <span className="font-mono text-sm">
+          {formatCurrency(sale.entradaCalculada)}
+        </span>
+        <span className="text-xs text-muted-foreground font-mono">
+          {sale.qtdParcelas}x {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
+        </span>
+      </>
+    ) : (
+      <span className="font-mono text-sm">À Vista</span>
+    )}
+  </div>
+</TableCell>
+```
+
+---
+
+### Renomear Título da Coluna
+
+Mudar de "Entrada" para "Pagamento" para refletir melhor o conteúdo:
+
+```tsx
+<ColumnFilterHeader
+  title="Pagamento"  // Era "Entrada"
+  columnKey="entradaCalculada"
+  ...
+/>
+```
+
+---
+
+### Resultado Esperado
+
+#### Visualização na Tabela
+
+| Data | NF | Cliente | Produto | Valor Total | Pagamento | % Comissão | Comissão | Status |
+|------|-----|---------|---------|-------------|-----------|------------|----------|--------|
+| 16/01/2026 | 9063 | CLEBER... | CDD12J | R$ 23.088,05 | R$ 8.996,00<br/>3x R$ 4.697,35 | 11,01% | R$ 2.540,87 | Pago |
+
+---
+
+### Nota sobre Comissões do Vendedor
+
+O usuário mencionou que o R$ 2.540,87 é "sujo" porque:
+- Sobre R$ 1.679,33 (pedido): vendedor recebe **5%** = R$ 83,97
+- Sobre R$ 861,53 (over): vendedor recebe **10%** = R$ 86,15
+- **Total vendedor**: R$ 170,12
+
+Este cálculo de comissão do vendedor será implementado na aba de comissões do vendedor, não na tabela da empresa.
+
+---
+
+### Seção Técnica
+
+**Interface SaleWithCalculations usada:**
 ```typescript
-// Encontrar índices das três colunas de valor
-const valor12Index = headerRow.findIndex(cell => 
-  value.includes('valor') && value.includes('12%'));
-const valor7Index = headerRow.findIndex(cell => 
-  value.includes('valor') && value.includes('7%'));
-const valor4Index = headerRow.findIndex(cell => 
-  value.includes('valor') && value.includes('4%'));
-
-// Ao encontrar o produto, verificar qual coluna tem valor
-const valor4 = parseFloat(row[valor4Index]?.value) || 0;
-const valor7 = parseFloat(row[valor7Index]?.value) || 0;
-const valor12 = parseFloat(row[valor12Index]?.value) || 0;
-
-// Prioridade: 4% > 7% > 12%
-if (valor4 > 0) {
-  return { valorTabela: valor4, icmsTabela: 4, comissao: ... };
-} else if (valor7 > 0) {
-  return { valorTabela: valor7, icmsTabela: 7, comissao: ... };
-} else {
-  return { valorTabela: valor12, icmsTabela: 12, comissao: ... };
+interface SaleWithCalculations {
+  // ... campos existentes
+  entradaCalculada: number;      // Valor da entrada
+  somaParcelas: number;          // Soma total das parcelas
+  qtdParcelas: number;           // Quantidade de parcelas
+  valorComissaoCalculado: number; // R$ 2.540,87
+  percentualComissaoCalculado: number; // 11,0051%
 }
 ```
 
-#### 2. Carregar ICMS salvo no modo edição
-
-```typescript
-useEffect(() => {
-  if (sale) {
-    // ... outros campos ...
-    
-    // ICMS Tabela: priorizar valor salvo
-    if (sale.icms_tabela != null) {
-      setIcmsTabela(sale.icms_tabela);
-    } else if (matchedFipeRow?.icmsTabela) {
-      // Fallback: detectar pela planilha
-      setIcmsTabela(matchedFipeRow.icmsTabela);
-    } else {
-      // Último fallback: UF do emitente
-      setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);
-    }
-  }
-}, [sale, matchedFipeRow]);
-```
-
-#### 3. Salvar ICMS Tabela
-
-No `handleSave` do `SalesApproval.tsx`:
-
-```typescript
-const updateData = {
-  table_value: calculationData.valorTabela,
-  percentual_comissao: calculationData.percentualComissao,
-  percentual_icms: calculationData.icmsDestino,
-  icms_tabela: calculationData.icmsTabela,  // NOVO
-  // ... demais campos
-};
-```
-
----
-
-### Fluxo Esperado Após Implementação
-
+**Lógica de exibição:**
 ```text
-1. Sistema lê planilha e encontra CDD12J
-2. Verifica: coluna 4% tem valor? → SIM (R$ 20.991,67)
-3. Define: valorTabela = 20.991,67, icmsTabela = 4%
-4. Usuário aprova/salva venda
-5. Banco salva: icms_tabela = 4
-6. Usuário abre para editar
-7. Sistema lê: sale.icms_tabela = 4
-8. Campo ICMS Tabela mostra 4% ✓
+SE qtdParcelas > 0:
+   Mostrar: "R$ {entrada}"
+            "{qtd}x R$ {valor_parcela}"
+SENÃO:
+   Mostrar: "À Vista"
 ```
-
----
-
-### Seção Tecnica
-
-**Migração SQL:**
-```sql
-ALTER TABLE public.sales 
-ADD COLUMN icms_tabela NUMERIC(5,2);
-
-COMMENT ON COLUMN public.sales.icms_tabela IS 
-'ICMS da origem/tabela (4%, 7% ou 12%) detectado pela planilha FIPE';
-```
-
-**Interface matchedFipeRow atualizada:**
-```typescript
-interface MatchedFipeRow {
-  rowIndex: number;
-  valorTabela: number;
-  icmsTabela: number;  // NOVO: 4, 7 ou 12
-  comissao: number;
-}
-```
-
-**Ordem de prioridade para ICMS Tabela:**
-1. Valor salvo no banco (`sale.icms_tabela`)
-2. Detecção automática pela planilha (qual coluna tem valor)
-3. Fallback pela UF do emitente (`getIcmsRate`)
 
