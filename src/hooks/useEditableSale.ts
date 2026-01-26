@@ -31,6 +31,7 @@ export interface EditableSale {
   valor_entrada: number | null;
   observacoes: string | null;
   emitente_uf: string | null;
+  icms_tabela: number | null;
 }
 
 export interface EditableSaleInstallment {

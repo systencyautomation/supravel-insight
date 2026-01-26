@@ -553,6 +553,7 @@ export type Database = {
           emitente_nome: string | null
           emitente_uf: string | null
           icms: number | null
+          icms_tabela: number | null
           id: string
           internal_seller_id: string | null
           ir_csll: number | null
@@ -598,6 +599,7 @@ export type Database = {
           emitente_nome?: string | null
           emitente_uf?: string | null
           icms?: number | null
+          icms_tabela?: number | null
           id?: string
           internal_seller_id?: string | null
           ir_csll?: number | null
@@ -643,6 +645,7 @@ export type Database = {
           emitente_nome?: string | null
           emitente_uf?: string | null
           icms?: number | null
+          icms_tabela?: number | null
           id?: string
           internal_seller_id?: string | null
           ir_csll?: number | null

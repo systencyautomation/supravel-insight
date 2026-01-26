@@ -132,6 +132,7 @@ export default function SalesApproval() {
       table_value: calculationData.valorTabela,
       percentual_comissao: calculationData.percentualComissao,
       percentual_icms: calculationData.icmsDestino,
+      icms_tabela: calculationData.icmsTabela,
       payment_method: calculationData.tipoPagamento,
       over_price: calculationData.overPrice,
       over_price_liquido: calculationData.overPriceLiquido,
