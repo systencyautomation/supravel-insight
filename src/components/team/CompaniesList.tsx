@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Building2, Wrench, MoreVertical, Trash2, Edit, Phone } from 'lucide-react';
+import { ChevronDown, ChevronRight, Building2, Wrench, MoreVertical, Trash2, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,14 +30,14 @@ import { useToast } from '@/hooks/use-toast';
 interface CompaniesListProps {
   companies: RepresentativeCompany[];
   onDeleteCompany: (id: string) => Promise<boolean>;
-  onUpdateCompany: (id: string, data: Partial<{ name: string; cnpj: string; sede: string; position: RepresentativePosition; is_technical: boolean }>) => Promise<boolean>;
+  onUpdateCompany: (id: string, data: Partial<{ name: string; cnpj: string; position: RepresentativePosition; is_technical: boolean }>) => Promise<boolean>;
   onRefetch: () => void;
 }
 
 interface CompanyItemProps {
   company: RepresentativeCompany;
   onDelete: (id: string) => Promise<boolean>;
-  onUpdate: (id: string, data: Partial<{ name: string; cnpj: string; sede: string; position: RepresentativePosition; is_technical: boolean }>) => Promise<boolean>;
+  onUpdate: (id: string, data: Partial<{ name: string; cnpj: string; position: RepresentativePosition; is_technical: boolean }>) => Promise<boolean>;
   onMembersChange: () => void;
 }
 
@@ -67,13 +67,11 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
     companyData: {
       name: string;
       cnpj?: string;
-      sede?: string;
       position: RepresentativePosition;
       is_technical: boolean;
     },
     responsavelData?: {
       name: string;
-      phone?: string;
       email?: string;
       is_technical: boolean;
     }
@@ -82,7 +80,6 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
     const companySuccess = await onUpdate(company.id, {
       name: companyData.name,
       cnpj: companyData.cnpj || '',
-      sede: companyData.sede || '',
       position: companyData.position,
       is_technical: companyData.is_technical,
     });
@@ -93,7 +90,6 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
     if (responsavelData && responsavel) {
       const memberSuccess = await updateMember(responsavel.id, {
         name: responsavelData.name,
-        phone: responsavelData.phone,
         email: responsavelData.email,
         is_technical: responsavelData.is_technical,
       });
@@ -119,7 +115,6 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
 
   const positionLabel = company.position === 'indicador' ? 'Indicador' : 'Representante';
   const positionVariant = company.position === 'indicador' ? 'secondary' : 'default';
-  const isMei = company.company_type === 'mei';
 
   return (
     <>
@@ -127,15 +122,15 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
         <div className="border rounded-lg overflow-hidden">
           <div className="flex flex-col">
             {/* Header clickable area */}
-            <CollapsibleTrigger asChild disabled={!hasFuncionarios && company.company_type !== 'empresa'}>
+            <CollapsibleTrigger asChild disabled={!hasFuncionarios}>
               <div 
-                className={`flex flex-col p-4 transition-colors ${hasFuncionarios || company.company_type === 'empresa' ? 'hover:bg-muted/50 cursor-pointer' : ''}`}
+                className={`flex flex-col p-4 transition-colors ${hasFuncionarios ? 'hover:bg-muted/50 cursor-pointer' : ''}`}
               >
                 {/* Line 1: Company info */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {/* Expansion arrow - only if has funcionarios or is empresa */}
-                    {hasFuncionarios || company.company_type === 'empresa' ? (
+                    {/* Expansion arrow - only if has funcionarios */}
+                    {hasFuncionarios ? (
                       <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
                         {isOpen ? (
                           <ChevronDown className="h-4 w-4" />
@@ -149,9 +144,6 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                     <Building2 className="h-5 w-5 text-muted-foreground" />
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{company.name}</span>
-                      {isMei && (
-                        <Badge variant="outline" className="text-xs">MEI</Badge>
-                      )}
                       <Badge variant={positionVariant as any} className="text-xs">
                         {positionLabel}
                       </Badge>
@@ -164,9 +156,6 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {company.sede && (
-                      <span className="text-sm text-muted-foreground">{company.sede}</span>
-                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -210,13 +199,6 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                             técnico
                           </Badge>
                         )}
-                        {responsavel.phone && (
-                          <>
-                            <span>•</span>
-                            <Phone className="h-3 w-3" />
-                            <span>{responsavel.phone}</span>
-                          </>
-                        )}
                       </>
                     ) : (
                       <span className="italic">Sem responsável cadastrado</span>
@@ -247,14 +229,12 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                         Nenhum funcionário cadastrado
                       </div>
                     )}
-                    {company.company_type === 'empresa' && (
-                      <div className="px-4 pt-2">
-                        <AddMemberDialog
-                          companyName={company.name}
-                          onAdd={handleAddMember}
-                        />
-                      </div>
-                    )}
+                    <div className="px-4 pt-2">
+                      <AddMemberDialog
+                        companyName={company.name}
+                        onAdd={handleAddMember}
+                      />
+                    </div>
                   </>
                 )}
               </div>

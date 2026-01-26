@@ -31,13 +31,11 @@ interface EditCompanyDialogProps {
     companyData: {
       name: string;
       cnpj?: string;
-      sede?: string;
       position: RepresentativePosition;
       is_technical: boolean;
     },
     responsavelData?: {
       name: string;
-      phone?: string;
       email?: string;
       is_technical: boolean;
     }
@@ -53,18 +51,14 @@ export function EditCompanyDialog({
 }: EditCompanyDialogProps) {
   const [companyName, setCompanyName] = useState(company.name);
   const [cnpj, setCnpj] = useState(company.cnpj || '');
-  const [sede, setSede] = useState(company.sede || '');
   const [position, setPosition] = useState<RepresentativePosition>(company.position);
   const [companyTechnical, setCompanyTechnical] = useState(company.is_technical);
 
   const [responsavelName, setResponsavelName] = useState(responsavel?.name || '');
-  const [responsavelPhone, setResponsavelPhone] = useState(responsavel?.phone || '');
   const [responsavelEmail, setResponsavelEmail] = useState(responsavel?.email || '');
   const [responsavelTechnical, setResponsavelTechnical] = useState(responsavel?.is_technical || false);
 
   const [saving, setSaving] = useState(false);
-
-  const isMei = company.company_type === 'mei';
 
   const handleSave = async () => {
     if (!companyName.trim()) return;
@@ -74,16 +68,14 @@ export function EditCompanyDialog({
     try {
       const success = await onSave(
         {
-          name: isMei ? responsavelName.trim() : companyName.trim(),
+          name: companyName.trim(),
           cnpj: cnpj.trim() || undefined,
-          sede: sede.trim() || undefined,
           position,
           is_technical: companyTechnical,
         },
         responsavel
           ? {
               name: responsavelName.trim(),
-              phone: responsavelPhone.trim() || undefined,
               email: responsavelEmail.trim() || undefined,
               is_technical: responsavelTechnical,
             }
@@ -102,9 +94,9 @@ export function EditCompanyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Editar {isMei ? 'MEI' : 'Empresa'}</DialogTitle>
+          <DialogTitle>Editar Empresa</DialogTitle>
           <DialogDescription>
-            Atualize os dados {isMei ? 'do MEI' : 'da empresa'} e do responsável.
+            Atualize os dados da empresa e do responsável.
           </DialogDescription>
         </DialogHeader>
 
@@ -112,40 +104,27 @@ export function EditCompanyDialog({
           {/* Dados da Empresa */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-muted-foreground">
-              Dados {isMei ? 'do MEI' : 'da Empresa'}
+              Dados da Empresa
             </h4>
 
-            {!isMei && (
-              <div className="space-y-2">
-                <Label htmlFor="company-name">Nome da Empresa</Label>
-                <Input
-                  id="company-name"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Nome da empresa"
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="company-name">Nome da Empresa</Label>
+              <Input
+                id="company-name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Nome da empresa"
+              />
+            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cnpj">CNPJ (opcional)</Label>
-                <Input
-                  id="cnpj"
-                  value={cnpj}
-                  onChange={(e) => setCnpj(e.target.value)}
-                  placeholder="00.000.000/0000-00"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sede">Cidade/Sede</Label>
-                <Input
-                  id="sede"
-                  value={sede}
-                  onChange={(e) => setSede(e.target.value)}
-                  placeholder="Cidade"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="cnpj">CNPJ (opcional)</Label>
+              <Input
+                id="cnpj"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
+                placeholder="00.000.000/0000-00"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -188,26 +167,15 @@ export function EditCompanyDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="responsavel-phone">Telefone</Label>
-                <Input
-                  id="responsavel-phone"
-                  value={responsavelPhone}
-                  onChange={(e) => setResponsavelPhone(e.target.value)}
-                  placeholder="(00) 00000-0000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="responsavel-email">Email (opcional)</Label>
-                <Input
-                  id="responsavel-email"
-                  type="email"
-                  value={responsavelEmail}
-                  onChange={(e) => setResponsavelEmail(e.target.value)}
-                  placeholder="email@exemplo.com"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="responsavel-email">Email (opcional)</Label>
+              <Input
+                id="responsavel-email"
+                type="email"
+                value={responsavelEmail}
+                onChange={(e) => setResponsavelEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+              />
             </div>
 
             <div className="flex items-center justify-between">
