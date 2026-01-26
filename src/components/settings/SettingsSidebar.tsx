@@ -32,7 +32,13 @@ export function SettingsSidebar() {
       <Button 
         variant="ghost" 
         size="sm"
-        onClick={() => navigate('/')}
+        onClick={() => {
+          if (isMasterAdmin && !effectiveOrgId) {
+            navigate('/master');
+          } else {
+            navigate('/');
+          }
+        }}
         className="justify-start gap-2 mb-6 hover:bg-accent/80"
       >
         <ArrowLeft className="h-4 w-4" />
