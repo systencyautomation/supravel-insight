@@ -66,6 +66,7 @@ export function CommissionCalculator({
   const [tipoPagamento, setTipoPagamento] = useState('a_vista');
   const [valorEntrada, setValorEntrada] = useState(0);
   const [qtdParcelas, setQtdParcelas] = useState(0);
+  const [parcelasEditadasManualmente, setParcelasEditadasManualmente] = useState(false);
   const [valorParcelaReal, setValorParcelaReal] = useState(0);
 
   // Over Price editing
@@ -233,11 +234,21 @@ export function CommissionCalculator({
 
   // Calculate valor da parcela (use real value if available, otherwise calculate)
   const valorParcela = useMemo(() => {
+    // Se usuário editou manualmente as parcelas ou entrada, recalcular
+    if (parcelasEditadasManualmente) {
+      if (qtdParcelas <= 0) return 0;
+      const valorRestante = valorFaturado - valorEntrada;
+      return valorRestante / qtdParcelas;
+    }
+    
+    // Se tem valor real (dos boletos) e não foi editado, usar ele
     if (valorParcelaReal > 0) return valorParcelaReal;
+    
+    // Fallback: calcular automaticamente
     if (qtdParcelas <= 0) return 0;
     const valorRestante = valorFaturado - valorEntrada;
     return valorRestante / qtdParcelas;
-  }, [valorFaturado, valorEntrada, qtdParcelas, valorParcelaReal]);
+  }, [valorFaturado, valorEntrada, qtdParcelas, valorParcelaReal, parcelasEditadasManualmente]);
 
   // Calculate Valor Real (com VP para parcelados)
   const valorReal = useMemo(() => {
@@ -504,7 +515,10 @@ export function CommissionCalculator({
                   <CurrencyInput
                     id="valorEntrada"
                     value={valorEntrada}
-                    onChange={setValorEntrada}
+                    onChange={(newValue) => {
+                      setValorEntrada(newValue);
+                      setParcelasEditadasManualmente(true);
+                    }}
                     className="font-mono h-9"
                   />
                 </div>
@@ -515,7 +529,10 @@ export function CommissionCalculator({
                     type="number"
                     min="0"
                     value={qtdParcelas}
-                    onChange={(e) => setQtdParcelas(parseInt(e.target.value, 10) || 0)}
+                    onChange={(e) => {
+                      setQtdParcelas(parseInt(e.target.value, 10) || 0);
+                      setParcelasEditadasManualmente(true);
+                    }}
                     className="h-9"
                   />
                 </div>
