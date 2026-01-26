@@ -1,9 +1,7 @@
 import { useMemo, useState, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
-import { Eye, BadgeCheck, FileText, X, Calculator, Pencil } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Eye, BadgeCheck, FileText, X, Calculator } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -98,9 +96,6 @@ const getStatusBadge = (status: string | null) => {
 };
 
 export function SalesListTable({ sales, loading }: SalesListTableProps) {
-  const navigate = useNavigate();
-  const { isSuperAdmin, userRoles } = useAuth();
-  
   const {
     filters,
     sortColumn,
@@ -120,9 +115,6 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
   const [columnWidths, setColumnWidths] = useState(defaultColumnWidths);
   const [isResizing, setIsResizing] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
-
-  // Check if user can edit (admin/manager)
-  const canEdit = isSuperAdmin || userRoles.some(role => role.role === 'admin' || role.role === 'manager');
 
 
   // Calculate total table width dynamically
@@ -497,37 +489,17 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                       </TableCell>
                       <TableCell>{getStatusBadge(sale.status)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedSale(sale);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {canEdit && (sale.status === 'aprovado' || sale.status === 'pago') && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/aprovacao?saleId=${sale.id}&mode=edit`);
-                                  }}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Editar Cálculos</TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSale(sale);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   </HoverCardTrigger>
