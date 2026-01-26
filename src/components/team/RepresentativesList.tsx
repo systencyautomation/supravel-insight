@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Phone, FileText, MoreVertical, Trash2, UserCheck, UserX } from 'lucide-react';
+import { Mail, Phone, MoreVertical, Trash2, UserCheck, UserX, Building2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -64,10 +64,15 @@ export function RepresentativesList({ representatives, onUpdate, onDelete }: Rep
             )}
           >
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium truncate">{rep.name}</span>
+                {rep.position && (
+                  <Badge variant={rep.position === 'representante' ? 'default' : 'secondary'} className="text-xs capitalize">
+                    {rep.position}
+                  </Badge>
+                )}
                 {!rep.active && (
-                  <Badge variant="secondary" className="text-xs">Inativo</Badge>
+                  <Badge variant="outline" className="text-xs">Inativo</Badge>
                 )}
                 {rep.user_id && (
                   <Badge variant="outline" className="text-xs text-primary">Com acesso</Badge>
@@ -86,10 +91,16 @@ export function RepresentativesList({ representatives, onUpdate, onDelete }: Rep
                     {rep.phone}
                   </span>
                 )}
-                {rep.document && (
+                {rep.company && (
                   <span className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" />
-                    {rep.document}
+                    <Building2 className="h-3 w-3" />
+                    {rep.company}
+                  </span>
+                )}
+                {rep.sede && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {rep.sede}
                   </span>
                 )}
               </div>
