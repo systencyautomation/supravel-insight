@@ -355,7 +355,7 @@ export function TeamMembersList({ organizationId, organizationName }: TeamMember
     const labels: Record<string, string> = {
       super_admin: 'Super Admin',
       admin: 'Gerente',
-      manager: 'Auxiliar',
+      manager: 'Analista',
       seller: 'Vendedor',
       representative: 'Representante',
     };

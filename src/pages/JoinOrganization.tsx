@@ -269,7 +269,7 @@ const JoinOrganization = () => {
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
       admin: 'Gerente',
-      manager: 'Auxiliar',
+      manager: 'Analista',
       seller: 'Vendedor',
       representative: 'Representante',
     };

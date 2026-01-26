@@ -18,7 +18,7 @@ type AppRole = 'admin' | 'manager' | 'seller' | 'representative';
 
 const roleLabels: Record<AppRole, string> = {
   admin: 'Gerente',
-  manager: 'Auxiliar',
+  manager: 'Analista',
   seller: 'Vendedor',
   representative: 'Representante',
 };

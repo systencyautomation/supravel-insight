@@ -13,7 +13,7 @@ const getRoleLabel = (role: string) => {
   const labels: Record<string, string> = {
     super_admin: 'Super Administrador',
     admin: 'Gerente',
-    manager: 'Auxiliar',
+    manager: 'Analista',
     seller: 'Vendedor',
     representative: 'Representante',
   };
