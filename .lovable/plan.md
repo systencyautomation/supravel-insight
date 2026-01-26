@@ -1,35 +1,44 @@
 
 
-## Plano: Atualizar Domínio de Email nas Edge Functions
+## Plano: Corrigir Mapeamento de Cargos no Email de Convite
 
-### Problema Atual
-As 3 edge functions que enviam emails estão usando o domínio antigo:
-- `noreply@dash.supravel.com.br`
+### Problema Identificado
 
-### Solução
-Atualizar para o novo domínio verificado no Resend:
-- `noreply@supravelconnect.com.br`
+Na Edge Function `send-member-invitation`, o mapeamento de roles está **invertido**:
 
-### Arquivos a Modificar
+| Role no DB | Exibido no Email | Deveria Exibir |
+|------------|------------------|----------------|
+| `manager`  | "Gerente" ❌     | "Auxiliar" ✓   |
+| `admin`    | (não mapeado)    | "Gerente" ✓    |
 
-| Arquivo | Linha | Alteração |
-|---------|-------|-----------|
-| `supabase/functions/send-invitation/index.ts` | 39 | Mudar para `noreply@supravelconnect.com.br` |
-| `supabase/functions/send-member-invitation/index.ts` | 53 | Mudar para `noreply@supravelconnect.com.br` |
-| `supabase/functions/send-verification-code/index.ts` | 103 | Mudar para `noreply@supravelconnect.com.br` |
+### Código Atual (Linha 37-41)
 
-### Alteração em Cada Arquivo
-
-**De:**
 ```typescript
-from: "Gestão de Comissões <noreply@dash.supravel.com.br>",
+const roleLabels: Record<string, string> = {
+  manager: "Gerente",       // ❌ Invertido
+  seller: "Vendedor",
+  representative: "Representante",
+};
 ```
 
-**Para:**
+### Código Corrigido
+
 ```typescript
-from: "Gestão de Comissões <noreply@supravelconnect.com.br>",
+const roleLabels: Record<string, string> = {
+  admin: "Gerente",         // ✓ Corrigido
+  manager: "Auxiliar",      // ✓ Corrigido  
+  seller: "Vendedor",
+  representative: "Representante",
+};
 ```
+
+### Arquivo a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/send-member-invitation/index.ts` | Linhas 37-41: Corrigir mapeamento de roles |
 
 ### Observação
-Como você verificou o domínio `supravelconnect.com.br` (sem o subdomínio `dash`), o Resend permite enviar emails de qualquer subdomínio desse domínio raiz, incluindo `noreply@supravelconnect.com.br`. Se preferir manter a consistência com o subdomínio da aplicação, também funcionaria `noreply@dash.supravelconnect.com.br`.
+
+Este é o mesmo padrão de nomenclatura usado no frontend (`InviteMemberDialog.tsx` linha 29-34), que já está correto. A Edge Function precisa ser alinhada com essa nomenclatura.
 
