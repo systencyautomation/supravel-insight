@@ -285,6 +285,7 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
         company={company}
         responsavel={responsavel}
         onSave={handleSaveEdit}
+        onAddMember={handleAddMember}
       />
 
       {/* Add Member Dialog */}
