@@ -5,13 +5,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { SettingsLayout } from '@/layouts/SettingsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, Shield, UserCircle } from 'lucide-react';
+import { Loader2, Users, Shield, Building2 } from 'lucide-react';
 import { TeamMembersList } from '@/components/TeamMembersList';
 import { InviteMemberDialog } from '@/components/InviteMemberDialog';
 import { RolePermissionsManager } from '@/components/team/RolePermissionsManager';
-import { RepresentativesList } from '@/components/team/RepresentativesList';
-import { AddRepresentativeDialog } from '@/components/team/AddRepresentativeDialog';
-import { useRepresentatives } from '@/hooks/useRepresentatives';
+import { CompaniesList } from '@/components/team/CompaniesList';
+import { AddCompanyDialog } from '@/components/team/AddCompanyDialog';
+import { useRepresentativeCompanies, CreateCompanyData } from '@/hooks/useRepresentativeCompanies';
+import { CreateMemberData } from '@/hooks/useCompanyMembers';
 
 interface Organization {
   id: string;
@@ -32,13 +33,39 @@ export default function TeamSettings() {
   const canManagePermissions = isMasterAdmin || userRole === 'admin';
 
   const { 
-    representatives, 
-    loading: repsLoading, 
-    createRepresentative, 
-    updateRepresentative, 
-    deleteRepresentative,
-    refetch: refetchRepresentatives 
-  } = useRepresentatives(effectiveOrgId);
+    companies, 
+    loading: companiesLoading, 
+    createCompany, 
+    deleteCompany,
+    refetch: refetchCompanies 
+  } = useRepresentativeCompanies(effectiveOrgId);
+
+  // Helper para adicionar membro diretamente
+  const addMemberToCompany = async (companyId: string, memberData: CreateMemberData) => {
+    const { data, error } = await supabase
+      .from('company_members')
+      .insert({
+        company_id: companyId,
+        name: memberData.name,
+        phone: memberData.phone || null,
+        email: memberData.email || null,
+        role: memberData.role,
+        is_technical: memberData.is_technical,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error adding member:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível adicionar o responsável.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    return data;
+  };
 
   useEffect(() => {
     if (!effectiveOrgId || !canInvite) {
@@ -119,35 +146,36 @@ export default function TeamSettings() {
           </CardContent>
         </Card>
 
-        {/* External Representatives Section */}
+        {/* External Companies Section */}
         {canInvite && organization && (
           <Card className="hover-lift">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/10 flex items-center justify-center">
-                    <UserCircle className="h-6 w-6 text-accent-foreground" />
+                    <Building2 className="h-6 w-6 text-accent-foreground" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Representantes Externos</CardTitle>
-                    <CardDescription>Representantes sem acesso ao sistema</CardDescription>
+                    <CardTitle className="text-lg">Empresas Externas</CardTitle>
+                    <CardDescription>Representantes e indicadores parceiros</CardDescription>
                   </div>
                 </div>
-                <AddRepresentativeDialog onAdd={createRepresentative} />
+                <AddCompanyDialog 
+                  onAddCompany={createCompany} 
+                  onAddMember={addMemberToCompany}
+                />
               </div>
             </CardHeader>
             <CardContent>
-              {repsLoading ? (
+              {companiesLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <RepresentativesList 
-                  representatives={representatives}
-                  organizationId={effectiveOrgId!}
-                  onUpdate={updateRepresentative}
-                  onDelete={deleteRepresentative}
-                  onRefetch={refetchRepresentatives}
+                <CompaniesList 
+                  companies={companies}
+                  onDeleteCompany={deleteCompany}
+                  onRefetch={refetchCompanies}
                 />
               )}
             </CardContent>
