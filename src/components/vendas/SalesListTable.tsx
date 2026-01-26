@@ -343,7 +343,7 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
               </ResizableHeader>
               <ResizableHeader columnKey="entrada" className="text-right">
                 <ColumnFilterHeader
-                  title="Entrada"
+                  title="Pagamento"
                   columnKey="entradaCalculada"
                   values={[]}
                   selectedValues={new Set()}
@@ -453,21 +453,18 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                         {formatCurrency(Number(sale.total_value) || 0)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="font-mono">{formatCurrency(sale.entradaCalculada)}</span>
-                          {sale.entradaVerificada && (
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <BadgeCheck className="h-4 w-4 text-success" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Verificado via boletos</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {sale.qtdParcelas} parcelas de{' '}
-                                  {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
+                        <div className="flex flex-col items-end">
+                          {sale.qtdParcelas > 0 ? (
+                            <>
+                              <span className="font-mono text-sm">
+                                {formatCurrency(sale.entradaCalculada)}
+                              </span>
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {sale.qtdParcelas}x {formatCurrency(sale.somaParcelas / sale.qtdParcelas)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-mono text-sm">À Vista</span>
                           )}
                         </div>
                       </TableCell>
