@@ -41,6 +41,7 @@ const formSchema = z.object({
   is_technical: z.boolean().default(false),
   // Responsável fields
   responsavel_name: z.string().min(2, 'Nome do responsável é obrigatório'),
+  responsavel_phone: z.string().optional(),
   responsavel_email: z.string().email('Email inválido').optional().or(z.literal('')),
   responsavel_is_technical: z.boolean().default(false),
 });
@@ -64,6 +65,7 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
       position: 'representante',
       is_technical: false,
       responsavel_name: '',
+      responsavel_phone: '',
       responsavel_email: '',
       responsavel_is_technical: false,
     },
@@ -85,6 +87,7 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
       // Criar responsável
       await onAddMember(company.id, {
         name: data.responsavel_name,
+        phone: data.responsavel_phone || undefined,
         email: data.responsavel_email || undefined,
         role: 'responsavel',
         is_technical: data.responsavel_is_technical,
@@ -197,6 +200,20 @@ export function AddCompanyDialog({ onAddCompany, onAddMember }: AddCompanyDialog
                     <FormLabel>Nome *</FormLabel>
                     <FormControl>
                       <Input placeholder="Nome completo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="responsavel_phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone (opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(11) 99999-0000" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
