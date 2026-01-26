@@ -50,7 +50,7 @@ const handler = async (req: Request): Promise<Response> => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Gestão de Comissões <noreply@dash.supravel.com.br>",
+        from: "Gestão de Comissões <noreply@supravelconnect.com.br>",
         to: [email],
         subject: `${organizationName} - Convite para acessar o sistema`,
         html: `
