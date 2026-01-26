@@ -36,6 +36,7 @@ export default function TeamSettings() {
     companies, 
     loading: companiesLoading, 
     createCompany, 
+    updateCompany,
     deleteCompany,
     refetch: refetchCompanies 
   } = useRepresentativeCompanies(effectiveOrgId);
@@ -175,6 +176,7 @@ export default function TeamSettings() {
                 <CompaniesList 
                   companies={companies}
                   onDeleteCompany={deleteCompany}
+                  onUpdateCompany={updateCompany}
                   onRefetch={refetchCompanies}
                 />
               )}
