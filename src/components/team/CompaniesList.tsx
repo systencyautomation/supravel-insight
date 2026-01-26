@@ -205,6 +205,9 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                     {responsavel ? (
                       <>
                         <span>{responsavel.name}</span>
+                        {responsavel.phone && (
+                          <span className="text-muted-foreground/70">• {responsavel.phone}</span>
+                        )}
                         {responsavel.is_technical && (
                           <Badge variant="secondary" className="text-xs gap-1 py-0 h-5">
                             <Wrench className="h-2.5 w-2.5" />
