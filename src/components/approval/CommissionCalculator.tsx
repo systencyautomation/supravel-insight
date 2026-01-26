@@ -74,6 +74,7 @@ export function CommissionCalculator({
   const [manualOverPrice, setManualOverPrice] = useState<number | null>(null);
 
   // Search FIPE spreadsheet for product code (prioritize produto_modelo = código FIPE)
+  // Search FIPE spreadsheet and detect which ICMS column has value (4%, 7%, or 12%)
   const matchedFipeRow = useMemo(() => {
     // Priorizar produto_modelo (código FIPE real), depois produto_codigo
     const codigoParaBusca = sale?.produto_modelo || sale?.produto_codigo;
@@ -106,10 +107,20 @@ export function CommissionCalculator({
     
     const headerRow = gridData[headerRowIndex];
     
-    // Find value and commission column indices
-    const valorIndex = headerRow?.findIndex(cell => {
+    // Find ICMS value columns (12%, 7%, 4%)
+    const valor12Index = headerRow?.findIndex(cell => {
       const value = String(cell?.value || '').toLowerCase();
       return value.includes('valor') && value.includes('12%');
+    }) ?? -1;
+    
+    const valor7Index = headerRow?.findIndex(cell => {
+      const value = String(cell?.value || '').toLowerCase();
+      return value.includes('valor') && value.includes('7%');
+    }) ?? -1;
+    
+    const valor4Index = headerRow?.findIndex(cell => {
+      const value = String(cell?.value || '').toLowerCase();
+      return value.includes('valor') && value.includes('4%');
     }) ?? -1;
     
     const comissaoIndex = headerRow?.findIndex(cell => {
@@ -124,8 +135,30 @@ export function CommissionCalculator({
     const prefixMatch = productCode.match(/^([A-Za-z0-9]+)/);
     const codePrefix = prefixMatch ? prefixMatch[1] : productCode;
 
+    // Helper to extract value and detect ICMS from row
+    const extractRowData = (row: typeof gridData[0]) => {
+      const parseValue = (idx: number) => {
+        if (idx < 0) return 0;
+        return parseFloat(String(row[idx]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+      };
+      
+      const valor4 = parseValue(valor4Index);
+      const valor7 = parseValue(valor7Index);
+      const valor12 = parseValue(valor12Index);
+      const comissao = parseValue(comissaoIndex);
+      
+      // Priority: 4% > 7% > 12% (imported products have 4%)
+      if (valor4 > 0) {
+        return { valorTabela: valor4, icmsTabela: 4, comissao };
+      } else if (valor7 > 0) {
+        return { valorTabela: valor7, icmsTabela: 7, comissao };
+      } else {
+        return { valorTabela: valor12, icmsTabela: 12, comissao };
+      }
+    };
+
     // Search for matching product code with multiple strategies
-    let bestMatch: { rowIndex: number; valorTabela: number; comissao: number } | null = null;
+    let bestMatch: { rowIndex: number; valorTabela: number; icmsTabela: number; comissao: number } | null = null;
     
     for (let i = headerRowIndex + 1; i < gridData.length; i++) {
       const row = gridData[i];
@@ -136,38 +169,26 @@ export function CommissionCalculator({
       
       // Strategy 1: Exact match (highest priority)
       if (cellValue === productCode) {
-        return {
-          rowIndex: i,
-          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-        };
+        const data = extractRowData(row);
+        return { rowIndex: i, ...data };
       }
       
       // Strategy 2: Table code matches the prefix (e.g. table has "CDD12J", we have "CDD12J - N.")
       if (cellValue === codePrefix && !bestMatch) {
-        bestMatch = {
-          rowIndex: i,
-          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-        };
+        const data = extractRowData(row);
+        bestMatch = { rowIndex: i, ...data };
       }
       
       // Strategy 3: Table code starts with our prefix
       if (!bestMatch && cellValue.toUpperCase().startsWith(codePrefix.toUpperCase())) {
-        bestMatch = {
-          rowIndex: i,
-          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-        };
+        const data = extractRowData(row);
+        bestMatch = { rowIndex: i, ...data };
       }
       
       // Strategy 4: Our code starts with the table code
       if (!bestMatch && productCode.toUpperCase().startsWith(cellValue.toUpperCase())) {
-        bestMatch = {
-          rowIndex: i,
-          valorTabela: valorIndex >= 0 ? parseFloat(String(row[valorIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-          comissao: comissaoIndex >= 0 ? parseFloat(String(row[comissaoIndex]?.value || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0 : 0,
-        };
+        const data = extractRowData(row);
+        bestMatch = { rowIndex: i, ...data };
       }
     }
     
@@ -179,14 +200,24 @@ export function CommissionCalculator({
     if (sale) {
       setValorFaturado(sale.total_value || 0);
       setIcmsDestino((sale.percentual_icms || getIcmsRate(sale.uf_destiny || '') * 100));
-      setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);
+      
+      // ICMS Tabela: priorizar valor salvo no banco
+      if (sale.icms_tabela != null) {
+        setIcmsTabela(sale.icms_tabela);
+      } else if (matchedFipeRow?.icmsTabela) {
+        // Fallback: detectar pela planilha (qual coluna tem valor)
+        setIcmsTabela(matchedFipeRow.icmsTabela);
+      } else {
+        // Último fallback: UF do emitente
+        setIcmsTabela(getIcmsRate(sale.emitente_uf || 'SP') * 100);
+      }
       
       // Pre-fill from existing sale data if available
       if (sale.table_value) setValorTabela(sale.table_value);
       if (sale.percentual_comissao) setPercentualComissao(sale.percentual_comissao);
       setValorEntrada(sale.valor_entrada || 0);
     }
-  }, [sale]);
+  }, [sale, matchedFipeRow]);
 
   // Pre-fill from installments
   useEffect(() => {
