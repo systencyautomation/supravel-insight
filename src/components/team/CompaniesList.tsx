@@ -73,6 +73,7 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
     },
     responsavelData?: {
       name: string;
+      phone?: string;
       email?: string;
       is_technical: boolean;
     }
@@ -91,6 +92,7 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
     if (responsavelData && responsavel) {
       const memberSuccess = await updateMember(responsavel.id, {
         name: responsavelData.name,
+        phone: responsavelData.phone,
         email: responsavelData.email,
         is_technical: responsavelData.is_technical,
       });
@@ -239,6 +241,17 @@ function CompanyItem({ company, onDelete, onUpdate, onMembersChange }: CompanyIt
                         Nenhum membro cadastrado
                       </div>
                     )}
+                    <div className="px-4 pt-2 border-t mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="gap-1 h-7 text-xs"
+                        onClick={() => setAddMemberDialogOpen(true)}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Adicionar Membro
+                      </Button>
+                    </div>
                   </>
                 )}
               </div>

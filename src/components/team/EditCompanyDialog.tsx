@@ -36,6 +36,7 @@ interface EditCompanyDialogProps {
     },
     responsavelData?: {
       name: string;
+      phone?: string;
       email?: string;
       is_technical: boolean;
     }
@@ -55,6 +56,7 @@ export function EditCompanyDialog({
   const [companyTechnical, setCompanyTechnical] = useState(company.is_technical);
 
   const [responsavelName, setResponsavelName] = useState(responsavel?.name || '');
+  const [responsavelPhone, setResponsavelPhone] = useState(responsavel?.phone || '');
   const [responsavelEmail, setResponsavelEmail] = useState(responsavel?.email || '');
   const [responsavelTechnical, setResponsavelTechnical] = useState(responsavel?.is_technical || false);
 
@@ -76,6 +78,7 @@ export function EditCompanyDialog({
         responsavel
           ? {
               name: responsavelName.trim(),
+              phone: responsavelPhone.trim() || undefined,
               email: responsavelEmail.trim() || undefined,
               is_technical: responsavelTechnical,
             }
@@ -164,6 +167,16 @@ export function EditCompanyDialog({
                 value={responsavelName}
                 onChange={(e) => setResponsavelName(e.target.value)}
                 placeholder="Nome do responsável"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="responsavel-phone">Telefone (opcional)</Label>
+              <Input
+                id="responsavel-phone"
+                value={responsavelPhone}
+                onChange={(e) => setResponsavelPhone(e.target.value)}
+                placeholder="(11) 99999-0000"
               />
             </div>
 
