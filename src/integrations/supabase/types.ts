@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      company_members: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          is_technical: boolean
+          name: string
+          phone: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_technical?: boolean
+          name: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_technical?: boolean
+          name?: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "representative_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_processing_log: {
         Row: {
           created_at: string | null
@@ -457,6 +501,53 @@ export type Database = {
         }
         Relationships: []
       }
+      representative_companies: {
+        Row: {
+          active: boolean
+          cnpj: string | null
+          company_type: Database["public"]["Enums"]["company_type"]
+          created_at: string
+          id: string
+          is_technical: boolean
+          name: string
+          organization_id: string
+          position: Database["public"]["Enums"]["representative_position"]
+          sede: string | null
+        }
+        Insert: {
+          active?: boolean
+          cnpj?: string | null
+          company_type?: Database["public"]["Enums"]["company_type"]
+          created_at?: string
+          id?: string
+          is_technical?: boolean
+          name: string
+          organization_id: string
+          position?: Database["public"]["Enums"]["representative_position"]
+          sede?: string | null
+        }
+        Update: {
+          active?: boolean
+          cnpj?: string | null
+          company_type?: Database["public"]["Enums"]["company_type"]
+          created_at?: string
+          id?: string
+          is_technical?: boolean
+          name?: string
+          organization_id?: string
+          position?: Database["public"]["Enums"]["representative_position"]
+          sede?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "representative_companies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       representatives: {
         Row: {
           active: boolean | null
@@ -797,6 +888,8 @@ export type Database = {
         | "seller"
         | "representative"
         | "saas_admin"
+      company_type: "mei" | "empresa"
+      member_role: "responsavel" | "funcionario"
       representative_position: "indicador" | "representante"
     }
     CompositeTypes: {
@@ -933,6 +1026,8 @@ export const Constants = {
         "representative",
         "saas_admin",
       ],
+      company_type: ["mei", "empresa"],
+      member_role: ["responsavel", "funcionario"],
       representative_position: ["indicador", "representante"],
     },
   },
