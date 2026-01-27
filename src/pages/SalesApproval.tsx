@@ -140,6 +140,9 @@ export default function SalesApproval() {
       valor_entrada: calculationData.valorEntrada,
       aprovado_por: user.id,
       aprovado_em: new Date().toISOString(),
+      // Atribuição de comissão
+      internal_seller_id: calculationData.internalSellerId,
+      representative_id: calculationData.representativeId,
     };
 
     // Only update status if NOT in edit mode
