@@ -1,255 +1,194 @@
 
-## Plano: Nova Aba "Recebimentos" em Empresa
+# Plano: Expansão da Página de Configurações da Empresa
 
-### Objetivo
-Criar uma nova sub-aba chamada "Recebimentos" dentro de Empresa que mostra uma visão detalhada de todos os pagamentos (entrada e parcelas) com filtros intuitivos, similar ao modelo Excel do usuário.
+## Resumo
+Expandir a página de Configurações > Empresa para incluir informações cadastrais completas da organização e uma nova seção de "Parametrização" para definir como as comissões são calculadas.
 
 ---
 
-### Estrutura da Nova Aba
+## 1. Alteração no Banco de Dados
+
+### Novos campos na tabela `organizations`:
+
+**Dados Cadastrais:**
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `cnpj` | text | CNPJ da empresa |
+| `razao_social` | text | Razão social completa |
+| `endereco` | text | Endereço completo |
+| `cidade` | text | Cidade |
+| `estado` | text | UF (2 caracteres) |
+| `cep` | text | CEP |
+| `telefone` | text | Telefone principal |
+| `email_contato` | text | Email de contato |
+
+**Parametrização de Comissões:**
+| Campo | Tipo | Default | Descrição |
+|-------|------|---------|-----------|
+| `comissao_base` | text | 'valor_tabela' | Base do cálculo: `'valor_tabela'` (sobre o valor de tabela) ou `'comissao_empresa'` (sobre a comissão da empresa) |
+| `comissao_over_percent` | numeric | 10 | Percentual do over líquido que o vendedor recebe (padrão 10%) |
+
+---
+
+## 2. Estrutura Visual da Página
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ [Dashboard]  [Vendas]  [Recebimentos]                                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌──────────────────────────────────────────┐   VALOR PENDENTE A RECEBER    │
-│  │ VENDEDOR   [Todos ▼]                     │   R$ 268.278,16               │
-│  └──────────────────────────────────────────┘                               │
-│                                                                             │
-│  FILTROS:                                                                   │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │ Data Início      Data Fim         Nome/Cliente      NF       Produto  │  │
-│  │ [📅 01/01/2026] [📅 26/01/2026]  [___________]   [____]    [______]   │  │
-│  │                                                                       │  │
-│  │ Status: [○ Todos] [● Pago] [● Pendente]          [🔍 Filtrar] [Limpar] │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │ Data     │ NF  │ Cliente          │ Produto │ Valor    │ % Com│ Valor │  │
-│  │          │     │                  │         │ Total    │      │ Com   │Status│
-│  ├──────────┼─────┼──────────────────┼─────────┼──────────┼──────┼───────┼──────┤
-│  │18/12/2025│ 770 │MERCADO ALT SELETO│ CDD12J  │ 8.336,00 │ 11%  │ 383,56│ Pago │
-│  │18/01/2026│ 770 │MERCADO ALT SELETO│ CDD12J  │ 4.637,35 │ 11%  │ 516,71│Pend. │
-│  │18/01/2026│ 770 │MERCADO ALT SELETO│ CDD12J  │ 4.637,35 │ 11%  │ 516,71│Pend. │
-│  │17/03/2026│ 770 │MERCADO ALT SELETO│ CDD12   │ 4.637,35 │ 11%  │ 516,71│Pend. │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  [🏢]  Dados da Empresa                                        │
+│        Informações cadastrais da sua organização               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐                      │
+│  │ Nome Fantasia   │  │ Razão Social    │                      │
+│  │ [Supravel     ] │  │ [Panama Log... ]│                      │
+│  └─────────────────┘  └─────────────────┘                      │
+│                                                                 │
+│  ┌─────────────────┐  ┌──────────┐                             │
+│  │ CNPJ            │  │ UF       │                             │
+│  │ [21.258.654/...]│  │ [SC    ] │                             │
+│  └─────────────────┘  └──────────┘                             │
+│                                                                 │
+│  ┌─────────────────────────────────────┐                       │
+│  │ Endereço                            │                       │
+│  │ [Rua Example, 123 - Centro        ] │                       │
+│  └─────────────────────────────────────┘                       │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │ Cidade      │  │ CEP         │  │ Telefone    │            │
+│  │ [Joinville ]│  │ [89000-000 ]│  │ [(47) 3422.]│            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+│                                                                 │
+│  ┌─────────────────────────────────────┐                       │
+│  │ Email de Contato                    │                       │
+│  │ [contato@empresa.com.br           ] │                       │
+│  └─────────────────────────────────────┘                       │
+│                                                                 │
+│                                       [Salvar Alterações]       │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  [⚙️]  Parametrização                                          │
+│        Configure as regras de comissão da empresa               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ── Comissão Base ──────────────────────────────────────────── │
+│  Defina sobre qual valor a comissão do vendedor será calculada │
+│                                                                 │
+│  ○ Sobre o Valor de Tabela                                     │
+│    Ex: Se valor tabela = R$ 20.000 e % = 8%, comissão = R$ 1.600│
+│                                                                 │
+│  ○ Sobre a Comissão da Empresa                                 │
+│    Ex: Se comissão empresa = R$ 2.500 e % = 8%, com. = R$ 200  │
+│                                                                 │
+│  ── Comissão do Over ───────────────────────────────────────── │
+│  Percentual do Over Líquido que o vendedor recebe              │
+│                                                                 │
+│  ┌──────────────────────────────────┐                          │
+│  │ Percentual do Over (%)           │                          │
+│  │ [10,00                        ]% │                          │
+│  └──────────────────────────────────┘                          │
+│                                                                 │
+│  ℹ️ Quando o vendedor é atribuído a uma venda, ele recebe      │
+│     este percentual sobre o Over Líquido (após impostos).      │
+│                                                                 │
+│                                       [Salvar Parametrização]   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### Arquivos a Criar/Modificar
+## 3. Arquivos a Modificar/Criar
 
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `src/components/empresa/EmpresaRecebimentos.tsx` | Criar | Novo componente principal da aba |
-| `src/components/empresa/RecebimentosFilters.tsx` | Criar | Componente de filtros (datas, texto, status) |
-| `src/components/empresa/RecebimentosTable.tsx` | Criar | Tabela de recebimentos com ações |
-| `src/hooks/useRecebimentosData.ts` | Criar | Hook para processar entrada + parcelas como linhas individuais |
-| `src/pages/Index.tsx` | Modificar | Adicionar nova sub-aba "Recebimentos" |
+### 3.1 Migração de Banco de Dados
+Adicionar novas colunas na tabela `organizations`:
 
----
+```sql
+ALTER TABLE public.organizations
+ADD COLUMN IF NOT EXISTS cnpj text,
+ADD COLUMN IF NOT EXISTS razao_social text,
+ADD COLUMN IF NOT EXISTS endereco text,
+ADD COLUMN IF NOT EXISTS cidade text,
+ADD COLUMN IF NOT EXISTS estado text,
+ADD COLUMN IF NOT EXISTS cep text,
+ADD COLUMN IF NOT EXISTS telefone text,
+ADD COLUMN IF NOT EXISTS email_contato text,
+ADD COLUMN IF NOT EXISTS comissao_base text DEFAULT 'valor_tabela',
+ADD COLUMN IF NOT EXISTS comissao_over_percent numeric DEFAULT 10;
+```
 
-### Detalhes Técnicos
+### 3.2 Frontend - Página de Configurações
+**Arquivo: `src/pages/settings/OrganizationSettings.tsx`**
 
-#### 1. Hook useRecebimentosData.ts
+Expandir para incluir:
+- Formulário editável com todos os campos cadastrais
+- Seção separada de "Parametrização" com:
+  - Radio buttons para escolher a base da comissão
+  - Input numérico para o percentual do over
+- Botões de salvar independentes para cada seção
+- Feedback visual de salvamento (loading states, toasts)
 
-**Propósito**: Transformar dados de vendas e parcelas em uma lista unificada de "recebimentos"
+### 3.3 Hook de Dados
+**Arquivo: `src/hooks/useOrganizationSettings.ts`** (existente)
 
-**Estrutura do Recebimento:**
+Atualizar a interface para incluir novos campos:
+
 ```typescript
-interface Recebimento {
-  id: string;                    // ID único (sale_id + tipo + número)
-  sale_id: string;               // Referência à venda
-  tipo: 'entrada' | 'parcela';   // Tipo do recebimento
-  numero_parcela?: number;       // Número da parcela (se aplicável)
-  data: Date;                    // Data do vencimento/pagamento
-  nf: string;                    // Número da NF
-  cliente: string;               // Nome do cliente
-  produto: string;               // Modelo do produto
-  valor: number;                 // Valor do recebimento
-  percentual_comissao: number;   // % de comissão
-  valor_comissao: number;        // Valor da comissão calculado
-  status: 'pago' | 'pendente';   // Status do pagamento
+export interface OrganizationSettings {
+  // Campos IMAP existentes...
+  
+  // Novos campos cadastrais
+  cnpj: string;
+  razao_social: string;
+  endereco: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+  telefone: string;
+  email_contato: string;
+  
+  // Parametrização de comissões
+  comissao_base: 'valor_tabela' | 'comissao_empresa';
+  comissao_over_percent: number;
 }
 ```
 
-**Lógica de transformação:**
-1. Para cada venda aprovada/paga, criar um recebimento de "entrada" usando `valor_entrada` e `emission_date`
-2. Para cada parcela em `installments`, criar um recebimento usando `due_date` e `value`
-3. Calcular comissão: `percentual * valor / 100`
-4. Unificar em lista ordenável e filtrável
+---
 
-#### 2. RecebimentosFilters.tsx
+## 4. Integração com Cálculo de Comissão
 
-**Componentes de filtro:**
+Após implementar a parametrização, o cálculo em `CommissionCalculator.tsx` deverá:
 
-- **Data Início / Data Fim**: Dois DatePickers independentes para selecionar período
-- **Cliente**: Input de texto com busca
-- **NF**: Input de texto
-- **Produto**: Input de texto
-- **Status**: Radio buttons (Todos / Pago / Pendente)
-
-**Layout:**
-```tsx
-<div className="grid grid-cols-5 gap-4">
-  <DatePicker label="Data Início" />
-  <DatePicker label="Data Fim" />
-  <Input placeholder="Cliente..." />
-  <Input placeholder="NF..." />
-  <Input placeholder="Produto..." />
-</div>
-<div className="flex items-center gap-4">
-  <RadioGroup value={status}>
-    <Radio value="todos">Todos</Radio>
-    <Radio value="pago">Pago</Radio>
-    <Radio value="pendente">Pendente</Radio>
-  </RadioGroup>
-  <Button>Filtrar</Button>
-  <Button variant="ghost">Limpar</Button>
-</div>
-```
-
-#### 3. RecebimentosTable.tsx
-
-**Colunas:**
-
-| Coluna | Campo | Tipo |
-|--------|-------|------|
-| Data | data | date |
-| NF | nf | text |
-| Cliente | cliente | text |
-| Produto | produto | text |
-| Valor Total | valor | currency |
-| % Comiss | percentual_comissao | percent |
-| Valor Comiss | valor_comissao | currency |
-| Status | status | badge + toggle |
-
-**Funcionalidades:**
-- Ordenação por qualquer coluna
-- Status clicável para alternar entre Pago/Pendente
-- Badge colorido (verde=Pago, amarelo=Pendente)
-
-**Atualização de Status:**
-```typescript
-const updateStatus = async (recebimento: Recebimento, newStatus: 'pago' | 'pendente') => {
-  if (recebimento.tipo === 'entrada') {
-    // Atualizar sale.status ou campo específico de entrada
-  } else {
-    // Atualizar installments.status
-    await supabase
-      .from('installments')
-      .update({ 
-        status: newStatus,
-        paid_at: newStatus === 'pago' ? new Date().toISOString() : null 
-      })
-      .eq('id', recebimento.installment_id);
-  }
-};
-```
-
-#### 4. EmpresaRecebimentos.tsx
-
-**Componente principal:**
-```tsx
-export function EmpresaRecebimentos({ sales, loading, onRefresh }) {
-  const { recebimentos, totalPendente } = useRecebimentosData(sales);
-  const [filteredRecebimentos, setFilteredRecebimentos] = useState([]);
-  
-  return (
-    <div className="space-y-4">
-      {/* Header com total pendente */}
-      <div className="flex justify-between items-center">
-        <h2>Recebimentos</h2>
-        <div className="text-right">
-          <span className="text-sm text-muted-foreground">
-            VALOR PENDENTE A RECEBER
-          </span>
-          <p className="text-2xl font-bold text-primary">
-            {formatCurrency(totalPendente)}
-          </p>
-        </div>
-      </div>
-      
-      {/* Filtros */}
-      <RecebimentosFilters onFilter={setFilteredRecebimentos} />
-      
-      {/* Tabela */}
-      <RecebimentosTable 
-        recebimentos={filteredRecebimentos} 
-        onStatusChange={handleStatusChange}
-      />
-    </div>
-  );
-}
-```
-
-#### 5. Index.tsx - Modificações
-
-**Adicionar nova sub-aba:**
-```tsx
-<Tabs defaultValue="dashboard" className="space-y-4">
-  <TabsList className="grid w-full max-w-lg grid-cols-3">  {/* Era cols-2 */}
-    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-    <TabsTrigger value="vendas">Vendas</TabsTrigger>
-    <TabsTrigger value="recebimentos">Recebimentos</TabsTrigger>  {/* Nova */}
-  </TabsList>
-  
-  {/* ... tabs existentes ... */}
-  
-  <TabsContent value="recebimentos">
-    <EmpresaRecebimentos
-      sales={salesWithCalculations}
-      loading={dataLoading}
-      onRefresh={refetch}
-    />
-  </TabsContent>
-</Tabs>
-```
+1. **Buscar configurações da organização** ao carregar
+2. **Usar `comissao_over_percent`** (da parametrização) ao invés do 10% fixo atual
+3. **Aplicar a lógica de `comissao_base`** para determinar sobre qual valor calcular o percentual do vendedor
 
 ---
 
-### Fluxo de Dados
+## Detalhes Técnicos
 
-```text
-┌─────────────┐    ┌───────────────┐    ┌────────────────────┐
-│   sales     │────▶│ useSalesWCalculations │────▶│ useRecebimentosData │
-└─────────────┘    └───────────────┘    └──────────┬─────────┘
-                                                    │
-┌─────────────┐                                     │
-│ installments│─────────────────────────────────────┘
-└─────────────┘                                     │
-                                                    ▼
-                                        ┌───────────────────┐
-                                        │ Lista unificada   │
-                                        │ de Recebimentos   │
-                                        │ (entrada+parcelas)│
-                                        └───────────────────┘
-```
+### Validações de Input
+- **CNPJ**: Máscara `XX.XXX.XXX/XXXX-XX` com validação de formato
+- **Telefone**: Máscara `(XX) XXXXX-XXXX`
+- **CEP**: Máscara `XXXXX-XXX`
+- **Estado**: Dropdown com UFs brasileiras
+- **Percentual Over**: Min 0, Max 100, permitir decimais
 
----
+### Permissões
+- Apenas usuários com role `admin` ou `manager` podem editar configurações
+- A política RLS existente já cobre UPDATE para admins/managers
 
-### Filtros - Lógica de Aplicação
-
-| Filtro | Lógica |
-|--------|--------|
-| Data Início | `recebimento.data >= dataInicio` |
-| Data Fim | `recebimento.data <= dataFim` |
-| Cliente | `recebimento.cliente.toLowerCase().includes(search)` |
-| NF | `recebimento.nf.includes(search)` |
-| Produto | `recebimento.produto.toLowerCase().includes(search)` |
-| Status | `status === 'todos' OR recebimento.status === status` |
+### UX/UI
+- Campos organizados em grid responsivo (2 colunas em desktop, 1 em mobile)
+- Loading skeleton enquanto carrega dados
+- Indicador visual de campos não salvos
+- Confirmação de salvamento com toast
 
 ---
 
-### Resultado Esperado
+## Ordem de Implementação
 
-1. Nova aba "Recebimentos" no menu Empresa
-2. Visualização de entrada + parcelas como linhas individuais
-3. Filtros intuitivos com DatePickers para selecionar período
-4. Filtros de texto para Cliente, NF, Produto
-5. Toggle de status (Pago/Pendente) com atualização em tempo real
-6. Cálculo automático de comissão por linha (% sobre valor)
-7. Total pendente a receber sempre visível no topo
+1. **Migração SQL** - Adicionar colunas no banco
+2. **Atualizar hook** - Incluir novos campos em `useOrganizationSettings`
+3. **Expandir página** - Reformular `OrganizationSettings.tsx` com formulários
+4. **Validações** - Adicionar máscaras e validações de input
+5. **Integrar com calculadora** - Usar parametrização no `CommissionCalculator`
