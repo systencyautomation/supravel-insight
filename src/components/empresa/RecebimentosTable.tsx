@@ -14,7 +14,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { formatCurrency } from '@/lib/utils';
 import { Recebimento } from '@/hooks/useRecebimentosData';
 
-type SortField = 'data' | 'nf' | 'cliente' | 'produto' | 'valor' | 'percentual_comissao' | 'valor_comissao' | 'status';
+type SortField = 'data' | 'tipo' | 'nf' | 'cliente' | 'produto' | 'valor' | 'percentual_comissao' | 'valor_comissao' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 interface RecebimentosTableProps {
@@ -43,6 +43,11 @@ export function RecebimentosTable({ recebimentos, loading, onStatusChange }: Rec
     switch (sortField) {
       case 'data':
         comparison = a.data.getTime() - b.data.getTime();
+        break;
+      case 'tipo':
+        const tipoA = a.tipo === 'entrada' ? 'Entrada' : `Parcela ${a.numero_parcela}`;
+        const tipoB = b.tipo === 'entrada' ? 'Entrada' : `Parcela ${b.numero_parcela}`;
+        comparison = tipoA.localeCompare(tipoB);
         break;
       case 'nf':
         comparison = a.nf.localeCompare(b.nf);
@@ -114,10 +119,11 @@ export function RecebimentosTable({ recebimentos, loading, onStatusChange }: Rec
         <TableHeader>
           <TableRow className="bg-muted/50">
             <SortableHeader field="data">Data</SortableHeader>
+            <SortableHeader field="tipo">Tipo</SortableHeader>
             <SortableHeader field="nf">NF</SortableHeader>
             <SortableHeader field="cliente">Cliente</SortableHeader>
             <SortableHeader field="produto">Produto</SortableHeader>
-            <SortableHeader field="valor">Valor Total</SortableHeader>
+            <SortableHeader field="valor">Valor</SortableHeader>
             <SortableHeader field="percentual_comissao">% Com</SortableHeader>
             <SortableHeader field="valor_comissao">Valor Com</SortableHeader>
             <SortableHeader field="status">Status</SortableHeader>
@@ -128,6 +134,11 @@ export function RecebimentosTable({ recebimentos, loading, onStatusChange }: Rec
             <TableRow key={recebimento.id} className="hover:bg-muted/30">
               <TableCell className="font-medium">
                 {format(recebimento.data, 'dd/MM/yyyy', { locale: ptBR })}
+              </TableCell>
+              <TableCell>
+                <span className={recebimento.tipo === 'entrada' ? 'text-primary font-medium' : 'text-muted-foreground'}>
+                  {recebimento.tipo === 'entrada' ? 'Entrada' : `Parcela ${recebimento.numero_parcela}`}
+                </span>
               </TableCell>
               <TableCell>{recebimento.nf}</TableCell>
               <TableCell className="max-w-[200px] truncate" title={recebimento.cliente}>
