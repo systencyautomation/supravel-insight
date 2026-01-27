@@ -34,12 +34,14 @@ export function useRecebimentosData(sales: SaleWithCalculations[]): Recebimentos
         return;
       }
 
+      // Usar percentual salvo OU calculado (prioridade para o salvo)
       const percentualComissao = Number(sale.percentual_comissao) || sale.percentualComissaoCalculado || 0;
       const nf = sale.nfe_number || '';
       const cliente = sale.client_name || '';
       const produto = sale.produto_modelo || sale.produto_descricao || '';
 
-      // 1. Criar recebimento de ENTRADA (valor_entrada ou entradaCalculada)
+      // 1. Criar recebimento de ENTRADA
+      // Priorizar valor_entrada salvo, senão usar entradaCalculada
       const valorEntrada = Number(sale.valor_entrada) || sale.entradaCalculada || 0;
       
       if (valorEntrada > 0) {
@@ -60,7 +62,7 @@ export function useRecebimentosData(sales: SaleWithCalculations[]): Recebimentos
         });
       }
 
-      // 2. Criar recebimentos para cada PARCELA
+      // 2. Criar recebimentos para cada PARCELA (já filtradas no useSalesWithCalculations)
       if (sale.installments && sale.installments.length > 0) {
         sale.installments.forEach((inst, index) => {
           const valorParcela = Number(inst.value) || 0;
