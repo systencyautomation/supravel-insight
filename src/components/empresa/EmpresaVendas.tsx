@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { SalesListTable } from '@/components/vendas/SalesListTable';
 import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,13 @@ interface EmpresaVendasProps {
 }
 
 export function EmpresaVendas({ sales, loading, onRefresh }: EmpresaVendasProps) {
+  // Filter to show only "aprovado" and "pendente" status (exclude "pago")
+  const filteredSales = useMemo(() => {
+    return sales.filter(sale => 
+      sale.status === 'aprovado' || sale.status === 'pendente'
+    );
+  }, [sales]);
+
   return (
     <div className="space-y-4">
       {/* Header actions */}
@@ -33,7 +41,7 @@ export function EmpresaVendas({ sales, loading, onRefresh }: EmpresaVendasProps)
       </div>
 
       {/* Sales table with filters */}
-      <SalesListTable sales={sales} loading={loading} />
+      <SalesListTable sales={filteredSales} loading={loading} showApprovalInfo />
     </div>
   );
 }

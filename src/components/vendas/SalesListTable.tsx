@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Eye, BadgeCheck, FileText, X, Calculator } from 'lucide-react';
+import { Eye, BadgeCheck, FileText, X, Calculator, UserCheck } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/hover-card';
 import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 import { useSalesFilters, ColumnFilters, SortDirection } from '@/hooks/useSalesFilters';
+import { useApprovalProfiles } from '@/hooks/useApprovalProfiles';
 import { ColumnFilterHeader } from './ColumnFilterHeader';
 import { SaleDetailSheet } from '@/components/dashboard/SaleDetailSheet';
 import { cn } from '@/lib/utils';
@@ -71,6 +72,7 @@ const minColumnWidths: Record<ColumnKey, number> = {
 interface SalesListTableProps {
   sales: SaleWithCalculations[];
   loading?: boolean;
+  showApprovalInfo?: boolean;
 }
 
 const formatCurrency = (value: number) => {
@@ -95,7 +97,7 @@ const getStatusBadge = (status: string | null) => {
   }
 };
 
-export function SalesListTable({ sales, loading }: SalesListTableProps) {
+export function SalesListTable({ sales, loading, showApprovalInfo = false }: SalesListTableProps) {
   const {
     filters,
     sortColumn,
@@ -108,6 +110,13 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
     handleSort,
     activeFilterCount,
   } = useSalesFilters(sales);
+
+  // Get approval profiles when showApprovalInfo is true
+  const approverIds = useMemo(() => 
+    showApprovalInfo ? sales.map(s => s.aprovado_por || null) : [],
+    [sales, showApprovalInfo]
+  );
+  const { getProfile } = useApprovalProfiles(approverIds);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -506,48 +515,90 @@ export function SalesListTable({ sales, loading }: SalesListTableProps) {
                     className="w-72 bg-popover border-border shadow-lg"
                     sideOffset={8}
                   >
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Calculator className="h-4 w-4 text-primary" />
-                        <h4 className="font-semibold text-sm">Cálculo Over Price</h4>
+                    {/* Show approval info for approved sales when showApprovalInfo is true */}
+                    {showApprovalInfo && sale.status === 'aprovado' && sale.aprovado_por ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4 text-success" />
+                          <h4 className="font-semibold text-sm">Aprovação</h4>
+                        </div>
+                        <div className="text-sm space-y-1.5">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Aprovado por:</span>
+                            <span className="font-medium">
+                              {getProfile(sale.aprovado_por)?.full_name || 
+                               getProfile(sale.aprovado_por)?.email || 
+                               'Usuário'}
+                            </span>
+                          </div>
+                          {sale.aprovado_em && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Data:</span>
+                              <span className="font-mono text-xs">
+                                {format(new Date(sale.aprovado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </span>
+                            </div>
+                          )}
+                          <div className="border-t border-border/50 my-2 pt-2">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Comissão:</span>
+                              <span className="font-mono text-success font-medium">
+                                {formatCurrency(sale.valorComissaoCalculado)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">Percentual:</span>
+                              <span className="font-mono">
+                                {sale.percentualComissaoCalculado.toFixed(2)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs space-y-1.5 font-mono">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Valor Real (VP):</span>
-                          <span>{formatCurrency(sale.valorReal)}</span>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Calculator className="h-4 w-4 text-primary" />
+                          <h4 className="font-semibold text-sm">Cálculo Over Price</h4>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">(-) Valor Tabela:</span>
-                          <span>{formatCurrency(Number(sale.table_value) || 0)}</span>
-                        </div>
-                        <div className="border-t border-border/50 my-1.5" />
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Over Bruto:</span>
-                          <span className={sale.overPriceBruto >= 0 ? 'text-success' : 'text-destructive'}>
-                            {formatCurrency(sale.overPriceBruto)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-muted-foreground/80">
-                          <span>(-) ICMS:</span>
-                          <span className="text-destructive">-{formatCurrency(sale.deducaoIcms)}</span>
-                        </div>
-                        <div className="flex justify-between text-muted-foreground/80">
-                          <span>(-) PIS/COFINS 9,25%:</span>
-                          <span className="text-destructive">-{formatCurrency(sale.deducaoPisCofins)}</span>
-                        </div>
-                        <div className="flex justify-between text-muted-foreground/80">
-                          <span>(-) IR/CSLL 34%:</span>
-                          <span className="text-destructive">-{formatCurrency(sale.deducaoIrCsll)}</span>
-                        </div>
-                        <div className="border-t border-border/50 my-1.5" />
-                        <div className="flex justify-between font-semibold">
-                          <span>Over Líquido:</span>
-                          <span className={sale.overPriceLiquido >= 0 ? 'text-success' : 'text-destructive'}>
-                            {formatCurrency(sale.overPriceLiquido)}
-                          </span>
+                        <div className="text-xs space-y-1.5 font-mono">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Valor Real (VP):</span>
+                            <span>{formatCurrency(sale.valorReal)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">(-) Valor Tabela:</span>
+                            <span>{formatCurrency(Number(sale.table_value) || 0)}</span>
+                          </div>
+                          <div className="border-t border-border/50 my-1.5" />
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Over Bruto:</span>
+                            <span className={sale.overPriceBruto >= 0 ? 'text-success' : 'text-destructive'}>
+                              {formatCurrency(sale.overPriceBruto)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground/80">
+                            <span>(-) ICMS:</span>
+                            <span className="text-destructive">-{formatCurrency(sale.deducaoIcms)}</span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground/80">
+                            <span>(-) PIS/COFINS 9,25%:</span>
+                            <span className="text-destructive">-{formatCurrency(sale.deducaoPisCofins)}</span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground/80">
+                            <span>(-) IR/CSLL 34%:</span>
+                            <span className="text-destructive">-{formatCurrency(sale.deducaoIrCsll)}</span>
+                          </div>
+                          <div className="border-t border-border/50 my-1.5" />
+                          <div className="flex justify-between font-semibold">
+                            <span>Over Líquido:</span>
+                            <span className={sale.overPriceLiquido >= 0 ? 'text-success' : 'text-destructive'}>
+                              {formatCurrency(sale.overPriceLiquido)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </HoverCardContent>
                 </HoverCard>
               ))
