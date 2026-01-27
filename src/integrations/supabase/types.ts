@@ -439,7 +439,15 @@ export type Database = {
         Row: {
           active: boolean | null
           automation_active: boolean | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          comissao_base: string | null
+          comissao_over_percent: number | null
           created_at: string | null
+          email_contato: string | null
+          endereco: string | null
+          estado: string | null
           id: string
           imap_allowed_domains: string[] | null
           imap_allowed_emails: string[] | null
@@ -448,12 +456,22 @@ export type Database = {
           imap_port: number | null
           imap_user: string | null
           name: string
+          razao_social: string | null
           slug: string
+          telefone: string | null
         }
         Insert: {
           active?: boolean | null
           automation_active?: boolean | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          comissao_base?: string | null
+          comissao_over_percent?: number | null
           created_at?: string | null
+          email_contato?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
           imap_allowed_domains?: string[] | null
           imap_allowed_emails?: string[] | null
@@ -462,12 +480,22 @@ export type Database = {
           imap_port?: number | null
           imap_user?: string | null
           name: string
+          razao_social?: string | null
           slug: string
+          telefone?: string | null
         }
         Update: {
           active?: boolean | null
           automation_active?: boolean | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          comissao_base?: string | null
+          comissao_over_percent?: number | null
           created_at?: string | null
+          email_contato?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
           imap_allowed_domains?: string[] | null
           imap_allowed_emails?: string[] | null
@@ -476,7 +504,9 @@ export type Database = {
           imap_port?: number | null
           imap_user?: string | null
           name?: string
+          razao_social?: string | null
           slug?: string
+          telefone?: string | null
         }
         Relationships: []
       }

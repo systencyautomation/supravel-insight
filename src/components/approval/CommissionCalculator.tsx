@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { calculateApprovalCommission, formatCurrency, getIcmsRate, calcularValorReal, getTaxaJuros } from '@/lib/approvalCalculator';
 import { CommissionAssignment, type CommissionAssignmentData } from './CommissionAssignment';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import type { PendingSale } from '@/hooks/usePendingSales';
 import type { FipeDocument } from '@/hooks/useFipeDocument';
 
@@ -64,6 +65,7 @@ export function CommissionCalculator({
   onCalculationChange 
 }: CommissionCalculatorProps) {
   const { effectiveOrgId } = useAuth();
+  const { settings: orgSettings } = useOrganizationSettings();
   
   // Dados da Tabela
   const [valorTabela, setValorTabela] = useState(0);
@@ -418,9 +420,10 @@ export function CommissionCalculator({
     const comissaoTabelaInternal = (assignmentData.internalSellerPercent / 100) * valorTabela;
     const comissaoTabelaRep = (assignmentData.representativePercent / 100) * valorTabela;
     
-    // Over: cada participante recebe 10% do over líquido quando selecionado
-    const overInternal = assignmentData.internalSellerId ? overLiquido * 0.10 : 0;
-    const overRep = assignmentData.representativeId ? overLiquido * 0.10 : 0;
+    // Over: usa percentual configurado na organização (default 10%)
+    const overPercent = (orgSettings?.comissao_over_percent ?? 10) / 100;
+    const overInternal = assignmentData.internalSellerId ? overLiquido * overPercent : 0;
+    const overRep = assignmentData.representativeId ? overLiquido * overPercent : 0;
     
     // Total por participante
     const comissaoInternalSeller = comissaoTabelaInternal + Math.max(0, overInternal);
@@ -438,7 +441,7 @@ export function CommissionCalculator({
       comissaoRepresentative,
       comissaoTotalAtribuida,
     };
-  }, [activeCalculation, assignmentData, valorTabela]);
+  }, [activeCalculation, assignmentData, valorTabela, orgSettings?.comissao_over_percent]);
 
   // Notify parent of changes
   useEffect(() => {

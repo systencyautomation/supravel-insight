@@ -4,12 +4,27 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export interface OrganizationSettings {
+  // Campos IMAP
   imap_host: string;
   imap_port: number;
   imap_user: string;
   imap_password: string;
   automation_active: boolean;
   imap_allowed_emails: string[];
+  
+  // Dados cadastrais
+  cnpj: string;
+  razao_social: string;
+  endereco: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+  telefone: string;
+  email_contato: string;
+  
+  // Parametrização de comissões
+  comissao_base: 'valor_tabela' | 'comissao_empresa';
+  comissao_over_percent: number;
 }
 
 interface UseOrganizationSettingsReturn {
@@ -40,7 +55,7 @@ export function useOrganizationSettings(): UseOrganizationSettingsReturn {
       setLoading(true);
       const { data, error } = await supabase
         .from('organizations')
-        .select('imap_host, imap_port, imap_user, imap_password, automation_active, imap_allowed_emails')
+        .select('imap_host, imap_port, imap_user, imap_password, automation_active, imap_allowed_emails, cnpj, razao_social, endereco, cidade, estado, cep, telefone, email_contato, comissao_base, comissao_over_percent')
         .eq('id', effectiveOrgId)
         .single();
 
@@ -53,6 +68,18 @@ export function useOrganizationSettings(): UseOrganizationSettingsReturn {
         imap_password: data.imap_password || '',
         automation_active: data.automation_active || false,
         imap_allowed_emails: data.imap_allowed_emails || [],
+        // Dados cadastrais
+        cnpj: data.cnpj || '',
+        razao_social: data.razao_social || '',
+        endereco: data.endereco || '',
+        cidade: data.cidade || '',
+        estado: data.estado || '',
+        cep: data.cep || '',
+        telefone: data.telefone || '',
+        email_contato: data.email_contato || '',
+        // Parametrização
+        comissao_base: (data.comissao_base as 'valor_tabela' | 'comissao_empresa') || 'valor_tabela',
+        comissao_over_percent: data.comissao_over_percent ?? 10,
       });
     } catch (error) {
       console.error('Error fetching organization settings:', error);

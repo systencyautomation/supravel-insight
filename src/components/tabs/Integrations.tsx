@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 export function Integrations() {
   const { settings, loading, saving, testing, updateSettings, testConnection } = useOrganizationSettings();
   
-  const [formData, setFormData] = useState<OrganizationSettings>({
+  const [formData, setFormData] = useState<Partial<OrganizationSettings>>({
     imap_host: 'imap.hostgator.com.br',
     imap_port: 993,
     imap_user: '',
@@ -77,7 +77,25 @@ export function Integrations() {
   };
 
   const handleTestConnection = async () => {
-    const success = await testConnection(formData);
+    const testSettings: OrganizationSettings = {
+      imap_host: formData.imap_host || 'imap.hostgator.com.br',
+      imap_port: formData.imap_port || 993,
+      imap_user: formData.imap_user || '',
+      imap_password: formData.imap_password || '',
+      automation_active: formData.automation_active || false,
+      imap_allowed_emails: formData.imap_allowed_emails || [],
+      cnpj: '',
+      razao_social: '',
+      endereco: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      telefone: '',
+      email_contato: '',
+      comissao_base: 'valor_tabela',
+      comissao_over_percent: 10,
+    };
+    const success = await testConnection(testSettings);
     setConnectionStatus(success ? 'success' : 'error');
   };
 
