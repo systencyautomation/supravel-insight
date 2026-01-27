@@ -74,10 +74,12 @@ export function usePermissions() {
   }, [fetchPermissions]);
 
   const hasPermission = useCallback((permission: Permission): boolean => {
+    // SECURITY: Deny by default while loading to prevent UI flash
+    if (loading) return false;
     if (isMasterAdmin) return true;
     if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'saas_admin') return true;
     return permissions.includes(permission);
-  }, [isMasterAdmin, userRole, permissions]);
+  }, [loading, isMasterAdmin, userRole, permissions]);
 
   const refreshPermissions = useCallback(() => {
     setLoading(true);
