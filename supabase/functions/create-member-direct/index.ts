@@ -91,24 +91,46 @@ Deno.serve(async (req: Request) => {
     // Create admin client for privileged operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the requesting user has permission (admin or manager) in the organization
-    const { data: userRoles, error: rolesError } = await supabaseAdmin
+    // First check if user is super_admin or saas_admin (global permissions)
+    const { data: globalRoles, error: globalRolesError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", authUser.id)
-      .eq("organization_id", organizationId);
+      .eq("user_id", authUser.id);
 
-    if (rolesError) {
-      console.error("Error fetching user roles:", rolesError);
+    if (globalRolesError) {
+      console.error("Error fetching global roles:", globalRolesError);
       return new Response(
         JSON.stringify({ error: "Erro ao verificar permissões" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const hasPermission = userRoles?.some(
-      (r) => r.role === "admin" || r.role === "manager" || r.role === "super_admin"
+    const isGlobalAdmin = globalRoles?.some(
+      (r) => r.role === "super_admin" || r.role === "saas_admin"
     );
+
+    // If not global admin, check organization-specific permissions
+    let hasPermission = isGlobalAdmin;
+    
+    if (!hasPermission) {
+      const { data: orgRoles, error: orgRolesError } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", authUser.id)
+        .eq("organization_id", organizationId);
+
+      if (orgRolesError) {
+        console.error("Error fetching org roles:", orgRolesError);
+        return new Response(
+          JSON.stringify({ error: "Erro ao verificar permissões" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      hasPermission = orgRoles?.some(
+        (r) => r.role === "admin" || r.role === "manager"
+      ) || false;
+    }
 
     if (!hasPermission) {
       return new Response(
