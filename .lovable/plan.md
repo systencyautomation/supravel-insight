@@ -1,151 +1,151 @@
 
 
-# Correção: Separação Clara entre Comissão Empresa vs Vendedor
+# Correção: Layout, Nomenclatura e Cálculo da Comissão
 
-## Problema Raiz
+## Problemas Identificados
 
-O campo `commission_calculated` no banco está sendo usado para dois propósitos conflitantes:
+### 1. Layout dos Botões na Etapa 2 Diferente da Etapa 1
 
-| Momento | O que guarda | Problema |
-|---------|-------------|----------|
-| Na aprovação (Etapa 1) | Comissão da empresa (ex: R$ 1.971,61) | OK |
-| Na atribuição (Etapa 2) | Total do vendedor (ex: R$ 127,81) | Sobrescreve! |
+**Etapa 1 (SalesApproval.tsx):**
+- Botões ficam no **footer da página** (fora do Card)
+- Alinhamento: `flex justify-end gap-3`
 
-Quando você edita a comissão do vendedor (Etapa 2), ao salvar, o campo `commission_calculated` recebe o valor do vendedor (linha 203 de SalesApproval.tsx):
+**Etapa 2 (SellerAssignment.tsx):**
+- Botões ficam no **footer do Card** (dentro do CardContent)
+- Alinhamento: `flex justify-between gap-3`
 
-```
-commission_calculated: assignmentData.comissaoTotalAtribuida
-```
+**Solução:** Mover os botões da Etapa 2 para o footer da página (SalesApproval.tsx), igual à Etapa 1. Remover o footer interno do SellerAssignment e deixar os botões no mesmo lugar.
 
-Isso faz com que:
-1. A próxima edição mostre "Comissão Empresa: R$ 127,81" (errado!)
-2. O percentual calculado apareça como 0.58% (127/22.000 × 100)
+### 2. Comissão da Empresa Sendo Sobrescrita
 
----
+Ao salvar com vendedor, o campo `commission_calculated` está recebendo o valor do vendedor (R$ 134,19) correto.
 
-## Solução
+**O problema real:** Na seção "Comissão" do SaleDetailSheet, o campo "Comissão Atribuída" mostra R$ 134,19, mas visualmente parece que essa seria a soma de R$ 1.679,33 + R$ 292,28 = R$ 1.971,61.
 
-### 1. Definir Claramente o Propósito do Campo `commission_calculated`
+**Solução:** 
+- "Comissão Atribuída" deve mostrar o valor que realmente foi atribuído ao vendedor/representante (R$ 134,19 está correto)
+- Adicionar uma linha para "Comissão Total da Empresa" que é R$ 1.679,33 + R$ 292,28 = R$ 1.971,61
+- OU remover a soma e deixar claro que são valores separados
 
-Este campo deve guardar apenas a **comissão total atribuída** (soma de vendedor + representante). A comissão da empresa NÃO precisa ser salva - pode ser sempre **calculada** como:
+### 3. Nome "Comissão" com Porcentagem
 
-```
-Comissão Empresa = table_value × (percentual_comissao / 100)
-```
-
-### 2. Corrigir Inicialização no Modo Edição (SalesApproval.tsx)
-
-Ao entrar em modo edição com step=2, calcular `comissaoTotal` corretamente a partir dos dados da tabela:
-
-```typescript
-// Linha 77 - Já corrigido anteriormente
-comissaoTotal: (editableSale.table_value || 0) * ((editableSale.percentual_comissao || 0) / 100),
-```
-
-Esta linha já está correta! O problema está em outro lugar.
-
-### 3. Corrigir Exibição da "Comissão Empresa" no SellerAssignment
-
-No `SellerAssignment.tsx` (linha 253-254), o valor exibido como "Comissão Empresa" deve ser recalculado, não pego do `confirmedData`:
-
-Alterar de:
-```typescript
-<p className="font-semibold text-primary">{formatCurrency(confirmedData.comissaoTotal)}</p>
-```
-
-Para:
-```typescript
-const comissaoEmpresa = confirmedData.valorTabela * (confirmedData.percentualComissao / 100);
-<p className="font-semibold text-primary">{formatCurrency(comissaoEmpresa)}</p>
-```
-
-### 4. Corrigir SaleDetailSheet para Mostrar Valores Corretos
-
-No `SaleDetailSheet.tsx`, separar a exibição da comissão da empresa e do vendedor:
-
-- **Comissão Base** = `table_value × percentual_comissao` (calculado)
-- **Comissão Atribuída** = `commission_calculated` (o que o vendedor recebe)
-
-### 5. Remover Botões Duplicados no Modo Edição Step 2
-
-No `SalesApproval.tsx`, ocultar o footer quando estiver em `step === 2`, pois o `SellerAssignment` já tem seus próprios botões:
-
-```typescript
-// Linha 524: adicionar condição
-{isEditMode && canApprove && step === 1 && (
-```
-
-### 6. Adaptar Botões do SellerAssignment para Modo Edição
-
-Passar prop `isEditMode` para `SellerAssignment` e alterar o texto dos botões:
-
-- Modo Aprovação: "Rejeitar" / "Aprovar Venda"
-- Modo Edição: "Cancelar" / "Salvar Alterações"
+Voltar para o nome original:
+- **De:** "Comissão Atribuída" (sem %)
+- **Para:** "Comissão" (com badge mostrando a %)
 
 ---
 
 ## Arquivos a Modificar
 
-1. **`src/components/approval/SellerAssignment.tsx`**
-   - Calcular `comissaoEmpresa` independentemente do `confirmedData.comissaoTotal`
-   - Receber prop `isEditMode` para alterar texto dos botões
-   - Trocar "Aprovar Venda" → "Salvar Alterações" quando em edição
-   - Trocar "Rejeitar" → "Cancelar" quando em edição
+### 1. `src/components/approval/SellerAssignment.tsx`
 
-2. **`src/pages/SalesApproval.tsx`**
-   - Ocultar footer quando `step === 2`
-   - Passar `isEditMode` para `SellerAssignment`
+Remover o footer interno (linhas 498-521) e passar a responsabilidade para SalesApproval.tsx:
 
-3. **`src/components/dashboard/SaleDetailSheet.tsx`**
-   - Calcular e exibir "Comissão Empresa" separadamente
-   - Se houver atribuição, mostrar também "Comissão Atribuída"
+```typescript
+// Remover o bloco {!showRejectInput && ( ... )} no final do Card
+// O componente agora termina sem o footer de botões
+```
 
-4. **`src/hooks/useSalesWithCalculations.ts`**
-   - Melhorar lógica para distinguir comissão empresa vs vendedor
+### 2. `src/pages/SalesApproval.tsx`
 
----
+Adicionar footer para step === 2 no mesmo estilo do step === 1:
 
-## Fluxo Corrigido
+```typescript
+{/* Actions - Step 1 or Step 2 */}
+{canApprove && (
+  <div className="p-4 border-t bg-card flex justify-end gap-3">
+    {step === 1 && isEditMode && (
+      <>
+        <Button variant="outline" onClick={() => navigate(-1)}>
+          Cancelar
+        </Button>
+        <Button onClick={handleConfirmCalculations} disabled={!currentSale || !calculationData}>
+          Próxima Etapa
+        </Button>
+      </>
+    )}
+    {step === 2 && (
+      <>
+        <Button variant="outline" onClick={isEditMode ? () => navigate(-1) : () => setShowRejectInput(true)}>
+          {isEditMode ? 'Cancelar' : 'Rejeitar'}
+        </Button>
+        <Button onClick={handleStep2Approve}>
+          {isEditMode ? 'Salvar Alterações' : 'Aprovar Venda'}
+        </Button>
+      </>
+    )}
+  </div>
+)}
+```
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│ ETAPA 2: Atribuição de Vendedor (Modo Edição)              │
-├────────────────────────────────────────────────────────────┤
-│                                                            │
-│ ┌─ Valores Confirmados ──────────────────────────────────┐ │
-│ │ Valor Tabela:        R$ 20.991,67                      │ │
-│ │ Over Price Líquido:  R$ 292,28                         │ │
-│ │ Comissão Empresa:    R$ 1.679,33  ← CALCULADO (8%)     │ │
-│ │ Percentual Final:    8.00%                             │ │
-│ └────────────────────────────────────────────────────────┘ │
-│                                                            │
-│ ┌─ Vendedor Interno ─────────────────────────────────────┐ │
-│ │ ☑ Vendedor Interno                                     │ │
-│ │ [Tainã Marques ▼]    [0,5] % sobre Tabela              │ │
-│ │                                                        │ │
-│ │ Tabela (0,5%):       R$ 104,96                         │ │
-│ │ Over (10%):          R$ 29,23                          │ │
-│ │ ─────────────────────────────                          │ │
-│ │ Total:               R$ 134,19                         │ │
-│ └────────────────────────────────────────────────────────┘ │
-│                                                            │
-│ ┌─ Total a Pagar ────────────────────────────────────────┐ │
-│ │ Total Atribuído:     R$ 134,19                         │ │
-│ └────────────────────────────────────────────────────────┘ │
-│                                                            │
-│             [Cancelar]        [Salvar Alterações]          │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
+### 3. `src/components/dashboard/SaleDetailSheet.tsx`
+
+Ajustar a seção de Comissão para:
+1. Voltar ao nome "Comissão" com badge de porcentagem
+2. Calcular o percentual corretamente baseado no total da empresa
+
+```typescript
+// Calcular comissão total da empresa
+const comissaoEmpresaTotal = ((Number(sale.table_value) || 0) * ((Number(sale.percentual_comissao) || 0) / 100)) + sale.overPriceLiquido;
+const percentualCalculado = sale.total_value ? ((Number(sale.commission_calculated) || 0) / sale.total_value) * 100 : 0;
+
+// Na UI:
+<div className="flex justify-between text-lg font-bold">
+  <div className="flex items-center gap-2">
+    <span>Comissão</span>
+    <Badge variant="outline" className="text-xs">
+      {percentualCalculado.toFixed(2)}%
+    </Badge>
+  </div>
+  <span className="text-primary">{formatCurrency(Number(sale.commission_calculated) || 0)}</span>
+</div>
 ```
 
 ---
 
-## Resumo das Mudanças
+## Resumo Visual
 
-| Arquivo | Mudança |
-|---------|---------|
-| SellerAssignment.tsx | Calcular comissaoEmpresa localmente; Receber isEditMode; Alterar texto botões |
-| SalesApproval.tsx | Ocultar footer em step=2; Passar isEditMode |
-| SaleDetailSheet.tsx | Separar comissão empresa vs atribuída |
-| useSalesWithCalculations.ts | Distinguir comissão empresa vs vendedor |
+```text
+LAYOUT ATUAL (Etapa 2):
+┌─────────────────────────────────────────────────┐
+│ Card: Atribuição de Vendedor                    │
+│  ┌──────────────────────────────────────────┐   │
+│  │ Conteúdo...                              │   │
+│  ├──────────────────────────────────────────┤   │
+│  │ [Cancelar]     [Salvar Alterações]       │ ← Dentro do Card
+│  └──────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────┘
+
+LAYOUT CORRETO (igual Etapa 1):
+┌─────────────────────────────────────────────────┐
+│ Card: Atribuição de Vendedor                    │
+│  ┌──────────────────────────────────────────┐   │
+│  │ Conteúdo...                              │   │
+│  └──────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────┤
+│        [Cancelar]     [Salvar Alterações]       │ ← Footer da página
+└─────────────────────────────────────────────────┘
+```
+
+```text
+SALEDETAILSHEET - Seção Comissão:
+┌─────────────────────────────────────────────────┐
+│ % Comissão                                      │
+├─────────────────────────────────────────────────┤
+│ Comissão Empresa (8%)              R$ 1.679,33  │
+│ Over Price Líquido                 R$ 292,28    │
+├─────────────────────────────────────────────────┤
+│ Comissão                [0.61%]    R$ 134,19    │ ← Nome original + badge
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## Arquivos Impactados
+
+| Arquivo | Modificação |
+|---------|-------------|
+| `SellerAssignment.tsx` | Remover footer interno, expor handlers via callbacks |
+| `SalesApproval.tsx` | Adicionar footer unificado para step 1 e step 2 |
+| `SaleDetailSheet.tsx` | Voltar nome "Comissão" com badge de porcentagem |
 
