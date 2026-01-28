@@ -1,115 +1,109 @@
 
+# Correção: Cálculo de ICMS e Persistência das Deduções
 
-# Correção: Separar Comissão da Empresa vs Comissão do Vendedor
+## Problemas Identificados
 
-## Problema Identificado
+### 1. ICMS Calculado Errado (R$ 2.033,28 em vez de R$ 20,33)
 
-O campo `commission_calculated` está salvando a comissão do **vendedor** (R$ 134,19), mas a aba da **Empresa** exibe esse valor como se fosse a comissão da empresa.
+**Causa:** O campo `percentual_icms` está salvo como `4.00` (inteiro), mas o código multiplica diretamente:
+- **Errado:** `508.32 × 4.00 = 2.033,28`
+- **Correto:** `508.32 × 0.04 = 20,33`
 
-### Fluxo Atual
+### 2. Deduções Não Persistidas
 
-| Passo | O que acontece | Problema |
-|-------|---------------|----------|
-| Etapa 2 Salva | `commission_calculated = R$ 134,19` (vendedor) | OK - salva corretamente |
-| Aba Empresa | Lê `commission_calculated = R$ 134,19` | ERRADO - mostra comissão do vendedor |
-| Hook | `valorComissaoCalculado = comissaoSalva` | ERRADO - deveria ser comissão da empresa |
-
-### Regra de Negócio
-
-- **Aba Empresa**: deve mostrar a comissão **da empresa** = (Tabela × %) + Over Líquido = R$ 1.679,33 + R$ 292,28 = R$ 1.971,61
-- **Aba Vendedores**: deve mostrar a comissão **do vendedor** = R$ 134,19
-
----
-
-## Solução
-
-### 1. Modificar `useSalesWithCalculations.ts`
-
-**Mudar a lógica**: Quando `commission_calculated` existir, NÃO usar diretamente para `valorComissaoCalculado`. Em vez disso:
-
-```typescript
-// SEMPRE calcular a comissão da empresa dinamicamente
-const percentualComissaoBase = Number(sale.percentual_comissao) || 8;
-const comissaoEmpresaBase = tableValue * (percentualComissaoBase / 100);
-
-// Calcular Over Price
-const overPriceBruto = valorReal - tableValue;
-const overPriceLiquido = overPriceBruto * (1 - 0.0925 - 0.34 - icmsDestino);
-
-// Comissão da empresa = base + over líquido
-const valorComissaoEmpresa = comissaoEmpresaBase + overPriceLiquido;
-const percentualComissaoEmpresa = totalValue > 0 ? (valorComissaoEmpresa / totalValue) * 100 : 0;
-```
-
-O `commission_calculated` do banco será guardado em um campo separado: `comissaoAtribuida` para uso na aba de vendedores.
-
-### 2. Adicionar Campo `comissaoAtribuida` ao Hook
-
-Novo campo na interface `SaleWithCalculations`:
-
-```typescript
-export interface SaleWithCalculations extends SaleWithDetails {
-  // ... outros campos
-  
-  // Comissão da empresa (calculada)
-  valorComissaoCalculado: number;   // Empresa = base + over
-  percentualComissaoCalculado: number;
-  
-  // Comissão atribuída (salva no banco)
-  comissaoAtribuida: number;        // O que o vendedor/rep recebe
-}
-```
-
-### 3. Ajustar Exibição na Aba Empresa
-
-**`SalesListTable.tsx`** já usa `valorComissaoCalculado`, que agora terá o valor correto da empresa.
-
-### 4. Ajustar Exibição na Aba Vendedores
-
-**`InternalSellerCommissions.tsx`** deve usar `comissaoAtribuida` (o novo campo) em vez de `valorComissaoCalculado`.
+As colunas `icms`, `pis_cofins` e `ir_csll` na tabela `sales` estão `null`. Esses valores precisam ser salvos durante a aprovação para que apareçam corretamente na visualização posterior.
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Modificação |
-|---------|-------------|
-| `src/hooks/useSalesWithCalculations.ts` | Calcular `valorComissaoCalculado` como comissão da empresa; Adicionar campo `comissaoAtribuida` |
-| `src/components/tabs/InternalSellerCommissions.tsx` | Usar `comissaoAtribuida` para exibir valor do vendedor |
-| `src/components/tabs/RepresentativeCommissions.tsx` | Usar `comissaoAtribuida` para exibir valor do representante |
+### 1. `src/hooks/useSalesWithCalculations.ts`
+
+**Problema:** Linha 118 usa `sale.percentual_icms` diretamente como multiplicador.
+
+**Solução:** Converter para taxa decimal se o valor for > 1:
+
+```typescript
+// Se percentual_icms é 4, 7, ou 12 (inteiro), converter para 0.04, 0.07, 0.12
+const savedIcmsRate = Number(sale.percentual_icms) || 0;
+const icmsRateCalc = savedIcmsRate > 1 ? savedIcmsRate / 100 : savedIcmsRate;
+deducaoIcms = overPriceBruto * icmsRateCalc;
+```
+
+### 2. `src/pages/SalesApproval.tsx`
+
+**Problema:** As deduções não estão sendo salvas no `updateData`.
+
+**Solução:** Adicionar os campos de dedução no objeto de atualização:
+
+```typescript
+// No handleApproveWithAssignment e handleEditModeSave:
+const updateData = {
+  // ... campos existentes ...
+  
+  // Adicionar deduções para persistir
+  icms: calcularDeducaoIcms(confirmedCalculation.overPrice, confirmedCalculation.icmsDestino),
+  pis_cofins: confirmedCalculation.overPrice * 0.0925,
+  ir_csll: confirmedCalculation.overPrice * 0.34,
+};
+```
+
+### 3. `src/components/approval/CommissionCalculator.tsx`
+
+Adicionar os valores de dedução ao `CalculationData` para que sejam passados corretamente:
+
+```typescript
+export interface CalculationData {
+  // ... campos existentes ...
+  
+  // Deduções para persistência
+  deducaoIcms: number;
+  deducaoPisCofins: number;
+  deducaoIrCsll: number;
+}
+```
 
 ---
 
-## Resumo Visual
+## Fluxo Corrigido
 
 ```text
-BANCO DE DADOS:
+APROVAÇÃO (Etapa 1 ou 2):
 ┌─────────────────────────────────────────────────┐
-│ commission_calculated = R$ 134,19 (vendedor)    │
-│ table_value = R$ 20.991,67                      │
-│ percentual_comissao = 8%                        │
-│ over_price_liquido = R$ 292,28                  │
+│ Cálculos calculados (activeCalculation):        │
+│ - deducaoIcms: R$ 20,33                         │
+│ - deducaoPisCofins: R$ 47,02                    │
+│ - deducaoIrCsll: R$ 148,69                      │
 └─────────────────────────────────────────────────┘
-
-useSalesWithCalculations (CORRIGIDO):
+            ↓ Salvar no banco
 ┌─────────────────────────────────────────────────┐
-│ // Comissão da empresa (calculada)              │
-│ comissaoEmpresaBase = 20.991,67 × 8% = 1.679,33 │
-│ valorComissaoCalculado = 1.679,33 + 292,28      │
-│                       = R$ 1.971,61             │
-│                                                 │
-│ // Comissão atribuída (do banco)                │
-│ comissaoAtribuida = R$ 134,19                   │
+│ UPDATE sales SET                                │
+│   icms = 20.33,                                 │
+│   pis_cofins = 47.02,                           │
+│   ir_csll = 148.69,                             │
+│   ...                                           │
 └─────────────────────────────────────────────────┘
-
-ABA EMPRESA (usa valorComissaoCalculado):
+            ↓ Visualização posterior
 ┌─────────────────────────────────────────────────┐
-│ Comissão: R$ 1.971,61 ← CORRETO!                │
-└─────────────────────────────────────────────────┘
-
-ABA VENDEDORES (usa comissaoAtribuida):
-┌─────────────────────────────────────────────────┐
-│ Total do Vendedor: R$ 134,19 ← CORRETO!         │
+│ SaleDetailSheet lê diretamente do banco:        │
+│ - ICMS (4%): -R$ 20,33                          │
+│ - PIS/COFINS: -R$ 47,02                         │
+│ - IR/CSLL: -R$ 148,69                           │
 └─────────────────────────────────────────────────┘
 ```
 
+---
+
+## Resumo das Mudanças
+
+| Arquivo | Mudança |
+|---------|---------|
+| `useSalesWithCalculations.ts` | Converter `percentual_icms` para decimal (÷ 100 se > 1) |
+| `SalesApproval.tsx` | Adicionar `icms`, `pis_cofins`, `ir_csll` no updateData |
+| `CommissionCalculator.tsx` | Expor deduções no `CalculationData` para persistência |
+
+---
+
+## Sobre "Tem que salvar no banco?"
+
+**Sim!** Para que os valores de dedução apareçam corretamente em visualizações futuras, eles precisam ser persistidos no banco durante a aprovação. Atualmente apenas `over_price` e `over_price_liquido` estão sendo salvos, mas `icms`, `pis_cofins` e `ir_csll` ficam `null`.
