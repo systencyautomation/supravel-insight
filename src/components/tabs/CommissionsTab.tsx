@@ -2,13 +2,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InternalSellerCommissions } from './InternalSellerCommissions';
 import { RepresentativeCommissions } from './RepresentativeCommissions';
 import { Users, Briefcase } from 'lucide-react';
-import { Sale } from '@/types/commission';
 
-interface CommissionsTabProps {
-  sales: Sale[];
-}
-
-export function CommissionsTab({ sales }: CommissionsTabProps) {
+export function CommissionsTab() {
   return (
     <Tabs defaultValue="vendedor" className="space-y-4">
       <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -23,11 +18,11 @@ export function CommissionsTab({ sales }: CommissionsTabProps) {
       </TabsList>
 
       <TabsContent value="vendedor">
-        <InternalSellerCommissions sales={sales} />
+        <InternalSellerCommissions />
       </TabsContent>
 
       <TabsContent value="representante">
-        <RepresentativeCommissions sales={sales} />
+        <RepresentativeCommissions />
       </TabsContent>
     </Tabs>
   );

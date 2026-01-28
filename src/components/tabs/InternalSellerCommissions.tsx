@@ -1,5 +1,7 @@
-import { Sale } from '@/types/commission';
-import { calculateCommission } from '@/types/commission';
+import { useMemo } from 'react';
+import { useSalesWithCalculations, SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
+import { useSellerProfiles } from '@/hooks/useSellerProfiles';
+import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { SummaryCard } from '@/components/SummaryCard';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -11,62 +13,196 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { User, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 
-interface InternalSellerCommissionsProps {
-  sales: Sale[];
-}
+export function InternalSellerCommissions() {
+  const { sales, loading: salesLoading } = useSalesWithCalculations();
+  const { internalSellers, getInternalSeller, loading: profilesLoading } = useSellerProfiles();
+  const { settings: orgSettings } = useOrganizationSettings();
 
-export function InternalSellerCommissions({ sales }: InternalSellerCommissionsProps) {
-  // Internal sellers get 30% of the net commission as bonus
-  const BONUS_PERCENTAGE = 0.30;
+  // Filtrar apenas vendas com vendedor interno atribuído
+  const salesWithSeller = useMemo(() => {
+    return sales.filter(s => s.internal_seller_id);
+  }, [sales]);
 
-  // Get unique sellers from sales data
-  const vendedoresInternos = [...new Set(sales.map(s => s.vendedorInterno).filter(Boolean))];
+  // Agrupar por vendedor
+  const sellerData = useMemo(() => {
+    const grouped = new Map<string, SaleWithCalculations[]>();
+    
+    salesWithSeller.forEach(sale => {
+      const sellerId = sale.internal_seller_id!;
+      const existing = grouped.get(sellerId) || [];
+      grouped.set(sellerId, [...existing, sale]);
+    });
 
-  const sellerData = vendedoresInternos.map(vendedor => {
-    const vendorSales = sales.filter(s => s.vendedorInterno === vendedor);
-    const totalBonus = vendorSales.reduce((acc, sale) => {
-      const commission = calculateCommission(sale.valorTotal, sale.valorTabela, sale.uf);
-      return acc + (commission.comissaoLiquida * BONUS_PERCENTAGE);
-    }, 0);
-    return {
-      vendedor,
-      vendas: vendorSales.length,
-      totalBonus,
-      sales: vendorSales
-    };
-  });
+    // Calcular comissões por vendedor
+    const overPercent = orgSettings?.comissao_over_percent ?? 10;
+    const comissaoBase = orgSettings?.comissao_base || 'valor_tabela';
 
-  const totalBonusGeral = sellerData.reduce((acc, s) => acc + s.totalBonus, 0);
+    return Array.from(grouped.entries()).map(([sellerId, sellerSales]) => {
+      const seller = getInternalSeller(sellerId);
+      
+      // Calcular comissão total do vendedor
+      // Fórmula: % sobre base (tabela ou comissão empresa) + % over líquido
+      const totalComissao = sellerSales.reduce((acc, sale) => {
+        const valorTabela = Number(sale.table_value) || 0;
+        const comissaoEmpresa = sale.valorComissaoCalculado || 0;
+        const overLiquido = sale.overPriceLiquido || 0;
+        
+        // Base de cálculo conforme parametrização
+        const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
+        
+        // Usar percentual salvo na venda ou default (3%)
+        const percentualVendedor = Number(sale.percentual_comissao) || 3;
+        
+        // Comissão = % sobre base + % do over líquido
+        const comissaoBaseValue = baseCalculo * (percentualVendedor / 100);
+        const comissaoOver = overLiquido * (overPercent / 100);
+        
+        return acc + comissaoBaseValue + comissaoOver;
+      }, 0);
+
+      // Separar por status
+      const vendasAprovadas = sellerSales.filter(s => s.status === 'aprovado');
+      const vendasPagas = sellerSales.filter(s => s.status === 'pago');
+      const vendasPendentes = sellerSales.filter(s => s.status === 'pendente');
+
+      const comissaoPaga = vendasPagas.reduce((acc, sale) => {
+        const valorTabela = Number(sale.table_value) || 0;
+        const comissaoEmpresa = sale.valorComissaoCalculado || 0;
+        const overLiquido = sale.overPriceLiquido || 0;
+        const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
+        const percentualVendedor = Number(sale.percentual_comissao) || 3;
+        const comissaoBaseVal = baseCalculo * (percentualVendedor / 100);
+        const comissaoOver = overLiquido * (overPercent / 100);
+        return acc + comissaoBaseVal + comissaoOver;
+      }, 0);
+
+      return {
+        sellerId,
+        sellerName: seller?.full_name || 'Vendedor não encontrado',
+        sellerEmail: seller?.email || '',
+        sales: sellerSales,
+        totalVendas: sellerSales.length,
+        vendasAprovadas: vendasAprovadas.length,
+        vendasPagas: vendasPagas.length,
+        vendasPendentes: vendasPendentes.length,
+        totalComissao,
+        comissaoPaga,
+        comissaoPendente: totalComissao - comissaoPaga,
+      };
+    }).sort((a, b) => b.totalComissao - a.totalComissao);
+  }, [salesWithSeller, internalSellers, orgSettings]);
+
+  // Totais gerais
+  const totals = useMemo(() => {
+    return sellerData.reduce((acc, seller) => ({
+      totalComissao: acc.totalComissao + seller.totalComissao,
+      comissaoPaga: acc.comissaoPaga + seller.comissaoPaga,
+      comissaoPendente: acc.comissaoPendente + seller.comissaoPendente,
+      totalVendas: acc.totalVendas + seller.totalVendas,
+    }), { totalComissao: 0, comissaoPaga: 0, comissaoPendente: 0, totalVendas: 0 });
+  }, [sellerData]);
+
+  const loading = salesLoading || profilesLoading;
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+
+  if (salesWithSeller.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <User className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+        <h3 className="text-lg font-medium text-muted-foreground">
+          Nenhuma comissão de vendedor encontrada
+        </h3>
+        <p className="text-sm text-muted-foreground mt-2">
+          As comissões aparecerão aqui quando vendas forem aprovadas com vendedor atribuído.
+        </p>
+      </div>
+    );
+  }
+
+  const overPercent = orgSettings?.comissao_over_percent ?? 10;
+  const comissaoBase = orgSettings?.comissao_base || 'valor_tabela';
+  const baseLabel = comissaoBase === 'valor_tabela' ? 'Tabela' : 'Comissão';
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Cards de resumo */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <SummaryCard
-          title="Total Bônus Interno"
-          value={formatCurrency(totalBonusGeral)}
-          subtitle={`${BONUS_PERCENTAGE * 100}% da comissão líquida`}
+          title="Total Comissões"
+          value={formatCurrency(totals.totalComissao)}
+          subtitle={`${sellerData.length} vendedor(es)`}
           variant="primary"
         />
         <SummaryCard
           title="Vendedores Ativos"
-          value={vendedoresInternos.length.toString()}
-          subtitle="Equipe interna"
+          value={sellerData.length.toString()}
+          subtitle={`${totals.totalVendas} vendas atribuídas`}
         />
         <SummaryCard
-          title="Vendas Conciliadas"
-          value={sales.filter(s => s.status === 'pago').length.toString()}
-          subtitle="Aptas para pagamento"
+          title="Comissão Paga"
+          value={formatCurrency(totals.comissaoPaga)}
+          subtitle="Vendas finalizadas"
           variant="success"
+        />
+        <SummaryCard
+          title="Comissão Pendente"
+          value={formatCurrency(totals.comissaoPendente)}
+          subtitle="Aguardando pagamento"
         />
       </div>
 
-      {sellerData.map(({ vendedor, vendas, totalBonus, sales: vendorSales }) => (
-        <div key={vendedor} className="border border-border">
+      {/* Configuração ativa */}
+      <div className="bg-muted/30 border border-border px-4 py-3 text-sm">
+        <span className="text-muted-foreground">Base de cálculo: </span>
+        <span className="font-medium">{baseLabel}</span>
+        <span className="text-muted-foreground mx-2">|</span>
+        <span className="text-muted-foreground">Over Price: </span>
+        <span className="font-medium">{overPercent}%</span>
+      </div>
+
+      {/* Lista de vendedores */}
+      {sellerData.map(({ sellerId, sellerName, sellerEmail, sales: sellerSales, totalVendas, totalComissao, comissaoPaga, comissaoPendente }) => (
+        <div key={sellerId} className="border border-border rounded-lg overflow-hidden">
           <div className="bg-muted/50 px-4 py-3 flex items-center justify-between border-b border-border">
-            <div>
-              <h3 className="font-semibold">{vendedor}</h3>
-              <p className="text-xs text-muted-foreground">{vendas} vendas | Bônus: {formatCurrency(totalBonus)}</p>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold">{sellerName}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {sellerEmail} • {totalVendas} venda(s)
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-6 text-sm">
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="font-semibold text-primary">{formatCurrency(totalComissao)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Pago</p>
+                <p className="font-medium text-[hsl(var(--success))]">{formatCurrency(comissaoPaga)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Pendente</p>
+                <p className="font-medium">{formatCurrency(comissaoPendente)}</p>
+              </div>
             </div>
           </div>
           <Table>
@@ -75,24 +211,39 @@ export function InternalSellerCommissions({ sales }: InternalSellerCommissionsPr
                 <TableHead className="font-semibold uppercase text-xs tracking-wide">Cliente</TableHead>
                 <TableHead className="font-semibold uppercase text-xs tracking-wide">NF-e</TableHead>
                 <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Valor NF</TableHead>
-                <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Bônus (30%)</TableHead>
+                <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Base ({baseLabel})</TableHead>
+                <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Over Líquido</TableHead>
+                <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Comissão</TableHead>
                 <TableHead className="font-semibold uppercase text-xs tracking-wide">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vendorSales.map(sale => {
-                const commission = calculateCommission(sale.valorTotal, sale.valorTabela, sale.uf);
-                const bonus = commission.comissaoLiquida * BONUS_PERCENTAGE;
+              {sellerSales.map(sale => {
+                const valorTabela = Number(sale.table_value) || 0;
+                const comissaoEmpresa = sale.valorComissaoCalculado || 0;
+                const overLiquido = sale.overPriceLiquido || 0;
+                const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
+                const percentualVendedor = Number(sale.percentual_comissao) || 3;
+                const comissaoBaseVal = baseCalculo * (percentualVendedor / 100);
+                const comissaoOver = overLiquido * (overPercent / 100);
+                const comissaoTotal = comissaoBaseVal + comissaoOver;
+                
                 return (
                   <TableRow key={sale.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium">{sale.cliente}</TableCell>
-                    <TableCell className="font-mono text-sm">{sale.nfe}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(sale.valorTotal)}</TableCell>
+                    <TableCell className="font-medium">{sale.client_name || '-'}</TableCell>
+                    <TableCell className="font-mono text-sm">{sale.nfe_number || '-'}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(Number(sale.total_value) || 0)}</TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">
+                      {formatCurrency(baseCalculo)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">
+                      {formatCurrency(overLiquido)}
+                    </TableCell>
                     <TableCell className="text-right font-mono font-semibold text-primary">
-                      {formatCurrency(bonus)}
+                      {formatCurrency(comissaoTotal)}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={sale.status} />
+                      <StatusBadge status={sale.status as 'pendente' | 'pago' | 'parcial'} />
                     </TableCell>
                   </TableRow>
                 );
