@@ -48,6 +48,10 @@ export interface CalculationData {
   valorReal: number;        // Valor com VP aplicado
   jurosEmbutidos: number;   // Diferença entre parcelado e VP
   taxaJuros: number;        // Taxa usada (2.2% ou 3.5%)
+  // Deduções para persistência no banco
+  deducaoIcms: number;
+  deducaoPisCofins: number;
+  deducaoIrCsll: number;
 }
 
 export function CommissionCalculator({ 
@@ -408,6 +412,10 @@ export function CommissionCalculator({
         valorReal,
         jurosEmbutidos: jurosEmbutidos.valor,
         taxaJuros: getTaxaJuros(tipoPagamento),
+        // Deduções para persistência
+        deducaoIcms: activeCalculation.deducaoIcms,
+        deducaoPisCofins: activeCalculation.deducaoPisCofins,
+        deducaoIrCsll: activeCalculation.deducaoIrCsll,
       });
     }
   }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorReal, jurosEmbutidos, onCalculationChange]);

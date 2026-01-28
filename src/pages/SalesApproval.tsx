@@ -193,6 +193,13 @@ export default function SalesApproval() {
   const handleApproveWithAssignment = async (assignmentData: SellerAssignmentResult) => {
     if (!currentSale || !user || !confirmedCalculation) return;
 
+    // Calcular deduções baseado no Over Price bruto
+    const overPriceBruto = confirmedCalculation.overPrice || 0;
+    const icmsRateDecimal = (confirmedCalculation.icmsDestino || 12) / 100;
+    const deducaoIcms = overPriceBruto * icmsRateDecimal;
+    const deducaoPisCofins = overPriceBruto * 0.0925;
+    const deducaoIrCsll = overPriceBruto * 0.34;
+
     const updateData: Record<string, unknown> = {
       table_value: confirmedCalculation.valorTabela,
       percentual_comissao: confirmedCalculation.percentualComissao,
@@ -203,6 +210,10 @@ export default function SalesApproval() {
       over_price_liquido: confirmedCalculation.overPriceLiquido,
       commission_calculated: assignmentData.comissaoTotalAtribuida || confirmedCalculation.comissaoTotal,
       valor_entrada: confirmedCalculation.valorEntrada,
+      // Persistir deduções
+      icms: deducaoIcms,
+      pis_cofins: deducaoPisCofins,
+      ir_csll: deducaoIrCsll,
       aprovado_por: user.id,
       aprovado_em: new Date().toISOString(),
       // Atribuição de comissão
@@ -256,6 +267,13 @@ export default function SalesApproval() {
   const handleEditModeSave = async () => {
     if (!currentSale || !user || !calculationData) return;
 
+    // Calcular deduções baseado no Over Price bruto
+    const overPriceBruto = calculationData.overPrice || 0;
+    const icmsRateDecimal = (calculationData.icmsDestino || 12) / 100;
+    const deducaoIcms = overPriceBruto * icmsRateDecimal;
+    const deducaoPisCofins = overPriceBruto * 0.0925;
+    const deducaoIrCsll = overPriceBruto * 0.34;
+
     const updateData: Record<string, unknown> = {
       table_value: calculationData.valorTabela,
       percentual_comissao: calculationData.percentualComissao,
@@ -266,6 +284,10 @@ export default function SalesApproval() {
       over_price_liquido: calculationData.overPriceLiquido,
       commission_calculated: calculationData.comissaoTotal,
       valor_entrada: calculationData.valorEntrada,
+      // Persistir deduções
+      icms: deducaoIcms,
+      pis_cofins: deducaoPisCofins,
+      ir_csll: deducaoIrCsll,
       aprovado_por: user.id,
       aprovado_em: new Date().toISOString(),
     };
