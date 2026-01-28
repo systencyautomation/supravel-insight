@@ -18,7 +18,9 @@ export interface Sale {
   icms: number | null;
   commission_calculated: number | null;
   internal_seller_id: string | null;
+  internal_seller_percent: number | null;
   representative_id: string | null;
+  representative_percent: number | null;
   emission_date: string | null;
   created_at: string | null;
   // Additional fields

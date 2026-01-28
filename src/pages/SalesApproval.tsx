@@ -206,7 +206,9 @@ export default function SalesApproval() {
       aprovado_em: new Date().toISOString(),
       // Atribuição de comissão
       internal_seller_id: assignmentData.internalSellerId,
+      internal_seller_percent: assignmentData.internalSellerPercent || null,
       representative_id: assignmentData.representativeId,
+      representative_percent: assignmentData.representativePercent || null,
     };
 
     // Only update status if NOT in edit mode
