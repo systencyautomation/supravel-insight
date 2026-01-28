@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSalesWithCalculations, SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 import { useSellerProfiles } from '@/hooks/useSellerProfiles';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
+import { usePermissions } from '@/hooks/usePermissions';
 import { SummaryCard } from '@/components/SummaryCard';
 import { CommissionFilters, CommissionFiltersState } from './CommissionFilters';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -14,9 +16,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User, ChevronDown } from 'lucide-react';
+import { User, ChevronDown, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface SaleRowProps {
@@ -26,9 +29,11 @@ interface SaleRowProps {
   comissaoBase: string;
   overPercent: number;
   baseLabel: string;
+  canEdit: boolean;
+  onEdit: (saleId: string) => void;
 }
 
-function SaleRow({ sale, isExpanded, onToggle, comissaoBase, overPercent, baseLabel }: SaleRowProps) {
+function SaleRow({ sale, isExpanded, onToggle, comissaoBase, overPercent, baseLabel, canEdit, onEdit }: SaleRowProps) {
   const valorTabela = Number(sale.table_value) || 0;
   const comissaoEmpresa = sale.valorComissaoCalculado || 0;
   const overLiquido = sale.overPriceLiquido || 0;
@@ -126,13 +131,28 @@ function SaleRow({ sale, isExpanded, onToggle, comissaoBase, overPercent, baseLa
               </div>
             </div>
             
-            {/* Total */}
+            {/* Total with Edit Button */}
             <div className="mt-4 pt-3 border-t border-border max-w-2xl">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Total Vendedor</span>
-                <span className="text-lg font-semibold text-primary font-mono">
-                  {formatCurrency(comissaoTotal)}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-semibold text-primary font-mono">
+                    {formatCurrency(comissaoTotal)}
+                  </span>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(sale.id);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </TableCell>
@@ -143,9 +163,13 @@ function SaleRow({ sale, isExpanded, onToggle, comissaoBase, overPercent, baseLa
 }
 
 export function InternalSellerCommissions() {
+  const navigate = useNavigate();
   const { sales, loading: salesLoading } = useSalesWithCalculations();
   const { internalSellers, getInternalSeller, loading: profilesLoading } = useSellerProfiles();
   const { settings: orgSettings } = useOrganizationSettings();
+  const { hasPermission } = usePermissions();
+
+  const canEditCommission = hasPermission('approve_sales');
 
   const [filters, setFilters] = useState<CommissionFiltersState>({
     sellerId: null,
@@ -405,6 +429,8 @@ export function InternalSellerCommissions() {
                     comissaoBase={comissaoBase}
                     overPercent={overPercent}
                     baseLabel={baseLabel}
+                    canEdit={canEditCommission}
+                    onEdit={(saleId) => navigate(`/sales-approval?mode=edit&saleId=${saleId}&step=2`)}
                   />
                 ))}
               </TableBody>
