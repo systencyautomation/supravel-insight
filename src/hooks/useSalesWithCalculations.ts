@@ -100,13 +100,30 @@ export function useSalesWithCalculations() {
       let deducaoPisCofins: number;
       let deducaoIrCsll: number;
       
-      if (Number(sale.over_price) || Number(sale.over_price_liquido)) {
+      // Verificar se temos over_price salvo no banco
+      const hasOverPriceSaved = Number(sale.over_price) > 0 || Number(sale.over_price_liquido) > 0;
+      
+      if (hasOverPriceSaved) {
         // Usar valores salvos do banco
         overPriceBruto = Number(sale.over_price) || 0;
         overPriceLiquido = Number(sale.over_price_liquido) || 0;
-        deducaoIcms = Number(sale.icms) || 0;
-        deducaoPisCofins = Number(sale.pis_cofins) || 0;
-        deducaoIrCsll = Number(sale.ir_csll) || 0;
+        
+        // Se as deduções estão zeradas mas temos over_price, recalcular as deduções
+        const savedIcms = Number(sale.icms) || 0;
+        const savedPisCofins = Number(sale.pis_cofins) || 0;
+        const savedIrCsll = Number(sale.ir_csll) || 0;
+        
+        if (savedIcms === 0 && savedPisCofins === 0 && savedIrCsll === 0 && overPriceBruto > 0) {
+          // Calcular deduções baseado no over_price_bruto
+          const icmsRateCalc = Number(sale.percentual_icms) || icmsDestino || 0.12;
+          deducaoIcms = overPriceBruto * icmsRateCalc;
+          deducaoPisCofins = overPriceBruto * 0.0925;
+          deducaoIrCsll = overPriceBruto * 0.34;
+        } else {
+          deducaoIcms = savedIcms;
+          deducaoPisCofins = savedPisCofins;
+          deducaoIrCsll = savedIrCsll;
+        }
       } else {
         // Recalcular usando approvalCalculator
         const calculo = calculateApprovalCommission({
