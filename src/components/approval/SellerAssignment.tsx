@@ -140,10 +140,16 @@ export function SellerAssignment({
   const commissionBreakdown = useMemo(() => {
     const overLiquido = confirmedData.overPriceLiquido;
     const valorTabela = confirmedData.valorTabela;
+    const comissaoEmpresa = confirmedData.comissaoTotal; // Comissão total da empresa (sem over)
     
-    // Comissão sobre valor tabela (percentual customizado)
-    const comissaoTabelaInternal = useInternalSeller ? (internalSellerPercent / 100) * valorTabela : 0;
-    const comissaoTabelaRep = useRepresentative ? (representativePercent / 100) * valorTabela : 0;
+    // Determinar base de cálculo conforme parametrização
+    const comissaoBase = orgSettings?.comissao_base || 'valor_tabela';
+    const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
+    const baseLabel = comissaoBase === 'valor_tabela' ? 'Tabela' : 'Comissão';
+    
+    // Comissão sobre a base escolhida (percentual customizado pelo aprovador)
+    const comissaoBaseInternal = useInternalSeller ? (internalSellerPercent / 100) * baseCalculo : 0;
+    const comissaoBaseRep = useRepresentative ? (representativePercent / 100) * baseCalculo : 0;
     
     // Over: usa percentual configurado na organização (default 10%)
     const overPercent = (orgSettings?.comissao_over_percent ?? 10) / 100;
@@ -151,15 +157,18 @@ export function SellerAssignment({
     const overRep = useRepresentative && representativeId ? overLiquido * overPercent : 0;
     
     // Total por participante
-    const comissaoInternalSeller = comissaoTabelaInternal + Math.max(0, overInternal);
-    const comissaoRepresentative = comissaoTabelaRep + Math.max(0, overRep);
+    const comissaoInternalSeller = comissaoBaseInternal + Math.max(0, overInternal);
+    const comissaoRepresentative = comissaoBaseRep + Math.max(0, overRep);
     
     // Total geral
     const comissaoTotalAtribuida = comissaoInternalSeller + comissaoRepresentative;
     
     return {
-      comissaoTabelaInternal,
-      comissaoTabelaRep,
+      comissaoBase,
+      baseCalculo,
+      baseLabel,
+      comissaoBaseInternal,
+      comissaoBaseRep,
       overInternal,
       overRep,
       overPercent: (orgSettings?.comissao_over_percent ?? 10),
@@ -167,7 +176,7 @@ export function SellerAssignment({
       comissaoRepresentative,
       comissaoTotalAtribuida,
     };
-  }, [confirmedData, useInternalSeller, useRepresentative, internalSellerId, internalSellerPercent, representativeId, representativePercent, orgSettings?.comissao_over_percent]);
+  }, [confirmedData, useInternalSeller, useRepresentative, internalSellerId, internalSellerPercent, representativeId, representativePercent, orgSettings?.comissao_over_percent, orgSettings?.comissao_base]);
 
   const handleApprove = () => {
     onApprove({
@@ -299,8 +308,8 @@ export function SellerAssignment({
                   {internalSellerId && (
                     <div className="bg-primary/5 rounded p-3 space-y-1 font-mono text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tabela ({internalSellerPercent}%)</span>
-                        <span>{formatCurrency(commissionBreakdown.comissaoTabelaInternal)}</span>
+                        <span className="text-muted-foreground">{commissionBreakdown.baseLabel} ({internalSellerPercent}%)</span>
+                        <span>{formatCurrency(commissionBreakdown.comissaoBaseInternal)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Over ({commissionBreakdown.overPercent}%)</span>
@@ -376,8 +385,8 @@ export function SellerAssignment({
                   {representativeId && (
                     <div className="bg-primary/5 rounded p-3 space-y-1 font-mono text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tabela ({representativePercent}%)</span>
-                        <span>{formatCurrency(commissionBreakdown.comissaoTabelaRep)}</span>
+                        <span className="text-muted-foreground">{commissionBreakdown.baseLabel} ({representativePercent}%)</span>
+                        <span>{formatCurrency(commissionBreakdown.comissaoBaseRep)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Over ({commissionBreakdown.overPercent}%)</span>
