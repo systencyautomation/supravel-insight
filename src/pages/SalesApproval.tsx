@@ -39,8 +39,9 @@ export default function SalesApproval() {
   const [installments, setInstallments] = useState<Installment[]>([]);
   const { fetchLatestDocument } = useFipeDocument();
 
-  // 2-step flow state
-  const [step, setStep] = useState<1 | 2>(1);
+  // 2-step flow state - check URL for initial step
+  const initialStep = searchParams.get('step') === '2' ? 2 : 1;
+  const [step, setStep] = useState<1 | 2>(initialStep as 1 | 2);
   const [confirmedCalculation, setConfirmedCalculation] = useState<ConfirmedCalculationData | null>(null);
 
   // Check permissions
@@ -61,11 +62,38 @@ export default function SalesApproval() {
   const count = isEditMode ? 1 : pendingCount;
   const loading = isEditMode ? editableLoading : pendingLoading;
 
-  // Reset step when changing sale
+  // Initialize step 2 directly when in edit mode with step=2 param
   useEffect(() => {
-    setStep(1);
-    setConfirmedCalculation(null);
-  }, [currentSale?.id]);
+    if (isEditMode && initialStep === 2 && editableSale && !confirmedCalculation) {
+      // Build confirmedCalculation from existing sale data
+      setConfirmedCalculation({
+        valorTabela: editableSale.table_value || 0,
+        percentualComissao: editableSale.percentual_comissao || 0,
+        icmsTabela: editableSale.icms_tabela || 0,
+        icmsDestino: editableSale.percentual_icms || 0,
+        tipoPagamento: (editableSale.payment_method as 'boleto' | 'avista') || 'boleto',
+        overPrice: editableSale.over_price || 0,
+        overPriceLiquido: editableSale.over_price_liquido || 0,
+        comissaoTotal: editableSale.commission_calculated || 0,
+        percentualFinal: editableSale.percentual_comissao || 0,
+        valorEntrada: editableSale.valor_entrada || 0,
+        qtdParcelas: 0,
+        valorParcela: 0,
+        valorReal: editableSale.total_value || 0,
+        jurosEmbutidos: 0,
+        taxaJuros: 0,
+      });
+      setStep(2);
+    }
+  }, [isEditMode, initialStep, editableSale, confirmedCalculation]);
+
+  // Reset step when changing sale (only for pending mode navigation)
+  useEffect(() => {
+    if (!isEditMode) {
+      setStep(1);
+      setConfirmedCalculation(null);
+    }
+  }, [currentSale?.id, isEditMode]);
 
   // Load FIPE document
   useEffect(() => {
