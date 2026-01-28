@@ -1,93 +1,89 @@
 
-# Correção: Cálculo de Comissões do Vendedor
+# Correção: Confusão entre Comissão Empresa vs Vendedor
 
 ## Problema Identificado
 
-Analisando os dados do banco e os prints, identifiquei **dois problemas críticos**:
+No modo de edição (quando clica no botão de lápis), o sistema está confundindo dois valores distintos:
 
-### 1. Percentual do Vendedor Não Está Sendo Salvo
+| Campo | O que deveria ser | O que está sendo usado |
+|-------|------------------|------------------------|
+| `comissaoTotal` (Comissão Empresa) | R$ 1.679,33 (8% do valor tabela) | R$ 127,81 (total do vendedor) |
+| Base de cálculo quando `comissao_base = comissao_empresa` | R$ 1.679,33 | R$ 127,81 |
 
-**No banco de dados:**
-- `percentual_comissao` = **8.00** (percentual da EMPRESA)
-- `commission_calculated` = **127.81** (total que a VENDEDORA recebe)
+### Raiz do Problema
 
-**O que falta:**
-- Não existe campo para guardar o **5%** que foi definido para a vendedora na Etapa 2
+**Linha 77 de `SalesApproval.tsx`:**
+```typescript
+comissaoTotal: editableSale.commission_calculated || 0,
+```
 
-### 2. Base de Cálculo Confusa na Tabela de Comissões
-
-**O que está acontecendo (ERRADO):**
-- `Base (Comissão)` = R$ 127,81 - está usando o **total do vendedor** como base!
-- `Percentual` = 8% - está usando o **percentual da empresa**, não do vendedor
-- `Resultado` = 8% × 127,81 = **R$ 10,22** (incorreto)
-
-**O que deveria acontecer (CORRETO):**
-- `Base (Comissão)` = R$ 1.971,61 (Comissão da Empresa = 8% do Valor Tabela aprox.)
-- `Percentual` = 5% (definido na aprovação)
-- `Resultado` = 5% × R$ 1.971,61 = **R$ 98,58**
+O campo `commission_calculated` armazena o **total que o vendedor/representante recebe**, não a comissão bruta da empresa.
 
 ---
 
-## Solução Proposta
+## Solução
 
-### Etapa 1: Adicionar Campos na Tabela `sales`
+### 1. Corrigir `src/pages/SalesApproval.tsx` (linhas 66-88)
 
-Criar migração SQL para adicionar:
-- `internal_seller_percent` (numeric) - percentual do vendedor interno
-- `representative_percent` (numeric) - percentual do representante
+Quando em modo de edição com step=2, calcular `comissaoTotal` corretamente:
 
-### Etapa 2: Atualizar Aprovação para Salvar Percentuais
-
-Modificar `src/pages/SalesApproval.tsx` para incluir no update:
 ```typescript
-internal_seller_percent: assignmentData.internalSellerPercent,
-representative_percent: assignmentData.representativePercent,
+// De:
+comissaoTotal: editableSale.commission_calculated || 0,
+
+// Para:
+comissaoTotal: (editableSale.table_value || 0) * ((editableSale.percentual_comissao || 0) / 100),
 ```
 
-### Etapa 3: Corrigir Lógica na Tabela de Comissões
+Isso garante que `comissaoTotal` seja sempre a comissão da **empresa** (valor tabela × percentual da empresa).
 
-Modificar `src/components/tabs/InternalSellerCommissions.tsx`:
+### 2. Corrigir `src/components/approval/SellerAssignment.tsx` (linhas 140-148)
+
+Garantir que a `comissaoEmpresa` seja sempre calculada corretamente, não dependendo apenas de `confirmedData.comissaoTotal`:
 
 ```typescript
-// ANTES (errado):
-const comissaoEmpresa = sale.valorComissaoCalculado || 0; // 127,81 = total vendedor
-const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-const percentualVendedor = Number(sale.percentual_comissao) || 3; // 8% = empresa
+// De:
+const comissaoEmpresa = confirmedData.comissaoTotal;
 
-// DEPOIS (correto):
-const percentualEmpresa = Number(sale.percentual_comissao) || 8;
-const comissaoEmpresa = valorTabela * (percentualEmpresa / 100); // R$ 1.679,33
-const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-const percentualVendedor = Number(sale.internal_seller_percent) || 0; // 5% = vendedor
+// Para:
+const percentualEmpresa = confirmedData.percentualComissao || 0;
+const comissaoEmpresa = valorTabela * (percentualEmpresa / 100);
+```
+
+Isso garante que mesmo que `confirmedData.comissaoTotal` venha com valor errado (legado), o cálculo seja feito corretamente.
+
+---
+
+## Resultado Esperado
+
+```text
+ANTES (ERRADO):
+┌─────────────────────────────────────────────┐
+│ Comissão Base (8%):    R$ 127,81  ← ERRADO! │
+│ Over Price Líquido:    R$ 292,28            │
+│ Comissão Total [0.58%] R$ 127,81            │
+└─────────────────────────────────────────────┘
+
+DEPOIS (CORRETO):
+┌─────────────────────────────────────────────┐
+│ Comissão Base (8%):    R$ 1.679,33 ← CERTO! │
+│ Over Price Líquido:    R$ 292,28            │
+│ Comissão Total [8.00%] R$ 1.679,33          │
+└─────────────────────────────────────────────┘
+```
+
+E quando atribuir 5% para a vendedora:
+```text
+┌─────────────────────────────────────────────┐
+│ Comissão (5%):         R$ 83,97   ← 5% de R$ 1.679,33
+│ Over (10%):            R$ 29,23   ← 10% de R$ 292,28
+│ Total Vendedora:       R$ 113,20            │
+└─────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-1. **Migração SQL** - Adicionar campos `internal_seller_percent` e `representative_percent`
-2. **`src/pages/SalesApproval.tsx`** - Salvar os percentuais individuais
-3. **`src/components/tabs/InternalSellerCommissions.tsx`** - Corrigir lógica de cálculo
-4. **`src/hooks/useOrganizationData.ts`** (se necessário) - Garantir que os novos campos sejam lidos
-
----
-
-## Resumo Visual da Correção
-
-```
-ANTES (ERRADO):
-┌─────────────────────────────────────────────┐
-│ Base (Comissão):    R$ 127,81   ← TOTAL VENDEDOR (errado!)
-│ Percentual:         8%          ← DA EMPRESA (errado!)
-│ Resultado:          R$ 10,22    ← CONSEQUÊNCIA (errado!)
-└─────────────────────────────────────────────┘
-
-DEPOIS (CORRETO):
-┌─────────────────────────────────────────────┐
-│ Base (Comissão):    R$ 1.679,33 ← COMISSÃO DA EMPRESA
-│ Percentual:         5%          ← DO VENDEDOR
-│ Resultado:          R$ 83,97    ← CORRETO
-└─────────────────────────────────────────────┘
-```
-
-Nota: O valor exato da "Comissão Empresa" pode variar dependendo de como é calculado na Etapa 1 (pode incluir ajustes de ICMS, Over líquido, etc.). A lógica final deve usar o mesmo cálculo que aparece na tela de aprovação (R$ 1.971,61).
+1. **`src/pages/SalesApproval.tsx`** - Corrigir inicialização de `comissaoTotal` no modo de edição
+2. **`src/components/approval/SellerAssignment.tsx`** - Calcular `comissaoEmpresa` independentemente
