@@ -115,7 +115,9 @@ export function useSalesWithCalculations() {
         
         if (savedIcms === 0 && savedPisCofins === 0 && savedIrCsll === 0 && overPriceBruto > 0) {
           // Calcular deduções baseado no over_price_bruto
-          const icmsRateCalc = Number(sale.percentual_icms) || icmsDestino || 0.12;
+          // IMPORTANTE: percentual_icms é salvo como 4, 7 ou 12 (inteiro), converter para decimal
+          const savedIcmsRate = Number(sale.percentual_icms) || 0;
+          const icmsRateCalc = savedIcmsRate > 1 ? savedIcmsRate / 100 : (savedIcmsRate || icmsDestino || 0.12);
           deducaoIcms = overPriceBruto * icmsRateCalc;
           deducaoPisCofins = overPriceBruto * 0.0925;
           deducaoIrCsll = overPriceBruto * 0.34;
