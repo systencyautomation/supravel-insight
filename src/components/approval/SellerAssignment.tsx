@@ -290,7 +290,7 @@ export function SellerAssignment({
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">% s/ Tabela</Label>
+                      <Label className="text-xs text-muted-foreground">% sobre {commissionBreakdown.baseLabel}</Label>
                       <Input
                         type="number"
                         step="0.5"
@@ -367,7 +367,7 @@ export function SellerAssignment({
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">% s/ Tabela</Label>
+                      <Label className="text-xs text-muted-foreground">% sobre {commissionBreakdown.baseLabel}</Label>
                       <Input
                         type="number"
                         step="0.5"
