@@ -57,6 +57,8 @@ interface SellerAssignmentProps {
   onApprove: (assignmentData: SellerAssignmentResult) => void;
   onReject: (motivo: string) => void;
   onBack: () => void;
+  isEditMode?: boolean;
+  onCancel?: () => void;
 }
 
 export function SellerAssignment({ 
@@ -66,6 +68,8 @@ export function SellerAssignment({
   onApprove,
   onReject,
   onBack,
+  isEditMode = false,
+  onCancel,
 }: SellerAssignmentProps) {
   const { representatives, loading: repsLoading } = useRepresentatives(organizationId);
   const { settings: orgSettings } = useOrganizationSettings();
@@ -250,8 +254,10 @@ export function SellerAssignment({
                   </p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground font-sans">Comissão Empresa</span>
-                  <p className="font-semibold text-primary">{formatCurrency(confirmedData.comissaoTotal)}</p>
+                  <span className="text-xs text-muted-foreground font-sans">Comissão Empresa ({confirmedData.percentualComissao}%)</span>
+                  <p className="font-semibold text-primary">
+                    {formatCurrency(confirmedData.valorTabela * (confirmedData.percentualComissao / 100))}
+                  </p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground font-sans">Percentual Final</span>
@@ -492,12 +498,25 @@ export function SellerAssignment({
       {/* Actions Footer */}
       {!showRejectInput && (
         <div className="p-4 border-t bg-card flex justify-between gap-3">
-          <Button variant="outline" onClick={() => setShowRejectInput(true)}>
-            Rejeitar
-          </Button>
-          <Button onClick={handleApprove}>
-            Aprovar Venda
-          </Button>
+          {isEditMode ? (
+            <>
+              <Button variant="outline" onClick={onCancel}>
+                Cancelar
+              </Button>
+              <Button onClick={handleApprove}>
+                Salvar Alterações
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setShowRejectInput(true)}>
+                Rejeitar
+              </Button>
+              <Button onClick={handleApprove}>
+                Aprovar Venda
+              </Button>
+            </>
+          )}
         </div>
       )}
     </Card>

@@ -513,6 +513,8 @@ export default function SalesApproval() {
                   onApprove={handleApproveWithAssignment}
                   onReject={handleReject}
                   onBack={handleBackToStep1}
+                  isEditMode={isEditMode}
+                  onCancel={() => navigate(-1)}
                 />
               )}
             </div>
@@ -520,14 +522,14 @@ export default function SalesApproval() {
         </ResizablePanelGroup>
       </div>
 
-      {/* Actions - Only show for edit mode */}
-      {isEditMode && canApprove && (
+      {/* Actions - Only show for edit mode step 1 */}
+      {isEditMode && canApprove && step === 1 && (
         <div className="p-4 border-t bg-card flex justify-end gap-3">
           <Button variant="outline" onClick={() => navigate(-1)}>
             Cancelar
           </Button>
-          <Button onClick={handleEditModeSave} disabled={!currentSale}>
-            Salvar Alterações
+          <Button onClick={handleConfirmCalculations} disabled={!currentSale || !calculationData}>
+            Próxima Etapa
           </Button>
         </div>
       )}

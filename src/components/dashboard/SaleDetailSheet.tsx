@@ -255,9 +255,12 @@ export function SaleDetailSheet({ sale, open, onOpenChange }: SaleDetailSheetPro
             </div>
             
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
+              {/* Comissão da Empresa (calculada) */}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Comissão Base ({sale.percentual_comissao || 0}%)</span>
-                <span className="font-mono">{formatCurrency(sale.comissaoPedido)}</span>
+                <span className="text-muted-foreground">Comissão Empresa ({sale.percentual_comissao || 0}%)</span>
+                <span className="font-mono">
+                  {formatCurrency((Number(sale.table_value) || 0) * ((Number(sale.percentual_comissao) || 0) / 100))}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Over Price Líquido</span>
@@ -266,14 +269,12 @@ export function SaleDetailSheet({ sale, open, onOpenChange }: SaleDetailSheetPro
               
               <Separator className="my-2" />
               
+              {/* Comissão Atribuída (salva no banco) */}
               <div className="flex justify-between text-lg font-bold">
                 <div className="flex items-center gap-2">
-                  <span>Comissão Total</span>
-                  <Badge variant="outline" className="text-xs font-normal">
-                    {sale.percentualComissaoCalculado.toFixed(2)}%
-                  </Badge>
+                  <span>Comissão Atribuída</span>
                 </div>
-                <span className="text-primary">{formatCurrency(sale.valorComissaoCalculado)}</span>
+                <span className="text-primary">{formatCurrency(Number(sale.commission_calculated) || 0)}</span>
               </div>
             </div>
           </div>
