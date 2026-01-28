@@ -4,7 +4,7 @@ import { useSellerProfiles } from '@/hooks/useSellerProfiles';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { SummaryCard } from '@/components/SummaryCard';
 import { CommissionFilters, CommissionFiltersState } from './CommissionFilters';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -13,17 +13,140 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User } from 'lucide-react';
+import { User, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface SaleRowProps {
+  sale: SaleWithCalculations;
+  isExpanded: boolean;
+  onToggle: () => void;
+  comissaoBase: string;
+  overPercent: number;
+  baseLabel: string;
+}
+
+function SaleRow({ sale, isExpanded, onToggle, comissaoBase, overPercent, baseLabel }: SaleRowProps) {
+  const valorTabela = Number(sale.table_value) || 0;
+  const comissaoEmpresa = sale.valorComissaoCalculado || 0;
+  const overLiquido = sale.overPriceLiquido || 0;
+  const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
+  const percentualVendedor = Number(sale.percentual_comissao) || 3;
+  const comissaoBaseVal = baseCalculo * (percentualVendedor / 100);
+  const comissaoOver = overLiquido * (overPercent / 100);
+  const comissaoTotal = comissaoBaseVal + comissaoOver;
+
+  return (
+    <>
+      <TableRow 
+        className="cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={onToggle}
+      >
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <ChevronDown 
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform shrink-0",
+                isExpanded && "rotate-180"
+              )} 
+            />
+            <span className="font-mono text-sm">
+              {sale.emission_date 
+                ? format(new Date(sale.emission_date), 'dd/MM/yyyy')
+                : '-'
+              }
+            </span>
+          </div>
+        </TableCell>
+        <TableCell className="font-medium">{sale.client_name || '-'}</TableCell>
+        <TableCell className="font-mono text-sm">{sale.nfe_number || '-'}</TableCell>
+        <TableCell className="text-right font-mono">{formatCurrency(Number(sale.total_value) || 0)}</TableCell>
+        <TableCell className="text-right font-mono text-muted-foreground">
+          {formatCurrency(comissaoBaseVal)}
+        </TableCell>
+        <TableCell className="text-right font-mono text-muted-foreground">
+          {formatCurrency(comissaoOver)}
+        </TableCell>
+        <TableCell className="text-right font-mono font-semibold text-primary">
+          {formatCurrency(comissaoTotal)}
+        </TableCell>
+        <TableCell>
+          <StatusBadge status={sale.status as 'pendente' | 'pago' | 'parcial'} />
+        </TableCell>
+      </TableRow>
+      
+      {isExpanded && (
+        <TableRow className="bg-muted/20 hover:bg-muted/20">
+          <TableCell colSpan={8} className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+              {/* Card Comissão Base */}
+              <div className="bg-background border border-border rounded-lg p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Comissão Base
+                </p>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Base ({baseLabel})</span>
+                    <span className="font-mono">{formatCurrency(baseCalculo)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Percentual</span>
+                    <span className="font-mono">{percentualVendedor}%</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-medium">
+                    <span>Resultado</span>
+                    <span className="font-mono">{formatCurrency(comissaoBaseVal)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Card Over */}
+              <div className="bg-background border border-border rounded-lg p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Over Price
+                </p>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Over Líquido</span>
+                    <span className="font-mono">{formatCurrency(overLiquido)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Percentual</span>
+                    <span className="font-mono">{overPercent}%</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-medium">
+                    <span>Resultado</span>
+                    <span className="font-mono">{formatCurrency(comissaoOver)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Total */}
+            <div className="mt-4 pt-3 border-t border-border max-w-2xl">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Total Vendedor</span>
+                <span className="text-lg font-semibold text-primary font-mono">
+                  {formatCurrency(comissaoTotal)}
+                </span>
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
 
 export function InternalSellerCommissions() {
   const { sales, loading: salesLoading } = useSalesWithCalculations();
   const { internalSellers, getInternalSeller, loading: profilesLoading } = useSellerProfiles();
   const { settings: orgSettings } = useOrganizationSettings();
 
-  // Estado dos filtros
   const [filters, setFilters] = useState<CommissionFiltersState>({
     sellerId: null,
     startDate: null,
@@ -31,7 +154,20 @@ export function InternalSellerCommissions() {
     search: '',
   });
 
-  // Lista de vendedores para o filtro
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (saleId: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(saleId)) {
+        next.delete(saleId);
+      } else {
+        next.add(saleId);
+      }
+      return next;
+    });
+  };
+
   const sellerOptions = useMemo(() => {
     return Array.from(internalSellers.values()).map(seller => ({
       id: seller.id,
@@ -40,21 +176,17 @@ export function InternalSellerCommissions() {
     }));
   }, [internalSellers]);
 
-  // Filtrar apenas vendas com vendedor interno atribuído
   const salesWithSeller = useMemo(() => {
     return sales.filter(s => s.internal_seller_id);
   }, [sales]);
 
-  // Aplicar filtros
   const filteredSales = useMemo(() => {
     let result = [...salesWithSeller];
 
-    // Filtro por vendedor
     if (filters.sellerId) {
       result = result.filter(s => s.internal_seller_id === filters.sellerId);
     }
 
-    // Filtro por data inicial
     if (filters.startDate) {
       result = result.filter(s => {
         if (!s.emission_date) return false;
@@ -63,7 +195,6 @@ export function InternalSellerCommissions() {
       });
     }
 
-    // Filtro por data final
     if (filters.endDate) {
       result = result.filter(s => {
         if (!s.emission_date) return false;
@@ -74,7 +205,6 @@ export function InternalSellerCommissions() {
       });
     }
 
-    // Filtro por busca (cliente, NF)
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       result = result.filter(s => 
@@ -87,7 +217,10 @@ export function InternalSellerCommissions() {
     return result;
   }, [salesWithSeller, filters]);
 
-  // Agrupar por vendedor
+  const overPercent = orgSettings?.comissao_over_percent ?? 10;
+  const comissaoBase = orgSettings?.comissao_base || 'valor_tabela';
+  const baseLabel = comissaoBase === 'valor_tabela' ? 'Tabela' : 'Comissão';
+
   const sellerData = useMemo(() => {
     const grouped = new Map<string, SaleWithCalculations[]>();
     
@@ -97,37 +230,21 @@ export function InternalSellerCommissions() {
       grouped.set(sellerId, [...existing, sale]);
     });
 
-    // Calcular comissões por vendedor
-    const overPercent = orgSettings?.comissao_over_percent ?? 10;
-    const comissaoBase = orgSettings?.comissao_base || 'valor_tabela';
-
     return Array.from(grouped.entries()).map(([sellerId, sellerSales]) => {
       const seller = getInternalSeller(sellerId);
       
-      // Calcular comissão total do vendedor
-      // Fórmula: % sobre base (tabela ou comissão empresa) + % over líquido
       const totalComissao = sellerSales.reduce((acc, sale) => {
         const valorTabela = Number(sale.table_value) || 0;
         const comissaoEmpresa = sale.valorComissaoCalculado || 0;
         const overLiquido = sale.overPriceLiquido || 0;
-        
-        // Base de cálculo conforme parametrização
         const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-        
-        // Usar percentual salvo na venda ou default (3%)
         const percentualVendedor = Number(sale.percentual_comissao) || 3;
-        
-        // Comissão = % sobre base + % do over líquido
         const comissaoBaseValue = baseCalculo * (percentualVendedor / 100);
         const comissaoOver = overLiquido * (overPercent / 100);
-        
         return acc + comissaoBaseValue + comissaoOver;
       }, 0);
 
-      // Separar por status
-      const vendasAprovadas = sellerSales.filter(s => s.status === 'aprovado');
       const vendasPagas = sellerSales.filter(s => s.status === 'pago');
-      const vendasPendentes = sellerSales.filter(s => s.status === 'pendente');
 
       const comissaoPaga = vendasPagas.reduce((acc, sale) => {
         const valorTabela = Number(sale.table_value) || 0;
@@ -146,17 +263,13 @@ export function InternalSellerCommissions() {
         sellerEmail: seller?.email || '',
         sales: sellerSales,
         totalVendas: sellerSales.length,
-        vendasAprovadas: vendasAprovadas.length,
-        vendasPagas: vendasPagas.length,
-        vendasPendentes: vendasPendentes.length,
         totalComissao,
         comissaoPaga,
         comissaoPendente: totalComissao - comissaoPaga,
       };
     }).sort((a, b) => b.totalComissao - a.totalComissao);
-  }, [filteredSales, internalSellers, orgSettings]);
+  }, [filteredSales, internalSellers, orgSettings, comissaoBase, overPercent, getInternalSeller]);
 
-  // Totais gerais
   const totals = useMemo(() => {
     return sellerData.reduce((acc, seller) => ({
       totalComissao: acc.totalComissao + seller.totalComissao,
@@ -181,13 +294,8 @@ export function InternalSellerCommissions() {
     );
   }
 
-  const overPercent = orgSettings?.comissao_over_percent ?? 10;
-  const comissaoBase = orgSettings?.comissao_base || 'valor_tabela';
-  const baseLabel = comissaoBase === 'valor_tabela' ? 'Tabela' : 'Comissão';
-
   return (
     <div className="space-y-6">
-      {/* Filtros */}
       <CommissionFilters
         sellers={sellerOptions}
         filters={filters}
@@ -195,7 +303,6 @@ export function InternalSellerCommissions() {
         type="vendedor"
       />
 
-      {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <SummaryCard
           title="Total Comissões"
@@ -221,8 +328,7 @@ export function InternalSellerCommissions() {
         />
       </div>
 
-      {/* Configuração ativa */}
-      <div className="bg-muted/30 border border-border px-4 py-3 text-sm">
+      <div className="bg-muted/30 border border-border px-4 py-3 text-sm rounded-md">
         <span className="text-muted-foreground">Base de cálculo: </span>
         <span className="font-medium">{baseLabel}</span>
         <span className="text-muted-foreground mx-2">|</span>
@@ -230,7 +336,6 @@ export function InternalSellerCommissions() {
         <span className="font-medium">{overPercent}%</span>
       </div>
 
-      {/* Estado vazio */}
       {filteredSales.length === 0 ? (
         <div className="text-center py-12">
           <User className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
@@ -248,7 +353,6 @@ export function InternalSellerCommissions() {
           </p>
         </div>
       ) : (
-        /* Lista de vendedores */
         sellerData.map(({ sellerId, sellerName, sellerEmail, sales: sellerSales, totalVendas, totalComissao, comissaoPaga, comissaoPendente }) => (
           <div key={sellerId} className="border border-border rounded-lg overflow-hidden">
             <div className="bg-muted/50 px-4 py-3 flex items-center justify-between border-b border-border">
@@ -285,49 +389,24 @@ export function InternalSellerCommissions() {
                   <TableHead className="font-semibold uppercase text-xs tracking-wide">Cliente</TableHead>
                   <TableHead className="font-semibold uppercase text-xs tracking-wide">NF-e</TableHead>
                   <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Valor NF</TableHead>
-                  <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Base ({baseLabel})</TableHead>
-                  <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Over Líquido</TableHead>
                   <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Comissão</TableHead>
+                  <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Over</TableHead>
+                  <TableHead className="font-semibold uppercase text-xs tracking-wide text-right">Total</TableHead>
                   <TableHead className="font-semibold uppercase text-xs tracking-wide">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sellerSales.map(sale => {
-                  const valorTabela = Number(sale.table_value) || 0;
-                  const comissaoEmpresa = sale.valorComissaoCalculado || 0;
-                  const overLiquido = sale.overPriceLiquido || 0;
-                  const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-                  const percentualVendedor = Number(sale.percentual_comissao) || 3;
-                  const comissaoBaseVal = baseCalculo * (percentualVendedor / 100);
-                  const comissaoOver = overLiquido * (overPercent / 100);
-                  const comissaoTotal = comissaoBaseVal + comissaoOver;
-                  
-                  return (
-                    <TableRow key={sale.id} className="hover:bg-muted/30">
-                      <TableCell className="font-mono text-sm">
-                        {sale.emission_date 
-                          ? format(new Date(sale.emission_date), 'dd/MM/yyyy')
-                          : '-'
-                        }
-                      </TableCell>
-                      <TableCell className="font-medium">{sale.client_name || '-'}</TableCell>
-                      <TableCell className="font-mono text-sm">{sale.nfe_number || '-'}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(Number(sale.total_value) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono text-muted-foreground">
-                        {formatCurrency(baseCalculo)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-muted-foreground">
-                        {formatCurrency(overLiquido)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-semibold text-primary">
-                        {formatCurrency(comissaoTotal)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={sale.status as 'pendente' | 'pago' | 'parcial'} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {sellerSales.map(sale => (
+                  <SaleRow
+                    key={sale.id}
+                    sale={sale}
+                    isExpanded={expandedRows.has(sale.id)}
+                    onToggle={() => toggleRow(sale.id)}
+                    comissaoBase={comissaoBase}
+                    overPercent={overPercent}
+                    baseLabel={baseLabel}
+                  />
+                ))}
               </TableBody>
             </Table>
           </div>
