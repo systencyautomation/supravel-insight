@@ -7,20 +7,21 @@ import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
 import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
 export function StockManagement() {
   const [document, setDocument] = useState<FipeDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const { effectiveOrgId } = useAuth();
-  const { fetchLatestDocument } = useFipeDocument();
-
+  const {
+    effectiveOrgId
+  } = useAuth();
+  const {
+    fetchLatestDocument
+  } = useFipeDocument();
   const loadDocument = useCallback(async () => {
     if (!effectiveOrgId) {
       setLoading(false);
       return;
     }
-    
     try {
       const doc = await fetchLatestDocument();
       setDocument(doc);
@@ -30,36 +31,27 @@ export function StockManagement() {
       setLoading(false);
     }
   }, [effectiveOrgId, fetchLatestDocument]);
-
   useEffect(() => {
     loadDocument();
   }, [loadDocument]);
-
   const handleImportSuccess = () => {
     loadDocument();
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Tabela FIPE</h2>
+          <h2 className="text-lg font-semibold">Tabela</h2>
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
             Documento oficial - somente consulta
           </p>
-          {document && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Última atualização: {format(new Date(document.uploadedAt), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-            </p>
-          )}
+          {document && <p className="text-xs text-muted-foreground mt-1">
+              Última atualização: {format(new Date(document.uploadedAt), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", {
+            locale: ptBR
+          })}
+            </p>}
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setImportDialogOpen(true)} 
-            className="gap-2"
-          >
+          <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" />
             Importar Planilha
           </Button>
@@ -71,25 +63,14 @@ export function StockManagement() {
       </div>
 
       <div>
-        {loading ? (
-          <div className="border border-border p-8 text-center">
+        {loading ? <div className="border border-border p-8 text-center">
             <p className="text-muted-foreground">Carregando...</p>
-          </div>
-        ) : document ? (
-          <SpreadsheetViewer
-            gridData={document.gridData}
-            colCount={document.colCount}
-            rowCount={document.rowCount}
-            fileName={document.fileName}
-          />
-        ) : (
-          <div className="border border-border p-8 text-center">
+          </div> : document ? <SpreadsheetViewer gridData={document.gridData} colCount={document.colCount} rowCount={document.rowCount} fileName={document.fileName} /> : <div className="border border-border p-8 text-center">
             <p className="text-muted-foreground">Nenhuma planilha importada</p>
             <p className="text-xs text-muted-foreground mt-2">
               Importe um arquivo Excel para visualizar a tabela FIPE
             </p>
-          </div>
-        )}
+          </div>}
       </div>
 
       <div className="p-4 bg-muted/30 border border-border">
@@ -100,11 +81,6 @@ export function StockManagement() {
         </p>
       </div>
 
-      <ImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        onSuccess={handleImportSuccess}
-      />
-    </div>
-  );
+      <ImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} onSuccess={handleImportSuccess} />
+    </div>;
 }
