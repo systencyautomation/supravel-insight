@@ -35,10 +35,15 @@ interface SaleRowProps {
 
 function SaleRow({ sale, isExpanded, onToggle, comissaoBase, overPercent, baseLabel, canEdit, onEdit }: SaleRowProps) {
   const valorTabela = Number(sale.table_value) || 0;
-  const comissaoEmpresa = sale.valorComissaoCalculado || 0;
+  const percentualEmpresa = Number(sale.percentual_comissao) || 0;
+  const comissaoEmpresaCalculada = valorTabela * (percentualEmpresa / 100);
   const overLiquido = sale.overPriceLiquido || 0;
-  const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-  const percentualVendedor = Number(sale.percentual_comissao) || 3;
+  
+  // Base de cálculo: valor tabela OU comissão da empresa (calculada)
+  const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresaCalculada;
+  
+  // Percentual do vendedor: usa o campo específico salvo na aprovação
+  const percentualVendedor = Number(sale.internal_seller_percent) || 0;
   const comissaoBaseVal = baseCalculo * (percentualVendedor / 100);
   const comissaoOver = overLiquido * (overPercent / 100);
   const comissaoTotal = comissaoBaseVal + comissaoOver;
@@ -260,10 +265,11 @@ export function InternalSellerCommissions() {
       
       const totalComissao = sellerSales.reduce((acc, sale) => {
         const valorTabela = Number(sale.table_value) || 0;
-        const comissaoEmpresa = sale.valorComissaoCalculado || 0;
+        const percentualEmpresa = Number(sale.percentual_comissao) || 0;
+        const comissaoEmpresaCalculada = valorTabela * (percentualEmpresa / 100);
         const overLiquido = sale.overPriceLiquido || 0;
-        const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-        const percentualVendedor = Number(sale.percentual_comissao) || 3;
+        const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresaCalculada;
+        const percentualVendedor = Number(sale.internal_seller_percent) || 0;
         const comissaoBaseValue = baseCalculo * (percentualVendedor / 100);
         const comissaoOver = overLiquido * (overPercent / 100);
         return acc + comissaoBaseValue + comissaoOver;
@@ -273,10 +279,11 @@ export function InternalSellerCommissions() {
 
       const comissaoPaga = vendasPagas.reduce((acc, sale) => {
         const valorTabela = Number(sale.table_value) || 0;
-        const comissaoEmpresa = sale.valorComissaoCalculado || 0;
+        const percentualEmpresa = Number(sale.percentual_comissao) || 0;
+        const comissaoEmpresaCalculada = valorTabela * (percentualEmpresa / 100);
         const overLiquido = sale.overPriceLiquido || 0;
-        const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-        const percentualVendedor = Number(sale.percentual_comissao) || 3;
+        const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresaCalculada;
+        const percentualVendedor = Number(sale.internal_seller_percent) || 0;
         const comissaoBaseVal = baseCalculo * (percentualVendedor / 100);
         const comissaoOver = overLiquido * (overPercent / 100);
         return acc + comissaoBaseVal + comissaoOver;

@@ -677,6 +677,7 @@ export type Database = {
           icms_tabela: number | null
           id: string
           internal_seller_id: string | null
+          internal_seller_percent: number | null
           ir_csll: number | null
           motivo_rejeicao: string | null
           nfe_email_from: string | null
@@ -700,6 +701,7 @@ export type Database = {
           produto_modelo: string | null
           produto_numero_serie: string | null
           representative_id: string | null
+          representative_percent: number | null
           status: string | null
           table_value: number | null
           total_ipi: number | null
@@ -723,6 +725,7 @@ export type Database = {
           icms_tabela?: number | null
           id?: string
           internal_seller_id?: string | null
+          internal_seller_percent?: number | null
           ir_csll?: number | null
           motivo_rejeicao?: string | null
           nfe_email_from?: string | null
@@ -746,6 +749,7 @@ export type Database = {
           produto_modelo?: string | null
           produto_numero_serie?: string | null
           representative_id?: string | null
+          representative_percent?: number | null
           status?: string | null
           table_value?: number | null
           total_ipi?: number | null
@@ -769,6 +773,7 @@ export type Database = {
           icms_tabela?: number | null
           id?: string
           internal_seller_id?: string | null
+          internal_seller_percent?: number | null
           ir_csll?: number | null
           motivo_rejeicao?: string | null
           nfe_email_from?: string | null
@@ -792,6 +797,7 @@ export type Database = {
           produto_modelo?: string | null
           produto_numero_serie?: string | null
           representative_id?: string | null
+          representative_percent?: number | null
           status?: string | null
           table_value?: number | null
           total_ipi?: number | null
