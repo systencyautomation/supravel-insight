@@ -74,7 +74,7 @@ export default function SalesApproval() {
         tipoPagamento: (editableSale.payment_method as 'boleto' | 'avista') || 'boleto',
         overPrice: editableSale.over_price || 0,
         overPriceLiquido: editableSale.over_price_liquido || 0,
-        comissaoTotal: editableSale.commission_calculated || 0,
+        comissaoTotal: (editableSale.table_value || 0) * ((editableSale.percentual_comissao || 0) / 100),
         percentualFinal: editableSale.percentual_comissao || 0,
         valorEntrada: editableSale.valor_entrada || 0,
         qtdParcelas: 0,
