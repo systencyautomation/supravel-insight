@@ -147,6 +147,16 @@ export function SellerAssignment({
     const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
     const baseLabel = comissaoBase === 'valor_tabela' ? 'Tabela' : 'Comissão';
     
+    // Debug log para verificar parametrização
+    console.log('[SellerAssignment] Parametrização:', {
+      comissao_base: orgSettings?.comissao_base,
+      comissao_over_percent: orgSettings?.comissao_over_percent,
+      baseCalculo,
+      baseLabel,
+      valorTabela,
+      comissaoEmpresa,
+    });
+    
     // Comissão sobre a base escolhida (percentual customizado pelo aprovador)
     const comissaoBaseInternal = useInternalSeller ? (internalSellerPercent / 100) * baseCalculo : 0;
     const comissaoBaseRep = useRepresentative ? (representativePercent / 100) * baseCalculo : 0;
