@@ -1,89 +1,151 @@
 
-# Correção: Confusão entre Comissão Empresa vs Vendedor
 
-## Problema Identificado
+# Correção: Separação Clara entre Comissão Empresa vs Vendedor
 
-No modo de edição (quando clica no botão de lápis), o sistema está confundindo dois valores distintos:
+## Problema Raiz
 
-| Campo | O que deveria ser | O que está sendo usado |
-|-------|------------------|------------------------|
-| `comissaoTotal` (Comissão Empresa) | R$ 1.679,33 (8% do valor tabela) | R$ 127,81 (total do vendedor) |
-| Base de cálculo quando `comissao_base = comissao_empresa` | R$ 1.679,33 | R$ 127,81 |
+O campo `commission_calculated` no banco está sendo usado para dois propósitos conflitantes:
 
-### Raiz do Problema
+| Momento | O que guarda | Problema |
+|---------|-------------|----------|
+| Na aprovação (Etapa 1) | Comissão da empresa (ex: R$ 1.971,61) | OK |
+| Na atribuição (Etapa 2) | Total do vendedor (ex: R$ 127,81) | Sobrescreve! |
 
-**Linha 77 de `SalesApproval.tsx`:**
-```typescript
-comissaoTotal: editableSale.commission_calculated || 0,
+Quando você edita a comissão do vendedor (Etapa 2), ao salvar, o campo `commission_calculated` recebe o valor do vendedor (linha 203 de SalesApproval.tsx):
+
+```
+commission_calculated: assignmentData.comissaoTotalAtribuida
 ```
 
-O campo `commission_calculated` armazena o **total que o vendedor/representante recebe**, não a comissão bruta da empresa.
+Isso faz com que:
+1. A próxima edição mostre "Comissão Empresa: R$ 127,81" (errado!)
+2. O percentual calculado apareça como 0.58% (127/22.000 × 100)
 
 ---
 
 ## Solução
 
-### 1. Corrigir `src/pages/SalesApproval.tsx` (linhas 66-88)
+### 1. Definir Claramente o Propósito do Campo `commission_calculated`
 
-Quando em modo de edição com step=2, calcular `comissaoTotal` corretamente:
+Este campo deve guardar apenas a **comissão total atribuída** (soma de vendedor + representante). A comissão da empresa NÃO precisa ser salva - pode ser sempre **calculada** como:
+
+```
+Comissão Empresa = table_value × (percentual_comissao / 100)
+```
+
+### 2. Corrigir Inicialização no Modo Edição (SalesApproval.tsx)
+
+Ao entrar em modo edição com step=2, calcular `comissaoTotal` corretamente a partir dos dados da tabela:
 
 ```typescript
-// De:
-comissaoTotal: editableSale.commission_calculated || 0,
-
-// Para:
+// Linha 77 - Já corrigido anteriormente
 comissaoTotal: (editableSale.table_value || 0) * ((editableSale.percentual_comissao || 0) / 100),
 ```
 
-Isso garante que `comissaoTotal` seja sempre a comissão da **empresa** (valor tabela × percentual da empresa).
+Esta linha já está correta! O problema está em outro lugar.
 
-### 2. Corrigir `src/components/approval/SellerAssignment.tsx` (linhas 140-148)
+### 3. Corrigir Exibição da "Comissão Empresa" no SellerAssignment
 
-Garantir que a `comissaoEmpresa` seja sempre calculada corretamente, não dependendo apenas de `confirmedData.comissaoTotal`:
+No `SellerAssignment.tsx` (linha 253-254), o valor exibido como "Comissão Empresa" deve ser recalculado, não pego do `confirmedData`:
+
+Alterar de:
+```typescript
+<p className="font-semibold text-primary">{formatCurrency(confirmedData.comissaoTotal)}</p>
+```
+
+Para:
+```typescript
+const comissaoEmpresa = confirmedData.valorTabela * (confirmedData.percentualComissao / 100);
+<p className="font-semibold text-primary">{formatCurrency(comissaoEmpresa)}</p>
+```
+
+### 4. Corrigir SaleDetailSheet para Mostrar Valores Corretos
+
+No `SaleDetailSheet.tsx`, separar a exibição da comissão da empresa e do vendedor:
+
+- **Comissão Base** = `table_value × percentual_comissao` (calculado)
+- **Comissão Atribuída** = `commission_calculated` (o que o vendedor recebe)
+
+### 5. Remover Botões Duplicados no Modo Edição Step 2
+
+No `SalesApproval.tsx`, ocultar o footer quando estiver em `step === 2`, pois o `SellerAssignment` já tem seus próprios botões:
 
 ```typescript
-// De:
-const comissaoEmpresa = confirmedData.comissaoTotal;
-
-// Para:
-const percentualEmpresa = confirmedData.percentualComissao || 0;
-const comissaoEmpresa = valorTabela * (percentualEmpresa / 100);
+// Linha 524: adicionar condição
+{isEditMode && canApprove && step === 1 && (
 ```
 
-Isso garante que mesmo que `confirmedData.comissaoTotal` venha com valor errado (legado), o cálculo seja feito corretamente.
+### 6. Adaptar Botões do SellerAssignment para Modo Edição
 
----
+Passar prop `isEditMode` para `SellerAssignment` e alterar o texto dos botões:
 
-## Resultado Esperado
-
-```text
-ANTES (ERRADO):
-┌─────────────────────────────────────────────┐
-│ Comissão Base (8%):    R$ 127,81  ← ERRADO! │
-│ Over Price Líquido:    R$ 292,28            │
-│ Comissão Total [0.58%] R$ 127,81            │
-└─────────────────────────────────────────────┘
-
-DEPOIS (CORRETO):
-┌─────────────────────────────────────────────┐
-│ Comissão Base (8%):    R$ 1.679,33 ← CERTO! │
-│ Over Price Líquido:    R$ 292,28            │
-│ Comissão Total [8.00%] R$ 1.679,33          │
-└─────────────────────────────────────────────┘
-```
-
-E quando atribuir 5% para a vendedora:
-```text
-┌─────────────────────────────────────────────┐
-│ Comissão (5%):         R$ 83,97   ← 5% de R$ 1.679,33
-│ Over (10%):            R$ 29,23   ← 10% de R$ 292,28
-│ Total Vendedora:       R$ 113,20            │
-└─────────────────────────────────────────────┘
-```
+- Modo Aprovação: "Rejeitar" / "Aprovar Venda"
+- Modo Edição: "Cancelar" / "Salvar Alterações"
 
 ---
 
 ## Arquivos a Modificar
 
-1. **`src/pages/SalesApproval.tsx`** - Corrigir inicialização de `comissaoTotal` no modo de edição
-2. **`src/components/approval/SellerAssignment.tsx`** - Calcular `comissaoEmpresa` independentemente
+1. **`src/components/approval/SellerAssignment.tsx`**
+   - Calcular `comissaoEmpresa` independentemente do `confirmedData.comissaoTotal`
+   - Receber prop `isEditMode` para alterar texto dos botões
+   - Trocar "Aprovar Venda" → "Salvar Alterações" quando em edição
+   - Trocar "Rejeitar" → "Cancelar" quando em edição
+
+2. **`src/pages/SalesApproval.tsx`**
+   - Ocultar footer quando `step === 2`
+   - Passar `isEditMode` para `SellerAssignment`
+
+3. **`src/components/dashboard/SaleDetailSheet.tsx`**
+   - Calcular e exibir "Comissão Empresa" separadamente
+   - Se houver atribuição, mostrar também "Comissão Atribuída"
+
+4. **`src/hooks/useSalesWithCalculations.ts`**
+   - Melhorar lógica para distinguir comissão empresa vs vendedor
+
+---
+
+## Fluxo Corrigido
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ ETAPA 2: Atribuição de Vendedor (Modo Edição)              │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│ ┌─ Valores Confirmados ──────────────────────────────────┐ │
+│ │ Valor Tabela:        R$ 20.991,67                      │ │
+│ │ Over Price Líquido:  R$ 292,28                         │ │
+│ │ Comissão Empresa:    R$ 1.679,33  ← CALCULADO (8%)     │ │
+│ │ Percentual Final:    8.00%                             │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                                                            │
+│ ┌─ Vendedor Interno ─────────────────────────────────────┐ │
+│ │ ☑ Vendedor Interno                                     │ │
+│ │ [Tainã Marques ▼]    [0,5] % sobre Tabela              │ │
+│ │                                                        │ │
+│ │ Tabela (0,5%):       R$ 104,96                         │ │
+│ │ Over (10%):          R$ 29,23                          │ │
+│ │ ─────────────────────────────                          │ │
+│ │ Total:               R$ 134,19                         │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                                                            │
+│ ┌─ Total a Pagar ────────────────────────────────────────┐ │
+│ │ Total Atribuído:     R$ 134,19                         │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                                                            │
+│             [Cancelar]        [Salvar Alterações]          │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Resumo das Mudanças
+
+| Arquivo | Mudança |
+|---------|---------|
+| SellerAssignment.tsx | Calcular comissaoEmpresa localmente; Receber isEditMode; Alterar texto botões |
+| SalesApproval.tsx | Ocultar footer em step=2; Passar isEditMode |
+| SaleDetailSheet.tsx | Separar comissão empresa vs atribuída |
+| useSalesWithCalculations.ts | Distinguir comissão empresa vs vendedor |
+
