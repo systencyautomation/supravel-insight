@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSales } from '@/hooks/usePendingSales';
 import { useEditableSale } from '@/hooks/useEditableSale';
 import { CommissionCalculator, CalculationData, type Installment } from '@/components/approval/CommissionCalculator';
+import { SellerAssignment, type ConfirmedCalculationData, type SellerAssignmentResult } from '@/components/approval/SellerAssignment';
 import { ApprovalActions } from '@/components/approval/ApprovalActions';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
@@ -38,6 +39,10 @@ export default function SalesApproval() {
   const [installments, setInstallments] = useState<Installment[]>([]);
   const { fetchLatestDocument } = useFipeDocument();
 
+  // 2-step flow state
+  const [step, setStep] = useState<1 | 2>(1);
+  const [confirmedCalculation, setConfirmedCalculation] = useState<ConfirmedCalculationData | null>(null);
+
   // Check permissions
   const canApprove = useMemo(() => {
     if (isSuperAdmin) return true;
@@ -55,6 +60,12 @@ export default function SalesApproval() {
   // Total count for navigation
   const count = isEditMode ? 1 : pendingCount;
   const loading = isEditMode ? editableLoading : pendingLoading;
+
+  // Reset step when changing sale
+  useEffect(() => {
+    setStep(1);
+    setConfirmedCalculation(null);
+  }, [currentSale?.id]);
 
   // Load FIPE document
   useEffect(() => {
@@ -125,24 +136,49 @@ export default function SalesApproval() {
     setCalculationData(data);
   }, []);
 
-  const handleSave = async () => {
-    if (!currentSale || !user || !calculationData) return;
+  // Step 1: Confirm calculations and proceed to step 2
+  const handleConfirmCalculations = useCallback(() => {
+    if (!calculationData) return;
+    
+    setConfirmedCalculation({
+      valorTabela: calculationData.valorTabela,
+      percentualComissao: calculationData.percentualComissao,
+      icmsTabela: calculationData.icmsTabela,
+      icmsDestino: calculationData.icmsDestino,
+      tipoPagamento: calculationData.tipoPagamento,
+      overPrice: calculationData.overPrice,
+      overPriceLiquido: calculationData.overPriceLiquido,
+      comissaoTotal: calculationData.comissaoTotal,
+      percentualFinal: calculationData.percentualFinal,
+      valorEntrada: calculationData.valorEntrada,
+      qtdParcelas: calculationData.qtdParcelas,
+      valorParcela: calculationData.valorParcela,
+      valorReal: calculationData.valorReal,
+      jurosEmbutidos: calculationData.jurosEmbutidos,
+      taxaJuros: calculationData.taxaJuros,
+    });
+    setStep(2);
+  }, [calculationData]);
+
+  // Step 2: Approve with assignment
+  const handleApproveWithAssignment = async (assignmentData: SellerAssignmentResult) => {
+    if (!currentSale || !user || !confirmedCalculation) return;
 
     const updateData: Record<string, unknown> = {
-      table_value: calculationData.valorTabela,
-      percentual_comissao: calculationData.percentualComissao,
-      percentual_icms: calculationData.icmsDestino,
-      icms_tabela: calculationData.icmsTabela,
-      payment_method: calculationData.tipoPagamento,
-      over_price: calculationData.overPrice,
-      over_price_liquido: calculationData.overPriceLiquido,
-      commission_calculated: calculationData.comissaoTotal,
-      valor_entrada: calculationData.valorEntrada,
+      table_value: confirmedCalculation.valorTabela,
+      percentual_comissao: confirmedCalculation.percentualComissao,
+      percentual_icms: confirmedCalculation.icmsDestino,
+      icms_tabela: confirmedCalculation.icmsTabela,
+      payment_method: confirmedCalculation.tipoPagamento,
+      over_price: confirmedCalculation.overPrice,
+      over_price_liquido: confirmedCalculation.overPriceLiquido,
+      commission_calculated: assignmentData.comissaoTotalAtribuida || confirmedCalculation.comissaoTotal,
+      valor_entrada: confirmedCalculation.valorEntrada,
       aprovado_por: user.id,
       aprovado_em: new Date().toISOString(),
       // Atribuição de comissão
-      internal_seller_id: calculationData.internalSellerId,
-      representative_id: calculationData.representativeId,
+      internal_seller_id: assignmentData.internalSellerId,
+      representative_id: assignmentData.representativeId,
     };
 
     // Only update status if NOT in edit mode
@@ -176,6 +212,8 @@ export default function SalesApproval() {
       navigate(-1); // Go back to previous page
     } else {
       await refetchPending();
+      setStep(1);
+      setConfirmedCalculation(null);
       // Go to next or stay at same index (which will show next item)
       if (currentIndex >= pendingSales.length - 1) {
         setCurrentIndex(Math.max(0, pendingSales.length - 2));
@@ -183,8 +221,49 @@ export default function SalesApproval() {
     }
   };
 
+  // Edit mode save (without 2-step flow)
+  const handleEditModeSave = async () => {
+    if (!currentSale || !user || !calculationData) return;
+
+    const updateData: Record<string, unknown> = {
+      table_value: calculationData.valorTabela,
+      percentual_comissao: calculationData.percentualComissao,
+      percentual_icms: calculationData.icmsDestino,
+      icms_tabela: calculationData.icmsTabela,
+      payment_method: calculationData.tipoPagamento,
+      over_price: calculationData.overPrice,
+      over_price_liquido: calculationData.overPriceLiquido,
+      commission_calculated: calculationData.comissaoTotal,
+      valor_entrada: calculationData.valorEntrada,
+      aprovado_por: user.id,
+      aprovado_em: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('sales')
+      .update(updateData)
+      .eq('id', currentSale.id);
+
+    if (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar as alterações',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+
+    toast({
+      title: 'Alterações salvas',
+      description: `NFe ${currentSale.nfe_number} atualizada com sucesso`,
+    });
+
+    await refetchEditable();
+    navigate(-1);
+  };
+
   const handleReject = async (motivo: string) => {
-    if (!currentSale || !calculationData) return;
+    if (!currentSale) return;
 
     const { error } = await supabase
       .from('sales')
@@ -210,10 +289,16 @@ export default function SalesApproval() {
     });
 
     await refetchPending();
+    setStep(1);
+    setConfirmedCalculation(null);
     
     if (currentIndex >= pendingSales.length - 1) {
       setCurrentIndex(Math.max(0, pendingSales.length - 2));
     }
+  };
+
+  const handleBackToStep1 = () => {
+    setStep(1);
   };
 
   const goToPrevious = () => {
@@ -306,12 +391,16 @@ export default function SalesApproval() {
                   <span className="bg-warning/20 text-warning-foreground px-2 py-0.5 rounded-full text-sm font-medium">
                     {pendingCount}
                   </span>
+                  {/* Step indicator */}
+                  <Badge variant="outline" className="ml-2">
+                    Etapa {step} de 2
+                  </Badge>
                 </>
               )}
             </div>
           </div>
           
-          {!isEditMode && (
+          {!isEditMode && step === 1 && (
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -373,36 +462,48 @@ export default function SalesApproval() {
           
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="h-full p-4">
-              <CommissionCalculator
-                sale={currentSale}
-                installments={installments}
-                fipeDocument={fipeDocument}
-                onCalculationChange={handleCalculationChange}
-              />
+              {/* Step 1: Commission Calculator */}
+              {step === 1 && (
+                <CommissionCalculator
+                  sale={currentSale}
+                  installments={installments}
+                  fipeDocument={fipeDocument}
+                  onCalculationChange={handleCalculationChange}
+                  onConfirmCalculations={handleConfirmCalculations}
+                  showConfirmButton={!isEditMode && canApprove}
+                />
+              )}
+              
+              {/* Step 2: Seller Assignment */}
+              {step === 2 && confirmedCalculation && currentSale && (
+                <SellerAssignment
+                  sale={currentSale}
+                  confirmedData={confirmedCalculation}
+                  organizationId={effectiveOrgId}
+                  onApprove={handleApproveWithAssignment}
+                  onReject={handleReject}
+                  onBack={handleBackToStep1}
+                />
+              )}
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
 
-      {/* Actions */}
-      {canApprove ? (
-        isEditMode ? (
-          <div className="p-4 border-t bg-card flex justify-end gap-3">
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={!currentSale}>
-              Salvar Alterações
-            </Button>
-          </div>
-        ) : (
-          <ApprovalActions
-            onApprove={handleSave}
-            onReject={handleReject}
-            disabled={!currentSale}
-          />
-        )
-      ) : (
+      {/* Actions - Only show for edit mode */}
+      {isEditMode && canApprove && (
+        <div className="p-4 border-t bg-card flex justify-end gap-3">
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Cancelar
+          </Button>
+          <Button onClick={handleEditModeSave} disabled={!currentSale}>
+            Salvar Alterações
+          </Button>
+        </div>
+      )}
+
+      {/* Permission warning */}
+      {!canApprove && (
         <div className="p-4 border-t bg-muted/50 text-center text-muted-foreground">
           Você não tem permissão para aprovar vendas. Apenas administradores e gerentes podem aprovar.
         </div>
