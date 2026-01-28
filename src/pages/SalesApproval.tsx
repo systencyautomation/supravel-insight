@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Bell, ArrowLeft, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSales } from '@/hooks/usePendingSales';
 import { useEditableSale } from '@/hooks/useEditableSale';
 import { CommissionCalculator, CalculationData, type Installment } from '@/components/approval/CommissionCalculator';
-import { SellerAssignment, type ConfirmedCalculationData, type SellerAssignmentResult } from '@/components/approval/SellerAssignment';
+import { SellerAssignment, type ConfirmedCalculationData, type SellerAssignmentResult, type SellerAssignmentHandle } from '@/components/approval/SellerAssignment';
 import { ApprovalActions } from '@/components/approval/ApprovalActions';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
@@ -38,6 +38,7 @@ export default function SalesApproval() {
   const [documentLoading, setDocumentLoading] = useState(true);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const { fetchLatestDocument } = useFipeDocument();
+  const sellerAssignmentRef = useRef<SellerAssignmentHandle>(null);
 
   // 2-step flow state - check URL for initial step
   const initialStep = searchParams.get('step') === '2' ? 2 : 1;
@@ -507,6 +508,7 @@ export default function SalesApproval() {
               {/* Step 2: Seller Assignment */}
               {step === 2 && confirmedCalculation && currentSale && (
                 <SellerAssignment
+                  ref={sellerAssignmentRef}
                   sale={currentSale}
                   confirmedData={confirmedCalculation}
                   organizationId={effectiveOrgId}
@@ -522,15 +524,29 @@ export default function SalesApproval() {
         </ResizablePanelGroup>
       </div>
 
-      {/* Actions - Only show for edit mode step 1 */}
-      {isEditMode && canApprove && step === 1 && (
+      {/* Actions - Step 1 or Step 2 */}
+      {canApprove && (step === 1 || step === 2) && (
         <div className="p-4 border-t bg-card flex justify-end gap-3">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleConfirmCalculations} disabled={!currentSale || !calculationData}>
-            Próxima Etapa
-          </Button>
+          {step === 1 && isEditMode && (
+            <>
+              <Button variant="outline" onClick={() => navigate(-1)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleConfirmCalculations} disabled={!currentSale || !calculationData}>
+                Próxima Etapa
+              </Button>
+            </>
+          )}
+          {step === 2 && (
+            <>
+              <Button variant="outline" onClick={isEditMode ? () => navigate(-1) : () => sellerAssignmentRef.current?.triggerReject()}>
+                {isEditMode ? 'Cancelar' : 'Rejeitar'}
+              </Button>
+              <Button onClick={() => sellerAssignmentRef.current?.triggerApprove()}>
+                {isEditMode ? 'Salvar Alterações' : 'Aprovar Venda'}
+              </Button>
+            </>
+          )}
         </div>
       )}
 

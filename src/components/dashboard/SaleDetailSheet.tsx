@@ -269,10 +269,13 @@ export function SaleDetailSheet({ sale, open, onOpenChange }: SaleDetailSheetPro
               
               <Separator className="my-2" />
               
-              {/* Comissão Atribuída (salva no banco) */}
+              {/* Comissão (salva no banco) - nome original com badge de % */}
               <div className="flex justify-between text-lg font-bold">
                 <div className="flex items-center gap-2">
-                  <span>Comissão Atribuída</span>
+                  <span>Comissão</span>
+                  <Badge variant="outline" className="text-xs">
+                    {sale.total_value ? ((Number(sale.commission_calculated) || 0) / sale.total_value * 100).toFixed(2) : '0.00'}%
+                  </Badge>
                 </div>
                 <span className="text-primary">{formatCurrency(Number(sale.commission_calculated) || 0)}</span>
               </div>
