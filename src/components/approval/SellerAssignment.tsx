@@ -140,7 +140,10 @@ export function SellerAssignment({
   const commissionBreakdown = useMemo(() => {
     const overLiquido = confirmedData.overPriceLiquido;
     const valorTabela = confirmedData.valorTabela;
-    const comissaoEmpresa = confirmedData.comissaoTotal; // Comissão total da empresa (sem over)
+    
+    // Calcular comissão da empresa independentemente (valor tabela × percentual da empresa)
+    const percentualEmpresa = confirmedData.percentualComissao || 0;
+    const comissaoEmpresa = valorTabela * (percentualEmpresa / 100);
     
     // Determinar base de cálculo conforme parametrização
     const comissaoBase = orgSettings?.comissao_base || 'valor_tabela';
