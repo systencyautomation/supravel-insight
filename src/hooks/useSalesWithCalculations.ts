@@ -28,10 +28,13 @@ export interface SaleWithCalculations extends SaleWithDetails {
   deducaoPisCofins: number;
   deducaoIrCsll: number;
   
-  // Comissão
+  // Comissão da empresa (sempre calculada dinamicamente)
   percentualComissaoCalculado: number;
-  valorComissaoCalculado: number;
+  valorComissaoCalculado: number;  // Empresa = base + over líquido
   comissaoPedido: number;
+  
+  // Comissão atribuída (salva no banco - vendedor/representante)
+  comissaoAtribuida: number;
   
   // Flags
   temBoletos: boolean;
@@ -84,38 +87,28 @@ export function useSalesWithCalculations() {
       const icmsOrigem = 0.12; // Assumindo SP como origem
       const icmsDestino = getIcmsRate(sale.uf_destiny || 'SP');
       
-      // 8. Verificar se tem comissão já calculada/aprovada no banco
-      const comissaoSalva = Number(sale.commission_calculated) || 0;
+      // 8. Comissão atribuída (salva no banco - para vendedor/representante)
+      const comissaoAtribuida = Number(sale.commission_calculated) || 0;
       
-      // 9. Calcular comissão ou usar valor salvo
-      let percentualComissaoCalculado: number;
-      let valorComissaoCalculado: number;
-      let comissaoPedido: number;
+      // 9. SEMPRE calcular comissão da empresa dinamicamente (nunca usar commission_calculated)
+      const percentualComissaoBase = Number(sale.percentual_comissao) || 8;
+      
+      // Usar valores salvos do banco se disponíveis, senão calcular
       let overPriceBruto: number;
       let overPriceLiquido: number;
       let deducaoIcms: number;
       let deducaoPisCofins: number;
       let deducaoIrCsll: number;
       
-      if (comissaoSalva > 0) {
-        // Venda já processada - usar valores salvos
-        valorComissaoCalculado = comissaoSalva;
-        percentualComissaoCalculado = totalValue > 0 ? (comissaoSalva / totalValue) * 100 : 0;
-        
-        // Usar valores salvos do banco se disponíveis
+      if (Number(sale.over_price) || Number(sale.over_price_liquido)) {
+        // Usar valores salvos do banco
         overPriceBruto = Number(sale.over_price) || 0;
         overPriceLiquido = Number(sale.over_price_liquido) || 0;
         deducaoIcms = Number(sale.icms) || 0;
         deducaoPisCofins = Number(sale.pis_cofins) || 0;
         deducaoIrCsll = Number(sale.ir_csll) || 0;
-        
-        // Calcular comissão do pedido baseado nos valores
-        const percentualComissaoBase = Number(sale.percentual_comissao) || 8;
-        comissaoPedido = tableValue * (percentualComissaoBase / 100);
       } else {
         // Recalcular usando approvalCalculator
-        const percentualComissaoBase = Number(sale.percentual_comissao) || 3;
-        
         const calculo = calculateApprovalCommission({
           valorNF: valorReal,
           valorFaturado: totalValue,
@@ -125,15 +118,17 @@ export function useSalesWithCalculations() {
           icmsDestino,
         });
         
-        percentualComissaoCalculado = calculo.percentualFinal;
-        valorComissaoCalculado = calculo.comissaoTotal;
-        comissaoPedido = calculo.comissaoPedido;
         overPriceBruto = calculo.overPrice;
         overPriceLiquido = calculo.overLiquido;
         deducaoIcms = calculo.deducaoIcms;
         deducaoPisCofins = calculo.deducaoPisCofins;
         deducaoIrCsll = calculo.deducaoIrCsll;
       }
+      
+      // Comissão da empresa = base sobre tabela + over líquido
+      const comissaoPedido = tableValue * (percentualComissaoBase / 100);
+      const valorComissaoCalculado = comissaoPedido + overPriceLiquido;
+      const percentualComissaoCalculado = totalValue > 0 ? (valorComissaoCalculado / totalValue) * 100 : 0;
       
       // 10. Verificar se entrada foi confirmada via boletos
       const entradaVerificada = temBoletos && entradaCalculada > 0;
@@ -162,10 +157,13 @@ export function useSalesWithCalculations() {
         deducaoPisCofins,
         deducaoIrCsll,
         
-        // Comissão
+        // Comissão da empresa (calculada)
         percentualComissaoCalculado,
         valorComissaoCalculado,
         comissaoPedido,
+        
+        // Comissão atribuída (do banco - vendedor/rep)
+        comissaoAtribuida,
         
         // Flags
         temBoletos,
