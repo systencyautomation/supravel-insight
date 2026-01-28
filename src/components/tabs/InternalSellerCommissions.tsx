@@ -141,15 +141,16 @@ function SaleRow({ sale, isExpanded, onToggle, comissaoBase, overPercent, baseLa
                   </span>
                   {canEdit && (
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         onEdit(sale.id);
                       }}
+                      title="Editar comissão"
                     >
-                      <Pencil className="h-4 w-4 mr-1" />
-                      Editar
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -430,7 +431,7 @@ export function InternalSellerCommissions() {
                     overPercent={overPercent}
                     baseLabel={baseLabel}
                     canEdit={canEditCommission}
-                    onEdit={(saleId) => navigate(`/sales-approval?mode=edit&saleId=${saleId}&step=2`)}
+                    onEdit={(saleId) => navigate(`/aprovacao?mode=edit&saleId=${saleId}&step=2`)}
                   />
                 ))}
               </TableBody>
