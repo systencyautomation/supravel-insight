@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Pencil, Check, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Pencil, Check, AlertCircle, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -9,9 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { calculateApprovalCommission, formatCurrency, getIcmsRate, calcularValorReal, getTaxaJuros } from '@/lib/approvalCalculator';
-import { CommissionAssignment, type CommissionAssignmentData } from './CommissionAssignment';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import type { PendingSale } from '@/hooks/usePendingSales';
 import type { FipeDocument } from '@/hooks/useFipeDocument';
 
@@ -29,6 +27,8 @@ interface CommissionCalculatorProps {
   installments: Installment[];
   fipeDocument: FipeDocument | null;
   onCalculationChange: (data: CalculationData) => void;
+  onConfirmCalculations?: () => void;
+  showConfirmButton?: boolean;
 }
 
 export interface CalculationData {
@@ -48,24 +48,17 @@ export interface CalculationData {
   valorReal: number;        // Valor com VP aplicado
   jurosEmbutidos: number;   // Diferença entre parcelado e VP
   taxaJuros: number;        // Taxa usada (2.2% ou 3.5%)
-  // Atribuição de comissão
-  internalSellerId: string | null;
-  internalSellerPercent: number;
-  representativeId: string | null;
-  representativePercent: number;
-  // Detalhamento de comissões
-  comissaoInternalSeller: number;
-  comissaoRepresentative: number;
 }
 
 export function CommissionCalculator({ 
   sale, 
   installments,
   fipeDocument,
-  onCalculationChange 
+  onCalculationChange,
+  onConfirmCalculations,
+  showConfirmButton = false,
 }: CommissionCalculatorProps) {
   const { effectiveOrgId } = useAuth();
-  const { settings: orgSettings } = useOrganizationSettings();
   
   // Dados da Tabela
   const [valorTabela, setValorTabela] = useState(0);
@@ -86,20 +79,6 @@ export function CommissionCalculator({
   // Over Price editing
   const [editingOverPrice, setEditingOverPrice] = useState(false);
   const [manualOverPrice, setManualOverPrice] = useState<number | null>(null);
-
-  // Atribuição de comissão
-  const [assignmentData, setAssignmentData] = useState<CommissionAssignmentData>({
-    internalSellerId: null,
-    internalSellerPercent: 0,
-    representativeId: null,
-    representativePercent: 0,
-    overSplitInternal: 0,
-    overSplitRepresentative: 0,
-  });
-
-  const handleAssignmentChange = useCallback((data: CommissionAssignmentData) => {
-    setAssignmentData(data);
-  }, []);
 
   // Search FIPE spreadsheet for product code (prioritize produto_modelo = código FIPE)
   // Search FIPE spreadsheet and detect which ICMS column has value (4%, 7%, or 12%)
@@ -410,39 +389,6 @@ export function CommissionCalculator({
 
   const activeCalculation = finalCalculation || calculation;
 
-  // Calcular comissões individuais com base na atribuição
-  const commissionBreakdown = useMemo(() => {
-    if (!activeCalculation) return null;
-    
-    const overLiquido = activeCalculation.overLiquido;
-    
-    // Comissão sobre valor tabela (percentual customizado)
-    const comissaoTabelaInternal = (assignmentData.internalSellerPercent / 100) * valorTabela;
-    const comissaoTabelaRep = (assignmentData.representativePercent / 100) * valorTabela;
-    
-    // Over: usa percentual configurado na organização (default 10%)
-    const overPercent = (orgSettings?.comissao_over_percent ?? 10) / 100;
-    const overInternal = assignmentData.internalSellerId ? overLiquido * overPercent : 0;
-    const overRep = assignmentData.representativeId ? overLiquido * overPercent : 0;
-    
-    // Total por participante
-    const comissaoInternalSeller = comissaoTabelaInternal + Math.max(0, overInternal);
-    const comissaoRepresentative = comissaoTabelaRep + Math.max(0, overRep);
-    
-    // Total geral
-    const comissaoTotalAtribuida = comissaoInternalSeller + comissaoRepresentative;
-    
-    return {
-      comissaoTabelaInternal,
-      comissaoTabelaRep,
-      overInternal,
-      overRep,
-      comissaoInternalSeller,
-      comissaoRepresentative,
-      comissaoTotalAtribuida,
-    };
-  }, [activeCalculation, assignmentData, valorTabela, orgSettings?.comissao_over_percent]);
-
   // Notify parent of changes
   useEffect(() => {
     if (activeCalculation) {
@@ -454,7 +400,7 @@ export function CommissionCalculator({
         tipoPagamento,
         overPrice: activeCalculation.overPrice,
         overPriceLiquido: activeCalculation.overLiquido,
-        comissaoTotal: commissionBreakdown?.comissaoTotalAtribuida || activeCalculation.comissaoTotal,
+        comissaoTotal: activeCalculation.comissaoTotal,
         percentualFinal: activeCalculation.percentualFinal,
         valorEntrada,
         qtdParcelas,
@@ -462,15 +408,9 @@ export function CommissionCalculator({
         valorReal,
         jurosEmbutidos: jurosEmbutidos.valor,
         taxaJuros: getTaxaJuros(tipoPagamento),
-        internalSellerId: assignmentData.internalSellerId,
-        internalSellerPercent: assignmentData.internalSellerPercent,
-        representativeId: assignmentData.representativeId,
-        representativePercent: assignmentData.representativePercent,
-        comissaoInternalSeller: commissionBreakdown?.comissaoInternalSeller || 0,
-        comissaoRepresentative: commissionBreakdown?.comissaoRepresentative || 0,
       });
     }
-  }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorReal, jurosEmbutidos, onCalculationChange, assignmentData, commissionBreakdown]);
+  }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorReal, jurosEmbutidos, onCalculationChange]);
 
   if (!sale) {
     return (
@@ -746,88 +686,30 @@ export function CommissionCalculator({
               </div>
             )}
 
-            <Separator />
-
-            {/* Atribuição de Comissão */}
-            <CommissionAssignment
-              organizationId={effectiveOrgId}
-              onChange={handleAssignmentChange}
-            />
-
-            <Separator />
-
-            {/* Comissão à ser Paga */}
-            {activeCalculation && commissionBreakdown && (
+            {/* Comissão da Empresa */}
+            {activeCalculation && (
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                  Comissão à ser Paga
+                  Comissão da Empresa
                 </h3>
                 <div className="bg-primary/10 rounded-lg p-4 space-y-3 font-mono text-sm">
-                  {/* Vendedor Interno */}
-                  {assignmentData.internalSellerId && (
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground font-sans">Vendedor Interno</div>
-                      <div className="flex justify-between">
-                        <span>Tabela ({assignmentData.internalSellerPercent}%)</span>
-                        <span>{formatCurrency(commissionBreakdown.comissaoTabelaInternal)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Over (10%)</span>
-                        <span className={commissionBreakdown.overInternal < 0 ? 'text-destructive' : ''}>
-                          {formatCurrency(Math.max(0, commissionBreakdown.overInternal))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between font-semibold text-primary">
-                        <span>Subtotal</span>
-                        <span>{formatCurrency(commissionBreakdown.comissaoInternalSeller)}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Representante */}
-                  {assignmentData.representativeId && (
-                    <div className="space-y-1">
-                      {assignmentData.internalSellerId && <Separator className="my-2" />}
-                      <div className="text-xs text-muted-foreground font-sans">Representante</div>
-                      <div className="flex justify-between">
-                        <span>Tabela ({assignmentData.representativePercent}%)</span>
-                        <span>{formatCurrency(commissionBreakdown.comissaoTabelaRep)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Over (10%)</span>
-                        <span className={commissionBreakdown.overRep < 0 ? 'text-destructive' : ''}>
-                          {formatCurrency(Math.max(0, commissionBreakdown.overRep))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between font-semibold text-primary">
-                        <span>Subtotal</span>
-                        <span>{formatCurrency(commissionBreakdown.comissaoRepresentative)}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Se nenhum atribuído, mostrar total geral */}
-                  {!assignmentData.internalSellerId && !assignmentData.representativeId && (
-                    <>
-                      <div className="flex justify-between">
-                        <span>Pedido</span>
-                        <span>{formatCurrency(activeCalculation.comissaoPedido)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Over</span>
-                        <span className={activeCalculation.overLiquido < 0 ? 'text-destructive' : ''}>
-                          {formatCurrency(activeCalculation.overLiquido)}
-                        </span>
-                      </div>
-                    </>
-                  )}
+                  <div className="flex justify-between">
+                    <span>Pedido ({percentualComissao}% s/ Tabela)</span>
+                    <span>{formatCurrency(activeCalculation.comissaoPedido)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Over Price Líquido</span>
+                    <span className={activeCalculation.overLiquido < 0 ? 'text-destructive' : ''}>
+                      {formatCurrency(activeCalculation.overLiquido)}
+                    </span>
+                  </div>
 
                   <Separator className="my-2" />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total R$</span>
                     <div className="flex items-center gap-2">
                       <span className="text-primary">
-                        {formatCurrency(commissionBreakdown.comissaoTotalAtribuida || activeCalculation.comissaoTotal)}
+                        {formatCurrency(activeCalculation.comissaoTotal)}
                       </span>
                       <span className="text-sm font-normal text-muted-foreground">
                         ({activeCalculation.percentualFinal.toFixed(2)}%)
@@ -835,6 +717,20 @@ export function CommissionCalculator({
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Botão Confirmar Cálculos */}
+            {showConfirmButton && onConfirmCalculations && activeCalculation && (
+              <div className="pt-4">
+                <Button 
+                  onClick={onConfirmCalculations} 
+                  className="w-full"
+                  size="lg"
+                >
+                  Confirmar Cálculos e Prosseguir
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
               </div>
             )}
           </div>
