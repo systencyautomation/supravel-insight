@@ -66,6 +66,18 @@ export default function SalesApproval() {
   // Initialize step 2 directly when in edit mode with step=2 param
   useEffect(() => {
     if (isEditMode && initialStep === 2 && editableSale && !confirmedCalculation) {
+      // Calcular deduções usando cascata baseado nos valores salvos
+      const overPriceBruto = editableSale.over_price || 0;
+      const icmsRate = ((editableSale.percentual_icms || 12) > 1 
+        ? (editableSale.percentual_icms || 12) / 100 
+        : (editableSale.percentual_icms || 0.12));
+      
+      const deducaoIcms = overPriceBruto * icmsRate;
+      const subtotalAposIcms = overPriceBruto - deducaoIcms;
+      const deducaoPisCofins = subtotalAposIcms * 0.0925;
+      const subtotalAposPisCofins = subtotalAposIcms - deducaoPisCofins;
+      const deducaoIrCsll = subtotalAposPisCofins * 0.34;
+      
       // Build confirmedCalculation from existing sale data
       setConfirmedCalculation({
         valorTabela: editableSale.table_value || 0,
@@ -83,6 +95,10 @@ export default function SalesApproval() {
         valorReal: editableSale.total_value || 0,
         jurosEmbutidos: 0,
         taxaJuros: 0,
+        // Deduções calculadas em cascata
+        deducaoIcms: editableSale.icms || deducaoIcms,
+        deducaoPisCofins: editableSale.pis_cofins || deducaoPisCofins,
+        deducaoIrCsll: editableSale.ir_csll || deducaoIrCsll,
       });
       setStep(2);
     }
@@ -185,6 +201,10 @@ export default function SalesApproval() {
       valorReal: calculationData.valorReal,
       jurosEmbutidos: calculationData.jurosEmbutidos,
       taxaJuros: calculationData.taxaJuros,
+      // Preservar deduções calculadas pela calculadora (cascata)
+      deducaoIcms: calculationData.deducaoIcms,
+      deducaoPisCofins: calculationData.deducaoPisCofins,
+      deducaoIrCsll: calculationData.deducaoIrCsll,
     });
     setStep(2);
   }, [calculationData]);
@@ -192,13 +212,6 @@ export default function SalesApproval() {
   // Step 2: Approve with assignment
   const handleApproveWithAssignment = async (assignmentData: SellerAssignmentResult) => {
     if (!currentSale || !user || !confirmedCalculation) return;
-
-    // Calcular deduções baseado no Over Price bruto
-    const overPriceBruto = confirmedCalculation.overPrice || 0;
-    const icmsRateDecimal = (confirmedCalculation.icmsDestino || 12) / 100;
-    const deducaoIcms = overPriceBruto * icmsRateDecimal;
-    const deducaoPisCofins = overPriceBruto * 0.0925;
-    const deducaoIrCsll = overPriceBruto * 0.34;
 
     const updateData: Record<string, unknown> = {
       table_value: confirmedCalculation.valorTabela,
@@ -210,10 +223,10 @@ export default function SalesApproval() {
       over_price_liquido: confirmedCalculation.overPriceLiquido,
       commission_calculated: assignmentData.comissaoTotalAtribuida || confirmedCalculation.comissaoTotal,
       valor_entrada: confirmedCalculation.valorEntrada,
-      // Persistir deduções
-      icms: deducaoIcms,
-      pis_cofins: deducaoPisCofins,
-      ir_csll: deducaoIrCsll,
+      // Usar deduções já calculadas pela calculadora (cascata)
+      icms: confirmedCalculation.deducaoIcms,
+      pis_cofins: confirmedCalculation.deducaoPisCofins,
+      ir_csll: confirmedCalculation.deducaoIrCsll,
       aprovado_por: user.id,
       aprovado_em: new Date().toISOString(),
       // Atribuição de comissão
@@ -267,13 +280,6 @@ export default function SalesApproval() {
   const handleEditModeSave = async () => {
     if (!currentSale || !user || !calculationData) return;
 
-    // Calcular deduções baseado no Over Price bruto
-    const overPriceBruto = calculationData.overPrice || 0;
-    const icmsRateDecimal = (calculationData.icmsDestino || 12) / 100;
-    const deducaoIcms = overPriceBruto * icmsRateDecimal;
-    const deducaoPisCofins = overPriceBruto * 0.0925;
-    const deducaoIrCsll = overPriceBruto * 0.34;
-
     const updateData: Record<string, unknown> = {
       table_value: calculationData.valorTabela,
       percentual_comissao: calculationData.percentualComissao,
@@ -284,10 +290,10 @@ export default function SalesApproval() {
       over_price_liquido: calculationData.overPriceLiquido,
       commission_calculated: calculationData.comissaoTotal,
       valor_entrada: calculationData.valorEntrada,
-      // Persistir deduções
-      icms: deducaoIcms,
-      pis_cofins: deducaoPisCofins,
-      ir_csll: deducaoIrCsll,
+      // Usar deduções da calculadora (cascata)
+      icms: calculationData.deducaoIcms,
+      pis_cofins: calculationData.deducaoPisCofins,
+      ir_csll: calculationData.deducaoIrCsll,
       aprovado_por: user.id,
       aprovado_em: new Date().toISOString(),
     };

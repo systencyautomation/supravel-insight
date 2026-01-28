@@ -38,6 +38,10 @@ export interface ConfirmedCalculationData {
   valorReal: number;
   jurosEmbutidos: number;
   taxaJuros: number;
+  // Deduções calculadas (cascata)
+  deducaoIcms: number;
+  deducaoPisCofins: number;
+  deducaoIrCsll: number;
 }
 
 export interface SellerAssignmentResult {
