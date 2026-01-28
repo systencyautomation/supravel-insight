@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { ArrowLeft, Users, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,7 +61,12 @@ interface SellerAssignmentProps {
   onCancel?: () => void;
 }
 
-export function SellerAssignment({ 
+export interface SellerAssignmentHandle {
+  triggerApprove: () => void;
+  triggerReject: () => void;
+}
+
+export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignmentProps>(({ 
   sale,
   confirmedData,
   organizationId,
@@ -70,7 +75,7 @@ export function SellerAssignment({
   onBack,
   isEditMode = false,
   onCancel,
-}: SellerAssignmentProps) {
+}, ref) => {
   const { representatives, loading: repsLoading } = useRepresentatives(organizationId);
   const { settings: orgSettings } = useOrganizationSettings();
   const [sellers, setSellers] = useState<OrgMember[]>([]);
@@ -195,7 +200,7 @@ export function SellerAssignment({
     };
   }, [confirmedData, useInternalSeller, useRepresentative, internalSellerId, internalSellerPercent, representativeId, representativePercent, orgSettings?.comissao_over_percent, orgSettings?.comissao_base]);
 
-  const handleApprove = () => {
+  const handleApprove = useCallback(() => {
     onApprove({
       internalSellerId: useInternalSeller ? internalSellerId : null,
       internalSellerPercent: useInternalSeller ? internalSellerPercent : 0,
@@ -205,13 +210,19 @@ export function SellerAssignment({
       comissaoRepresentative: commissionBreakdown.comissaoRepresentative,
       comissaoTotalAtribuida: commissionBreakdown.comissaoTotalAtribuida,
     });
-  };
+  }, [onApprove, useInternalSeller, internalSellerId, internalSellerPercent, useRepresentative, representativeId, representativePercent, commissionBreakdown]);
 
-  const handleReject = () => {
+  const handleReject = useCallback(() => {
     if (rejectReason.trim()) {
       onReject(rejectReason.trim());
     }
-  };
+  }, [onReject, rejectReason]);
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    triggerApprove: handleApprove,
+    triggerReject: () => setShowRejectInput(true),
+  }), [handleApprove]);
 
   const activeReps = representatives.filter(r => r.active !== false);
 
@@ -494,31 +505,8 @@ export function SellerAssignment({
           </div>
         </ScrollArea>
       </CardContent>
-
-      {/* Actions Footer */}
-      {!showRejectInput && (
-        <div className="p-4 border-t bg-card flex justify-between gap-3">
-          {isEditMode ? (
-            <>
-              <Button variant="outline" onClick={onCancel}>
-                Cancelar
-              </Button>
-              <Button onClick={handleApprove}>
-                Salvar Alterações
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => setShowRejectInput(true)}>
-                Rejeitar
-              </Button>
-              <Button onClick={handleApprove}>
-                Aprovar Venda
-              </Button>
-            </>
-          )}
-        </div>
-      )}
     </Card>
   );
-}
+});
+
+SellerAssignment.displayName = 'SellerAssignment';
