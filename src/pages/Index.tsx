@@ -76,23 +76,6 @@ const Index = () => {
   }
 
   if (!user) return null;
-
-  // Map for legacy CommissionsTab component
-  const displaySales = salesWithCalculations.map(s => ({
-    id: s.id,
-    cliente: s.client_name || '',
-    nfe: s.nfe_number || '',
-    valorTotal: Number(s.total_value) || 0,
-    valorTabela: Number(s.table_value) || 0,
-    uf: s.uf_destiny || 'SP',
-    formaPagamento: (s.payment_method === 'avista' ? 'avista' : 'boleto') as 'boleto' | 'avista',
-    status: (s.status || 'pendente') as 'pago' | 'pendente' | 'parcial',
-    dataEmissao: s.emission_date || new Date().toISOString(),
-    vendedorInterno: '',
-    representante: '',
-  }));
-
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <DashboardHeader />
@@ -175,7 +158,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="comissoes" className="mt-6">
-            <CommissionsTab sales={displaySales} />
+            <CommissionsTab />
           </TabsContent>
 
           <TabsContent value="tabela" className="mt-6">
