@@ -99,6 +99,8 @@ export default function SalesApproval() {
         deducaoIcms: editableSale.icms || deducaoIcms,
         deducaoPisCofins: editableSale.pis_cofins || deducaoPisCofins,
         deducaoIrCsll: editableSale.ir_csll || deducaoIrCsll,
+        // No edit mode step 2 direct, use existing installments (will be loaded separately)
+        parcelasGeradas: [],
       });
       setStep(2);
     }
@@ -205,9 +207,48 @@ export default function SalesApproval() {
       deducaoIcms: calculationData.deducaoIcms,
       deducaoPisCofins: calculationData.deducaoPisCofins,
       deducaoIrCsll: calculationData.deducaoIrCsll,
+      // Parcelas geradas para sincronizar
+      parcelasGeradas: calculationData.parcelasGeradas || [],
     });
     setStep(2);
   }, [calculationData]);
+
+  // Sincronizar parcelas com o banco de dados
+  const syncInstallments = async (saleId: string, parcelas: { installment_number: number; value: number; due_date: string }[]) => {
+    if (!effectiveOrgId) return;
+    
+    // 1. Deletar parcelas existentes
+    const { error: deleteError } = await supabase
+      .from('installments')
+      .delete()
+      .eq('sale_id', saleId);
+    
+    if (deleteError) {
+      console.error('Error deleting installments:', deleteError);
+      throw deleteError;
+    }
+    
+    // 2. Inserir novas parcelas (se houver)
+    if (parcelas.length > 0) {
+      const installmentsToInsert = parcelas.map(p => ({
+        organization_id: effectiveOrgId,
+        sale_id: saleId,
+        installment_number: p.installment_number,
+        value: p.value,
+        due_date: p.due_date,
+        status: 'pendente',
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('installments')
+        .insert(installmentsToInsert);
+      
+      if (insertError) {
+        console.error('Error inserting installments:', insertError);
+        throw insertError;
+      }
+    }
+  };
 
   // Step 2: Approve with assignment
   const handleApproveWithAssignment = async (assignmentData: SellerAssignmentResult) => {
@@ -240,6 +281,9 @@ export default function SalesApproval() {
     if (!isEditMode) {
       updateData.status = 'aprovado';
     }
+
+    // Sincronizar parcelas
+    await syncInstallments(currentSale.id, confirmedCalculation.parcelasGeradas || []);
 
     const { error } = await supabase
       .from('sales')

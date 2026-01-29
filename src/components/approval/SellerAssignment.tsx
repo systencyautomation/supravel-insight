@@ -22,6 +22,13 @@ interface OrgMember {
   role: string;
 }
 
+// Interface para parcelas geradas (deve coincidir com CommissionCalculator)
+export interface ParcelaGerada {
+  installment_number: number;
+  value: number;
+  due_date: string;
+}
+
 export interface ConfirmedCalculationData {
   valorTabela: number;
   percentualComissao: number;
@@ -42,6 +49,8 @@ export interface ConfirmedCalculationData {
   deducaoIcms: number;
   deducaoPisCofins: number;
   deducaoIrCsll: number;
+  // Parcelas geradas para sincronizar
+  parcelasGeradas: ParcelaGerada[];
 }
 
 export interface SellerAssignmentResult {
