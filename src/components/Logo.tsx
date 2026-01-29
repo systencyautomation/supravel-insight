@@ -22,7 +22,7 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
   return (
     <img 
       src={logoSrc}
-      alt="Connect CRM"
+      alt="Connect Dash"
       className={`${sizeClasses[size]} w-auto object-contain ${className}`}
     />
   );

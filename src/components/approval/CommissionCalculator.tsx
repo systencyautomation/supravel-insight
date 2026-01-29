@@ -737,19 +737,6 @@ export function CommissionCalculator({
               </div>
             )}
 
-            {/* Botão Confirmar Cálculos */}
-            {showConfirmButton && onConfirmCalculations && activeCalculation && (
-              <div className="pt-4">
-                <Button 
-                  onClick={onConfirmCalculations} 
-                  className="w-full"
-                  size="lg"
-                >
-                  Confirmar Cálculos e Prosseguir
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            )}
           </div>
         </ScrollArea>
       </CardContent>

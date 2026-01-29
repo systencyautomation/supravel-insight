@@ -226,7 +226,7 @@ export default function Auth() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Connect CRM © 2026
+          Connect Dash © 2026
         </p>
       </div>
     </div>

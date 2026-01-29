@@ -794,6 +794,14 @@ export default function MasterDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <footer className="border-t border-border py-3 mt-auto">
+        <div className="container mx-auto px-6 text-center">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+            Connect Dash © 2026 — Sistema de Gestão de Comissões
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
