@@ -34,15 +34,8 @@ export function useRecebimentosData(sales: SaleWithCalculations[]): Recebimentos
         return;
       }
 
-      // Usar percentual FINAL calculado (8% tabela + over líquido)
-      // Prioriza commission_calculated/total_value se já aprovado, senão usa percentualComissaoCalculado
-      const comissaoSalva = Number(sale.commission_calculated) || 0;
-      const totalValue = Number(sale.total_value) || 0;
-      
-      // Se tem comissão salva, calcular percentual efetivo sobre o valor total
-      const percentualComissao = comissaoSalva > 0 && totalValue > 0
-        ? (comissaoSalva / totalValue) * 100
-        : sale.percentualComissaoCalculado || 0;
+      // Usar percentual da comissão da empresa (já calculado corretamente no useSalesWithCalculations)
+      const percentualComissao = sale.percentualComissaoCalculado || 0;
       const nf = sale.nfe_number || '';
       const cliente = sale.client_name || '';
       const produto = sale.produto_modelo || sale.produto_descricao || '';
