@@ -555,7 +555,7 @@ export default function SalesApproval() {
       {/* Actions - Step 1 or Step 2 */}
       {canApprove && (step === 1 || step === 2) && (
         <div className="p-4 border-t bg-card flex justify-end gap-3">
-          {step === 1 && isEditMode && (
+          {step === 1 && (
             <>
               <Button variant="outline" onClick={() => navigate(-1)}>
                 Cancelar
