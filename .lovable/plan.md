@@ -1,88 +1,190 @@
 
+# Plano: Salvar Parcelas Editadas na Calculadora
 
-# Plano: Adicionar Comissão Pendente no Header de Recebimentos
+## Problema
 
-## Objetivo
+Quando o usuário altera o número de parcelas ou valor da entrada na calculadora de comissões:
 
-Mostrar no header da aba Recebimentos **dois indicadores** separados:
-1. **Valor Pendente (Cliente)** - o que o cliente deve pagar
-2. **Comissão a Receber** - o que a empresa ganha de comissão
+1. **O XML nem sempre traz todas as parcelas** (ex: só 9 de 10)
+2. **As alterações não são salvas** no banco de dados
+3. **A última parcela mostra valor errado** (R$ 16.000 em vez de R$ 8.000)
+4. **Falta cálculo automático de datas de vencimento** (+30 dias, pulando finais de semana/feriados)
 
-## Situação Atual
-
-O header mostra apenas:
-```
-VALOR PENDENTE A RECEBER
-R$ 4.697,35
-```
-
-## Novo Layout Proposto
+## Exemplo do Problema
 
 ```
-VALOR PENDENTE (CLIENTE)     COMISSÃO A RECEBER
-R$ 4.697,35                  R$ 516,95
+Calculadora mostra: 10 parcelas × R$ 8.000
+Banco de dados: 9 parcelas existentes + 1 nova que não foi criada
+SaleDetailSheet mostra: Parcela 9 com R$ 16.000 (porque está somando 2 parcelas)
 ```
 
-## Alterações
+## Solução
 
-### Arquivo: `src/components/empresa/EmpresaRecebimentos.tsx`
+### 1. Criar Função de Dias Úteis
 
-**1. Adicionar cálculo da comissão pendente filtrada (após linha 74):**
+Novo arquivo utilitário para calcular próximo dia útil:
 
 ```typescript
-// Total pendente filtrado (valor do cliente)
-const totalPendenteFiltrado = useMemo(() => {
-  return filteredRecebimentos
-    .filter(r => r.status === 'pendente')
-    .reduce((acc, r) => acc + r.valor, 0);
-}, [filteredRecebimentos]);
+// src/lib/businessDays.ts
 
-// NOVO: Total comissão pendente filtrada
-const totalComissaoPendenteFiltrada = useMemo(() => {
-  return filteredRecebimentos
-    .filter(r => r.status === 'pendente')
-    .reduce((acc, r) => acc + r.valor_comissao, 0);
-}, [filteredRecebimentos]);
-```
+const BRAZILIAN_HOLIDAYS_2026 = [
+  '2026-01-01', // Confraternização Universal
+  '2026-02-16', // Carnaval
+  '2026-02-17', // Carnaval
+  '2026-04-03', // Sexta-feira Santa
+  '2026-04-21', // Tiradentes
+  '2026-05-01', // Dia do Trabalho
+  '2026-06-04', // Corpus Christi
+  '2026-09-07', // Independência
+  '2026-10-12', // Padroeira
+  '2026-11-02', // Finados
+  '2026-11-15', // Proclamação da República
+  '2026-12-25', // Natal
+];
 
-**2. Atualizar o header para mostrar ambos os valores (linhas 132-139):**
-
-```tsx
-<div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
-  {/* Valor do Cliente */}
-  <div className="text-right">
-    <span className="text-sm text-muted-foreground uppercase tracking-wide">
-      Valor Pendente (Cliente)
-    </span>
-    <p className="text-2xl font-bold text-primary">
-      {formatCurrency(totalPendenteFiltrado)}
-    </p>
-  </div>
+export function isBusinessDay(date: Date): boolean {
+  const dayOfWeek = date.getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) return false;
   
-  {/* Comissão a Receber */}
-  <div className="text-right">
-    <span className="text-sm text-muted-foreground uppercase tracking-wide">
-      Comissão a Receber
-    </span>
-    <p className="text-2xl font-bold text-green-600">
-      {formatCurrency(totalComissaoPendenteFiltrada)}
-    </p>
-  </div>
-</div>
+  const dateStr = date.toISOString().split('T')[0];
+  return !BRAZILIAN_HOLIDAYS_2026.includes(dateStr);
+}
+
+export function addBusinessDays(startDate: Date, days: number): Date {
+  let result = new Date(startDate);
+  result.setDate(result.getDate() + days);
+  
+  while (!isBusinessDay(result)) {
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+}
+
+export function generateInstallmentDates(
+  baseDate: Date,
+  qtdParcelas: number
+): Date[] {
+  const dates: Date[] = [];
+  let currentDate = new Date(baseDate);
+  
+  for (let i = 0; i < qtdParcelas; i++) {
+    // Primeira parcela: +30 dias da data base
+    currentDate = addBusinessDays(currentDate, 30);
+    dates.push(new Date(currentDate));
+  }
+  
+  return dates;
+}
 ```
 
-## Resultado Visual Esperado
+### 2. Passar Parcelas da Calculadora para o Salvamento
 
-| Indicador | Cor | Valor (exemplo) |
-|-----------|-----|-----------------|
-| Valor Pendente (Cliente) | Azul (primary) | R$ 4.697,35 |
-| Comissão a Receber | Verde | R$ 516,95 |
+Modificar a estrutura `CalculationData` para incluir informações das parcelas:
 
-## Benefício
+```typescript
+// src/components/approval/CommissionCalculator.tsx
 
-Quando filtrar por cliente, período ou NF, você verá imediatamente:
-- Quanto o cliente deve pagar
-- Quanto você vai receber de comissão
+export interface CalculationData {
+  // ...campos existentes...
+  
+  // NOVO: Parcelas geradas para salvar
+  parcelasGeradas: {
+    installment_number: number;
+    value: number;
+    due_date: string;
+  }[];
+}
+```
 
-A soma funciona automaticamente quando aparecem múltiplos recebimentos no filtro.
+### 3. Atualizar Calculadora para Gerar Datas
 
+Na `CommissionCalculator`, gerar as parcelas com datas:
+
+```typescript
+// Dentro do useMemo que calcula parcelas
+const parcelasGeradas = useMemo(() => {
+  if (qtdParcelas <= 0 || tipoPagamento === 'a_vista') return [];
+  
+  const baseDate = sale?.emission_date 
+    ? new Date(sale.emission_date) 
+    : new Date();
+    
+  const dates = generateInstallmentDates(baseDate, qtdParcelas);
+  
+  return dates.map((dueDate, index) => ({
+    installment_number: index + 1,
+    value: valorParcela,
+    due_date: dueDate.toISOString().split('T')[0],
+  }));
+}, [qtdParcelas, valorParcela, tipoPagamento, sale?.emission_date]);
+```
+
+### 4. Salvar Parcelas na Aprovação
+
+Modificar `SalesApproval.tsx` para sincronizar parcelas:
+
+```typescript
+// handleApproveWithAssignment
+const syncInstallments = async (saleId: string, parcelas: ParcelaGerada[]) => {
+  // 1. Deletar parcelas existentes
+  await supabase
+    .from('installments')
+    .delete()
+    .eq('sale_id', saleId);
+  
+  // 2. Inserir novas parcelas
+  if (parcelas.length > 0) {
+    const installmentsToInsert = parcelas.map(p => ({
+      organization_id: effectiveOrgId,
+      sale_id: saleId,
+      installment_number: p.installment_number,
+      value: p.value,
+      due_date: p.due_date,
+      status: 'pendente',
+    }));
+    
+    await supabase
+      .from('installments')
+      .insert(installmentsToInsert);
+  }
+};
+```
+
+## Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/lib/businessDays.ts` | NOVO - Funções de dias úteis |
+| `src/components/approval/CommissionCalculator.tsx` | Adicionar geração de parcelas com datas |
+| `src/pages/SalesApproval.tsx` | Sincronizar parcelas ao salvar |
+| `src/components/approval/SellerAssignment.tsx` | Passar parcelas para o salvamento |
+
+## Fluxo Completo
+
+```
+1. Usuário edita "Número de Parcelas" → 10
+2. Calculadora recalcula:
+   - valorParcela = (130.000 - 50.000) / 10 = 8.000
+   - Gera 10 datas de vencimento (+30 dias úteis cada)
+3. Usuário clica "Próxima Etapa"
+4. Sistema salva:
+   - Deleta parcelas antigas (9)
+   - Insere novas parcelas (10 × R$ 8.000)
+   - Cada uma com data de vencimento em dia útil
+5. SaleDetailSheet mostra corretamente:
+   - Parcela 1: 12/02/2026 - R$ 8.000
+   - Parcela 2: 12/03/2026 - R$ 8.000
+   - ...
+   - Parcela 10: 12/11/2026 - R$ 8.000
+```
+
+## Cálculo de Datas
+
+| Parcela | Cálculo | Data |
+|---------|---------|------|
+| 1 | Emissão + 30 dias úteis | 12/02/2026 |
+| 2 | Parcela 1 + 30 dias úteis | 12/03/2026 |
+| 3 | Parcela 2 + 30 dias úteis | 14/04/2026 |
+| ... | ... | ... |
+
+Se cair em sábado/domingo/feriado, avança para próximo dia útil.
