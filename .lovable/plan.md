@@ -1,91 +1,65 @@
 
-# Plano: Desconsiderar Over Price Negativo no Cálculo de Comissão
+# Plano: Correção do Erro ao Salvar Representante
 
-## Problema Atual
+## Problema Identificado
 
-Quando o Over Price é negativo (valor de venda menor que valor tabela ajustado), o sistema está:
-1. Exibindo o over negativo: -R$ 8.785,51
-2. Subtraindo esse valor da comissão do pedido
-3. Resultado: R$ 10.392,00 - R$ 8.785,51 = R$ 1.606,49
+O erro **"violates foreign key constraint 'sales_representative_id_fkey'"** ocorre porque:
 
-**Regra de Negócio Correta:** Over negativo deve ser **desconsiderado** (= R$ 0,00), mantendo a comissão apenas como o valor base do pedido (R$ 10.392,00).
+1. A coluna `sales.representative_id` tem uma **foreign key apontando para `auth.users.id`**
+2. Porém, o código está tentando salvar o **ID da tabela `representatives`** (que é diferente)
+3. Como o UUID do representante não existe na tabela `auth.users`, a constraint falha
+
+### Situação Atual do Banco
+
+| Coluna | Foreign Key Atual | Problema |
+|--------|-------------------|----------|
+| `internal_seller_id` | `auth.users.id` | ✅ Correto (vendedores são usuários) |
+| `representative_id` | `auth.users.id` | ❌ **Incorreto** (representantes são empresas externas) |
 
 ---
 
-## Arquivos a Modificar
+## Solução Proposta
 
-### 1. `src/lib/approvalCalculator.ts`
+### Alterar a Foreign Key no Banco de Dados
 
-**Linhas 156-159 - Tratar over negativo como zero:**
+A FK `sales_representative_id_fkey` precisa ser alterada para referenciar a tabela `representatives`:
 
-```typescript
-// ANTES:
-} else {
-  // Se over negativo, passa direto (sem deduções)
-  overLiquido = overPrice;
-  console.log('[approvalCalculator] Over negativo, sem deduções:', overLiquido);
-}
+```sql
+-- 1. Remover a constraint existente (que aponta para auth.users)
+ALTER TABLE sales 
+DROP CONSTRAINT IF EXISTS sales_representative_id_fkey;
 
-// DEPOIS:
-} else {
-  // Se over negativo, desconsiderar (tratar como 0)
-  overLiquido = 0;
-  console.log('[approvalCalculator] Over negativo, desconsiderando:', overPrice, '→ 0');
-}
-```
-
-### 2. `src/components/approval/CommissionCalculator.tsx`
-
-**Linhas 737-741 - Ajustar exibição para mostrar "desconsiderado":**
-
-Quando o over bruto for negativo, exibir uma nota visual indicando que foi desconsiderado:
-
-```tsx
-<div className="flex justify-between">
-  <span>Over Price Líquido</span>
-  {activeCalculation.overPrice < 0 ? (
-    <span className="text-muted-foreground text-xs italic">
-      (desconsiderado)
-    </span>
-  ) : (
-    <span>{formatCurrency(activeCalculation.overLiquido)}</span>
-  )}
-</div>
+-- 2. Adicionar nova constraint apontando para representatives
+ALTER TABLE sales
+ADD CONSTRAINT sales_representative_id_fkey 
+FOREIGN KEY (representative_id) 
+REFERENCES representatives(id) 
+ON DELETE SET NULL;
 ```
 
 ---
 
-## Comportamento Esperado
+## Comportamento Esperado Após Correção
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Over Price | -R$ 8.785,51 | -R$ 8.785,51 (exibido) |
-| Over Price Líquido na soma | -R$ 8.785,51 | R$ 0,00 (desconsiderado) |
-| Comissão Base | R$ 10.392,00 | R$ 10.392,00 |
-| **Total** | R$ 1.606,49 | **R$ 10.392,00** |
+| Ação | Antes | Depois |
+|------|-------|--------|
+| Selecionar representante e salvar | ❌ Erro FK | ✅ Salva normalmente |
+| ID armazenado | - | UUID da tabela `representatives` |
 
 ---
 
-## Fluxo Visual
+## Impacto
 
-```
-Valor Real (VP): R$ 121.114,49
-Valor Tabela Ajustado: R$ 129.900,00
-                ↓
-Over Price = R$ 121.114,49 - R$ 129.900,00 = -R$ 8.785,51
-                ↓
-Over Price < 0? SIM
-                ↓
-Over Líquido = R$ 0,00 (desconsiderado)
-                ↓
-Comissão Total = R$ 10.392,00 + R$ 0,00 = R$ 10.392,00 ✓
-```
+- **Sem impacto no código React** - o código já está correto
+- **Apenas mudança no schema do banco de dados**
+- Dados existentes não serão afetados (nenhum valor válido em `representative_id` atualmente)
 
 ---
 
-## Resumo das Alterações
+## Resumo Técnico
 
-| Arquivo | Linha | Mudança |
-|---------|-------|---------|
-| `approvalCalculator.ts` | 156-159 | Setar `overLiquido = 0` quando over negativo |
-| `CommissionCalculator.tsx` | 737-741 | Exibir "(desconsiderado)" quando over bruto < 0 |
+| Item | Ação |
+|------|------|
+| Migração SQL | Dropar FK antiga, criar FK nova para `representatives.id` |
+| Código React | Nenhuma alteração necessária |
+| RLS | Nenhuma alteração necessária |
