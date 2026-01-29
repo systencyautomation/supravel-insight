@@ -1,190 +1,161 @@
 
-# Plano: Salvar Parcelas Editadas na Calculadora
 
-## Problema
+# Plano: Corrigir Processamento de Boletos - Separar Entrada das Parcelas
 
-Quando o usuário altera o número de parcelas ou valor da entrada na calculadora de comissões:
+## Problema Identificado
 
-1. **O XML nem sempre traz todas as parcelas** (ex: só 9 de 10)
-2. **As alterações não são salvas** no banco de dados
-3. **A última parcela mostra valor errado** (R$ 16.000 em vez de R$ 8.000)
-4. **Falta cálculo automático de datas de vencimento** (+30 dias, pulando finais de semana/feriados)
+Os boletos extraídos do PDF contêm **11 registros**:
+- 1 boleto de entrada: R$ 50.000 (com vencimento = data emissão)
+- 10 boletos de parcelas: R$ 8.000 cada
 
-## Exemplo do Problema
+A lógica atual **salva todos como installments**, resultando em:
+- Entrada duplicada (está em `sales.valor_entrada` E em `installments[0]`)
+- Última parcela mostra valor errado (R$ 16.000)
+
+## Dados Atuais no Banco (NF 7826)
 
 ```
-Calculadora mostra: 10 parcelas × R$ 8.000
-Banco de dados: 9 parcelas existentes + 1 nova que não foi criada
-SaleDetailSheet mostra: Parcela 9 com R$ 16.000 (porque está somando 2 parcelas)
+sales.valor_entrada = 50.000  ← Correto
+installments[0] = 50.000      ← ERRADO (duplicou a entrada)
+installments[1-8] = 8.000     ← Correto
+installments[9] = 16.000?     ← Errado (soma de sobra)
 ```
 
-## Solução
+## Lógica Correta
 
-### 1. Criar Função de Dias Úteis
+```
+Boletos recebidos = [50k, 8k, 8k, 8k, 8k, 8k, 8k, 8k, 8k, 8k, 8k] (11 itens)
 
-Novo arquivo utilitário para calcular próximo dia útil:
+Critério: boleto[0].vencimento == emission_date → É ENTRADA
+         boleto[0].vencimento != emission_date → É primeira parcela
+
+Se primeiro boleto for entrada:
+  - valor_entrada = boletos[0].valor
+  - installments = boletos.slice(1) ← Parcelas 1-10
+
+Senão:
+  - valor_entrada = total_nf - soma(boletos)
+  - installments = todos os boletos
+```
+
+## Arquivo a Alterar
+
+### `supabase/functions/parse-nfe-xml/index.ts`
+
+**Linhas 405-444 - Lógica de processamento de boletos:**
 
 ```typescript
-// src/lib/businessDays.ts
-
-const BRAZILIAN_HOLIDAYS_2026 = [
-  '2026-01-01', // Confraternização Universal
-  '2026-02-16', // Carnaval
-  '2026-02-17', // Carnaval
-  '2026-04-03', // Sexta-feira Santa
-  '2026-04-21', // Tiradentes
-  '2026-05-01', // Dia do Trabalho
-  '2026-06-04', // Corpus Christi
-  '2026-09-07', // Independência
-  '2026-10-12', // Padroeira
-  '2026-11-02', // Finados
-  '2026-11-15', // Proclamação da República
-  '2026-12-25', // Natal
-];
-
-export function isBusinessDay(date: Date): boolean {
-  const dayOfWeek = date.getDay();
-  if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+if (usarBoletos) {
+  console.log(`Processando ${boletosArray.length} boletos do e-mail`);
   
-  const dateStr = date.toISOString().split('T')[0];
-  return !BRAZILIAN_HOLIDAYS_2026.includes(dateStr);
-}
-
-export function addBusinessDays(startDate: Date, days: number): Date {
-  let result = new Date(startDate);
-  result.setDate(result.getDate() + days);
+  const emissionDate = parsedData.nfe.emissao; // YYYY-MM-DD
+  const primeiroBoleto = boletosArray[0];
   
-  while (!isBusinessDay(result)) {
-    result.setDate(result.getDate() + 1);
-  }
-  return result;
-}
-
-export function generateInstallmentDates(
-  baseDate: Date,
-  qtdParcelas: number
-): Date[] {
-  const dates: Date[] = [];
-  let currentDate = new Date(baseDate);
+  // Verificar se o primeiro boleto é a entrada
+  // Critério: vencimento = data de emissão OU diferença <= 1 dia
+  let primeiroBoletoeEntrada = false;
   
-  for (let i = 0; i < qtdParcelas; i++) {
-    // Primeira parcela: +30 dias da data base
-    currentDate = addBusinessDays(currentDate, 30);
-    dates.push(new Date(currentDate));
-  }
-  
-  return dates;
-}
-```
-
-### 2. Passar Parcelas da Calculadora para o Salvamento
-
-Modificar a estrutura `CalculationData` para incluir informações das parcelas:
-
-```typescript
-// src/components/approval/CommissionCalculator.tsx
-
-export interface CalculationData {
-  // ...campos existentes...
-  
-  // NOVO: Parcelas geradas para salvar
-  parcelasGeradas: {
-    installment_number: number;
-    value: number;
-    due_date: string;
-  }[];
-}
-```
-
-### 3. Atualizar Calculadora para Gerar Datas
-
-Na `CommissionCalculator`, gerar as parcelas com datas:
-
-```typescript
-// Dentro do useMemo que calcula parcelas
-const parcelasGeradas = useMemo(() => {
-  if (qtdParcelas <= 0 || tipoPagamento === 'a_vista') return [];
-  
-  const baseDate = sale?.emission_date 
-    ? new Date(sale.emission_date) 
-    : new Date();
+  if (primeiroBoleto && primeiroBoleto.vencimento && emissionDate) {
+    const diffDias = Math.abs(
+      (new Date(primeiroBoleto.vencimento).getTime() - new Date(emissionDate).getTime()) 
+      / (1000 * 60 * 60 * 24)
+    );
+    primeiroBoletoeEntrada = diffDias <= 3; // Até 3 dias de diferença = é entrada
     
-  const dates = generateInstallmentDates(baseDate, qtdParcelas);
+    console.log(`Primeiro boleto: venc=${primeiroBoleto.vencimento}, emissao=${emissionDate}, diff=${diffDias} dias, eEntrada=${primeiroBoletoeEntrada}`);
+  }
   
-  return dates.map((dueDate, index) => ({
-    installment_number: index + 1,
-    value: valorParcela,
-    due_date: dueDate.toISOString().split('T')[0],
+  if (primeiroBoletoeEntrada) {
+    // CENÁRIO 1: Primeiro boleto é a entrada
+    valorEntrada = primeiroBoleto.valor || 0;
+    parcelasParaSalvar = boletosArray.slice(1); // Remove primeiro (entrada)
+    
+    console.log(`Entrada identificada no boleto[0]: R$ ${valorEntrada}`);
+    console.log(`Parcelas restantes: ${parcelasParaSalvar.length}`);
+  } else {
+    // CENÁRIO 2: Todos os boletos são parcelas
+    const totalNf = parsedData.valores.total_nf || 0;
+    somaBoletos = boletosArray.reduce((sum, b) => sum + (b.valor || 0), 0);
+    valorEntrada = totalNf - somaBoletos;
+    parcelasParaSalvar = boletosArray;
+    
+    if (valorEntrada < 0) valorEntrada = 0;
+    
+    console.log(`Entrada calculada: ${totalNf} - ${somaBoletos} = ${valorEntrada}`);
+  }
+  
+  paymentMethod = parcelasParaSalvar.length > 1 ? 'parcelado_boleto' : 'a_vista';
+  
+  entradaCalculada = {
+    total_nf: parsedData.valores.total_nf || 0,
+    soma_boletos: boletosArray.reduce((sum, b) => sum + (b.valor || 0), 0),
+    entrada: valorEntrada,
+    primeiro_boleto_e_entrada: primeiroBoletoeEntrada,
+    parcelas_count: parcelasParaSalvar.length
+  };
+}
+```
+
+**Linhas 497-517 - Inserção de installments:**
+
+```typescript
+if (usarBoletos) {
+  // Usar parcelasParaSalvar (sem a entrada)
+  const installmentsToInsert = parcelasParaSalvar.map((boleto, index) => ({
+    organization_id,
+    sale_id: sale.id,
+    installment_number: index + 1,  // Começa em 1
+    value: boleto.valor || 0,
+    due_date: boleto.vencimento || null,
+    status: 'pendente'
   }));
-}, [qtdParcelas, valorParcela, tipoPagamento, sale?.emission_date]);
-```
 
-### 4. Salvar Parcelas na Aprovação
-
-Modificar `SalesApproval.tsx` para sincronizar parcelas:
-
-```typescript
-// handleApproveWithAssignment
-const syncInstallments = async (saleId: string, parcelas: ParcelaGerada[]) => {
-  // 1. Deletar parcelas existentes
-  await supabase
+  const { error: installmentsError } = await supabase
     .from('installments')
-    .delete()
-    .eq('sale_id', saleId);
-  
-  // 2. Inserir novas parcelas
-  if (parcelas.length > 0) {
-    const installmentsToInsert = parcelas.map(p => ({
-      organization_id: effectiveOrgId,
-      sale_id: saleId,
-      installment_number: p.installment_number,
-      value: p.value,
-      due_date: p.due_date,
-      status: 'pendente',
-    }));
-    
-    await supabase
-      .from('installments')
-      .insert(installmentsToInsert);
+    .insert(installmentsToInsert);
+
+  if (installmentsError) {
+    console.error('Error inserting installments:', installmentsError);
+  } else {
+    installmentsInserted = installmentsToInsert.length;
+    console.log(`Inserted ${installmentsInserted} installments (sem entrada) for sale ${sale.id}`);
   }
-};
+}
 ```
 
-## Arquivos a Modificar
+## Resultado Esperado
+
+### Antes (Errado)
+```
+sales.valor_entrada = 50.000
+installments = [50k, 8k, 8k, 8k, 8k, 8k, 8k, 8k, 8k, 16k?] (10 itens, dados errados)
+```
+
+### Depois (Correto)
+```
+sales.valor_entrada = 50.000
+installments = [8k, 8k, 8k, 8k, 8k, 8k, 8k, 8k, 8k, 8k] (10 itens × R$ 8.000)
+```
+
+### Verificação
+```
+Total = 50.000 + (10 × 8.000) = 130.000 ✓
+```
+
+## Correção de Dados Existentes
+
+Após deploy, rodar SQL para corrigir NF 7826:
+
+```sql
+-- Deletar installments atuais
+DELETE FROM installments WHERE sale_id = 'a7543f55-baf3-40b8-8b65-410e039c5abb';
+
+-- A próxima aprovação na calculadora irá criar os installments corretos
+```
+
+## Arquivos
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/lib/businessDays.ts` | NOVO - Funções de dias úteis |
-| `src/components/approval/CommissionCalculator.tsx` | Adicionar geração de parcelas com datas |
-| `src/pages/SalesApproval.tsx` | Sincronizar parcelas ao salvar |
-| `src/components/approval/SellerAssignment.tsx` | Passar parcelas para o salvamento |
+| `supabase/functions/parse-nfe-xml/index.ts` | Separar primeiro boleto como entrada se vencimento ~= emissão |
 
-## Fluxo Completo
-
-```
-1. Usuário edita "Número de Parcelas" → 10
-2. Calculadora recalcula:
-   - valorParcela = (130.000 - 50.000) / 10 = 8.000
-   - Gera 10 datas de vencimento (+30 dias úteis cada)
-3. Usuário clica "Próxima Etapa"
-4. Sistema salva:
-   - Deleta parcelas antigas (9)
-   - Insere novas parcelas (10 × R$ 8.000)
-   - Cada uma com data de vencimento em dia útil
-5. SaleDetailSheet mostra corretamente:
-   - Parcela 1: 12/02/2026 - R$ 8.000
-   - Parcela 2: 12/03/2026 - R$ 8.000
-   - ...
-   - Parcela 10: 12/11/2026 - R$ 8.000
-```
-
-## Cálculo de Datas
-
-| Parcela | Cálculo | Data |
-|---------|---------|------|
-| 1 | Emissão + 30 dias úteis | 12/02/2026 |
-| 2 | Parcela 1 + 30 dias úteis | 12/03/2026 |
-| 3 | Parcela 2 + 30 dias úteis | 14/04/2026 |
-| ... | ... | ... |
-
-Se cair em sábado/domingo/feriado, avança para próximo dia útil.
