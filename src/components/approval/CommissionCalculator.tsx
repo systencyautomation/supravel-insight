@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { calculateApprovalCommission, formatCurrency, getIcmsRate, calcularValorReal, getTaxaJuros } from '@/lib/approvalCalculator';
+import { generateInstallmentDates } from '@/lib/businessDays';
 import { useAuth } from '@/contexts/AuthContext';
 import type { PendingSale } from '@/hooks/usePendingSales';
 import type { FipeDocument } from '@/hooks/useFipeDocument';
@@ -29,6 +30,13 @@ interface CommissionCalculatorProps {
   onCalculationChange: (data: CalculationData) => void;
   onConfirmCalculations?: () => void;
   showConfirmButton?: boolean;
+}
+
+// Interface para parcelas geradas
+export interface ParcelaGerada {
+  installment_number: number;
+  value: number;
+  due_date: string;
 }
 
 export interface CalculationData {
@@ -52,6 +60,8 @@ export interface CalculationData {
   deducaoIcms: number;
   deducaoPisCofins: number;
   deducaoIrCsll: number;
+  // Parcelas geradas para salvar no banco
+  parcelasGeradas: ParcelaGerada[];
 }
 
 export function CommissionCalculator({ 
@@ -422,6 +432,20 @@ export function CommissionCalculator({
 
   const activeCalculation = finalCalculation || calculation;
 
+  // Gerar parcelas com datas de vencimento
+  const parcelasGeradas = useMemo(() => {
+    if (tipoPagamento === 'a_vista' || qtdParcelas <= 0 || valorParcela <= 0) {
+      return [];
+    }
+    
+    // Usar data de emissão da venda como base, ou data atual
+    const baseDate = sale?.emission_date 
+      ? new Date(sale.emission_date) 
+      : new Date();
+    
+    return generateInstallmentDates(baseDate, qtdParcelas, valorParcela);
+  }, [tipoPagamento, qtdParcelas, valorParcela, sale?.emission_date]);
+
   // Notify parent of changes
   useEffect(() => {
     if (activeCalculation) {
@@ -445,9 +469,11 @@ export function CommissionCalculator({
         deducaoIcms: activeCalculation.deducaoIcms,
         deducaoPisCofins: activeCalculation.deducaoPisCofins,
         deducaoIrCsll: activeCalculation.deducaoIrCsll,
+        // Parcelas geradas para sincronizar com o banco
+        parcelasGeradas,
       });
     }
-  }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorReal, jurosEmbutidos, onCalculationChange]);
+  }, [activeCalculation, valorTabela, percentualComissao, icmsTabela, icmsDestino, tipoPagamento, valorEntrada, qtdParcelas, valorParcela, valorReal, jurosEmbutidos, parcelasGeradas, onCalculationChange]);
 
   if (!sale) {
     return (
