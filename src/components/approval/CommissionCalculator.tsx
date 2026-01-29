@@ -736,9 +736,13 @@ export function CommissionCalculator({
                   </div>
                   <div className="flex justify-between">
                     <span>Over Price Líquido</span>
-                    <span className={activeCalculation.overLiquido < 0 ? 'text-destructive' : ''}>
-                      {formatCurrency(activeCalculation.overLiquido)}
-                    </span>
+                    {activeCalculation.overPrice < 0 ? (
+                      <span className="text-muted-foreground text-xs italic">
+                        R$ 0,00 (desconsiderado)
+                      </span>
+                    ) : (
+                      <span>{formatCurrency(activeCalculation.overLiquido)}</span>
+                    )}
                   </div>
 
                   <Separator className="my-2" />
