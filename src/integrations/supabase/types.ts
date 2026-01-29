@@ -821,6 +821,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sales_representative_id_fkey"
+            columns: ["representative_id"]
+            isOneToOne: false
+            referencedRelation: "representatives"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_permissions: {
