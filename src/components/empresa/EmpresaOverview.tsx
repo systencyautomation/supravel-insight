@@ -4,11 +4,14 @@ import { ProductMixChart } from '@/components/dashboard/ProductMixChart';
 import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilter';
 import { CommandBar } from '@/components/dashboard/CommandBar';
 import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
-import { TrendingUp, DollarSign, Percent, HeartPulse } from 'lucide-react';
+import { CommissionReceivableCard } from '@/components/dashboard/CommissionReceivableCard';
+import { TrendingUp, Percent, HeartPulse } from 'lucide-react';
 import { SaleWithDetails, SalesMetrics } from '@/hooks/useSalesMetrics';
+import { SaleWithCalculations } from '@/hooks/useSalesWithCalculations';
 
 interface EmpresaOverviewProps {
   salesWithDetails: SaleWithDetails[];
+  salesWithCalculations: SaleWithCalculations[];
   metrics: SalesMetrics;
   dateRange: DateRange;
   onDateRangeChange: (range: DateRange) => void;
@@ -17,6 +20,7 @@ interface EmpresaOverviewProps {
 
 export function EmpresaOverview({
   salesWithDetails,
+  salesWithCalculations,
   metrics,
   dateRange,
   onDateRangeChange,
@@ -46,13 +50,8 @@ export function EmpresaOverview({
           variant="primary"
           delay={0}
         />
-        <KPICard
-          title="Comissões a Pagar"
-          value={metrics.comissoesAPagar}
-          format="currency"
-          subtitle="Over + Base"
-          icon={DollarSign}
-          variant="success"
+        <CommissionReceivableCard
+          sales={salesWithCalculations}
           delay={100}
         />
         <KPICard
