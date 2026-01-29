@@ -1,100 +1,106 @@
 
-# Plano: Correção de Botões da Calculadora e Padronização do Footer
+# Plano: Correção da Seleção "À Vista" na Calculadora
 
-## Problemas Identificados
+## Problema Identificado
 
-### 1. Botão Extra na Calculadora
-Atualmente, a calculadora em `SalesApproval.tsx` mostra um botão "Confirmar Cálculos e Prosseguir" **dentro** do componente (quando `showConfirmButton={true}`), além dos botões no rodapé global ("Cancelar" e "Próxima Etapa").
+Quando não há parcelas (installments), o sistema deveria:
+1. Detectar automaticamente que é pagamento "À Vista"
+2. Preencher a Entrada com o Valor Faturado completo
+3. Manter o radio button "À Vista" selecionado
 
-**Solução:** Remover o botão duplicado da calculadora, mantendo apenas os 2 botões do rodapé.
-
-### 2. Renomeação de "Connect CRM" para "Connect Dash"
-Referências encontradas:
-- `index.html` (título e meta tags)
-- `src/pages/Index.tsx` (footer)
-- `src/pages/Auth.tsx` (footer)
-- `src/components/Logo.tsx` (alt text)
-
-### 3. Footer Faltando em Algumas Páginas
-Páginas sem footer:
-- `MasterDashboard.tsx`
-- `SettingsLayout.tsx` (afeta todas as páginas de settings)
-- `SalesApproval.tsx`
+**Situação atual:** O código define `setTipoPagamento('a_vista')` corretamente, mas seta `setValorEntrada(0)` em vez de `valorFaturado`.
 
 ---
 
-## Arquivos a Modificar
+## Lógica Corrigida
 
-### 1. `src/pages/SalesApproval.tsx`
-- Remover a prop `showConfirmButton` (sempre `false` ou remover)
-- Manter apenas os 2 botões do rodapé global: "Cancelar" e "Próxima Etapa"
-- Adicionar footer padronizado no final da página
+Arquivo: `src/components/approval/CommissionCalculator.tsx`
+
+### Cenário: Sem installments = À Vista
+
+Quando `installments.length === 0`:
+- `tipoPagamento = 'a_vista'`
+- `valorEntrada = valorFaturado` (não 0)
+- `qtdParcelas = 0`
+
+### Cenário: Apenas 1 installment = À Vista
+
+Quando há apenas 1 installment (que seria a própria "entrada" ou pagamento único):
+- `tipoPagamento = 'a_vista'`
+- `valorEntrada = valorFaturado`
+- `qtdParcelas = 0`
+
+---
+
+## Mudança Técnica
+
+### useEffect de Installments (linhas 233-272)
 
 **Antes:**
-```tsx
-<CommissionCalculator
-  ...
-  showConfirmButton={!isEditMode && canApprove}
-/>
+```typescript
+} else {
+  // Sem parcelas além da entrada = à vista
+  setTipoPagamento('a_vista');
+  setValorEntrada(0);  // ❌ ERRADO
+  setQtdParcelas(0);
+  setValorParcelaReal(0);
+}
 ```
 
 **Depois:**
-```tsx
-<CommissionCalculator
-  ...
-  showConfirmButton={false}
-/>
+```typescript
+} else {
+  // Sem parcelas além da entrada = à vista
+  setTipoPagamento('a_vista');
+  // À vista: entrada = valor total faturado
+  // (será atualizado pelo valorFaturado via outro useEffect)
+  setQtdParcelas(0);
+  setValorParcelaReal(0);
+}
 ```
 
-### 2. `src/components/approval/CommissionCalculator.tsx`
-- Remover o bloco do botão "Confirmar Cálculos e Prosseguir" (linhas 740-752)
-- Remover props `onConfirmCalculations` e `showConfirmButton` se não usadas em outro lugar
+### Novo useEffect para sincronizar entrada no modo À Vista
 
-### 3. `index.html`
-- Alterar título de "Connect CRM" para "Connect Dash"
-- Atualizar meta author
-
-### 4. `src/pages/Index.tsx`
-- Alterar footer de "Connect CRM" para "Connect Dash"
-
-### 5. `src/pages/Auth.tsx`
-- Alterar footer de "Connect CRM" para "Connect Dash"
-
-### 6. `src/components/Logo.tsx`
-- Alterar alt text de "Connect CRM" para "Connect Dash"
-
-### 7. `src/pages/master/MasterDashboard.tsx`
-- Adicionar footer consistente antes do fechamento da div principal
-
-### 8. `src/layouts/SettingsLayout.tsx`
-- Adicionar footer consistente no layout (aparece em todas páginas de settings)
-
----
-
-## Footer Padronizado
-
-Todas as páginas usarão o mesmo estilo:
-```tsx
-<footer className="border-t border-border py-3 mt-auto">
-  <div className="container mx-auto px-6 text-center">
-    <p className="text-xs text-muted-foreground uppercase tracking-wide">
-      Connect Dash © 2026 — Sistema de Gestão de Comissões
-    </p>
-  </div>
-</footer>
+```typescript
+// Sincronizar entrada com valorFaturado quando à vista
+useEffect(() => {
+  if (tipoPagamento === 'a_vista' && !parcelasEditadasManualmente) {
+    setValorEntrada(valorFaturado);
+  }
+}, [tipoPagamento, valorFaturado, parcelasEditadasManualmente]);
 ```
 
 ---
 
-## Resumo das Mudanças
+## Comportamento Esperado
 
-| Arquivo | Tipo | Mudança |
-|---------|------|---------|
-| `src/pages/SalesApproval.tsx` | Modificar | Remover `showConfirmButton`, adicionar footer |
-| `src/components/approval/CommissionCalculator.tsx` | Modificar | Remover botão interno "Confirmar Cálculos" |
-| `index.html` | Modificar | CRM → Dash no título e meta |
-| `src/pages/Index.tsx` | Modificar | CRM → Dash no footer |
-| `src/pages/Auth.tsx` | Modificar | CRM → Dash no footer |
-| `src/components/Logo.tsx` | Modificar | CRM → Dash no alt text |
-| `src/pages/master/MasterDashboard.tsx` | Modificar | Adicionar footer |
-| `src/layouts/SettingsLayout.tsx` | Modificar | Adicionar footer |
+| Cenário | installments | tipoPagamento | valorEntrada |
+|---------|-------------|---------------|--------------|
+| Sem parcelas | 0 | a_vista | = valorFaturado |
+| Apenas entrada | 1 (entrada) | a_vista | = valorFaturado |
+| Entrada + Parcelas | 3+ | parcelado_boleto | = 1ª parcela |
+
+---
+
+## Fluxo Visual
+
+```
+NF-e importada → Sem boletos detectados
+                         ↓
+              installments.length === 0
+                         ↓
+              tipoPagamento = 'a_vista' ✓
+                         ↓
+              valorEntrada = valorFaturado ✓
+                         ↓
+              Radio "À Vista" selecionado ✓
+              Campo Entrada preenchido ✓
+```
+
+---
+
+## Resumo
+
+| Arquivo | Mudança |
+|---------|---------|
+| `CommissionCalculator.tsx` | Remover `setValorEntrada(0)` quando à vista; adicionar useEffect para sincronizar entrada com valorFaturado no modo à vista |
