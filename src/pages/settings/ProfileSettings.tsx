@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save, User } from 'lucide-react';
 import { ProfileHero } from '@/components/profile/ProfileHero';
+import { ChangePasswordCard } from '@/components/profile/ChangePasswordCard';
 
 interface Profile {
   id: string;
@@ -149,6 +150,9 @@ export default function ProfileSettings() {
             )}
           </CardContent>
         </Card>
+
+        {/* Change Password Card */}
+        <ChangePasswordCard />
       </div>
     </SettingsLayout>
   );
