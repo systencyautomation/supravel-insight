@@ -226,27 +226,41 @@ export function CommissionCalculator({
       // Pre-fill from existing sale data if available
       if (sale.table_value) setValorTabela(sale.table_value);
       if (sale.percentual_comissao) setPercentualComissao(sale.percentual_comissao);
-      setValorEntrada(sale.valor_entrada || 0);
+      // Só pré-preencher entrada do banco se não foi editada manualmente
+      if (!parcelasEditadasManualmente && sale.valor_entrada != null) {
+        setValorEntrada(sale.valor_entrada);
+      }
     }
-  }, [sale, matchedFipeRow]);
+  }, [sale, matchedFipeRow, parcelasEditadasManualmente]);
 
   // Pre-fill from installments - detectar tipo de pagamento automaticamente
   useEffect(() => {
+    // Se usuário já editou manualmente, não sobrescrever
+    if (parcelasEditadasManualmente) return;
+    
     if (installments.length > 0) {
-      // First installment is usually the down payment (entrada)
-      const entrada = installments.find(i => i.installment_number === 1);
-      const parcelas = installments.filter(i => i.installment_number > 1);
+      // Verificar se parcelas são uniformes (mesmo valor = sem entrada separada)
+      const valores = installments.map(i => i.value);
+      const todosIguais = valores.length > 1 && valores.every(v => Math.abs(v - valores[0]) < 0.01);
+      const somaTotal = valores.reduce((acc, v) => acc + v, 0);
       
-      if (parcelas.length > 0) {
-        // Tem parcelas além da entrada = parcelado
+      if (todosIguais && Math.abs(somaTotal - valorFaturado) < 0.01) {
+        // Parcelas uniformes que somam o total = entrada é 0
+        setTipoPagamento('parcelado_boleto');
+        setValorEntrada(0);
+        setQtdParcelas(installments.length);
+        setValorParcelaReal(installments[0]?.value || 0);
+      } else if (installments.length > 1) {
+        // Primeira parcela diferente = provavelmente é entrada
+        const entrada = installments[0];
+        const parcelas = installments.slice(1);
         setTipoPagamento('parcelado_boleto');
         setValorEntrada(entrada?.value || 0);
         setQtdParcelas(parcelas.length);
         setValorParcelaReal(parcelas[0]?.value || 0);
-      } else {
-        // Sem parcelas além da entrada = à vista
+      } else if (installments.length === 1) {
+        // Apenas 1 installment = à vista
         setTipoPagamento('a_vista');
-        // Não resetar valorEntrada aqui - será sincronizado via useEffect
         setQtdParcelas(0);
         setValorParcelaReal(0);
       }
@@ -265,11 +279,10 @@ export function CommissionCalculator({
         // Default: à vista quando não há parcelas
         setTipoPagamento('a_vista');
         setQtdParcelas(0);
-        // Não resetar valorEntrada aqui - será sincronizado via useEffect
         setValorParcelaReal(0);
       }
     }
-  }, [installments, sale?.payment_method]);
+  }, [installments, sale?.payment_method, valorFaturado, parcelasEditadasManualmente]);
 
   // Pre-fill from FIPE spreadsheet match
   useEffect(() => {
