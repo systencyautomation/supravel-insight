@@ -230,7 +230,7 @@ export function CommissionCalculator({
     }
   }, [sale, matchedFipeRow]);
 
-  // Pre-fill from installments
+  // Pre-fill from installments - detectar tipo de pagamento automaticamente
   useEffect(() => {
     if (installments.length > 0) {
       // First installment is usually the down payment (entrada)
@@ -238,29 +238,38 @@ export function CommissionCalculator({
       const parcelas = installments.filter(i => i.installment_number > 1);
       
       if (parcelas.length > 0) {
+        // Tem parcelas além da entrada = parcelado
         setTipoPagamento('parcelado_boleto');
         setValorEntrada(entrada?.value || 0);
         setQtdParcelas(parcelas.length);
         setValorParcelaReal(parcelas[0]?.value || 0);
-      } else if (entrada && installments.length === 1) {
-        // Single payment = à vista
+      } else {
+        // Sem parcelas além da entrada = à vista
         setTipoPagamento('a_vista');
         setValorEntrada(0);
         setQtdParcelas(0);
         setValorParcelaReal(0);
       }
-    } else if (sale) {
-      // Fallback to payment_method parsing
-      setTipoPagamento(sale.payment_method || 'a_vista');
-      const paymentMethod = sale.payment_method || '';
-      const parcelasMatch = paymentMethod.match(/(\d+)/);
-      if (parcelasMatch) {
-        setQtdParcelas(parseInt(parcelasMatch[1], 10));
+    } else {
+      // Sem installments = à vista (pagamento único)
+      // Verificar se há payment_method salvo que indique parcelamento
+      const savedPaymentMethod = sale?.payment_method || '';
+      
+      if (savedPaymentMethod.includes('parcelado')) {
+        setTipoPagamento(savedPaymentMethod);
+        const parcelasMatch = savedPaymentMethod.match(/(\d+)/);
+        if (parcelasMatch) {
+          setQtdParcelas(parseInt(parcelasMatch[1], 10));
+        }
       } else {
+        // Default: à vista quando não há parcelas
+        setTipoPagamento('a_vista');
         setQtdParcelas(0);
+        setValorEntrada(0);
+        setValorParcelaReal(0);
       }
     }
-  }, [installments, sale]);
+  }, [installments, sale?.payment_method]);
 
   // Pre-fill from FIPE spreadsheet match
   useEffect(() => {
