@@ -67,11 +67,18 @@ export function EmpresaRecebimentos({ sales, loading, onRefresh }: EmpresaRecebi
     });
   }, [recebimentos, filters]);
 
-  // Total pendente filtrado
+  // Total pendente filtrado (valor do cliente)
   const totalPendenteFiltrado = useMemo(() => {
     return filteredRecebimentos
       .filter(r => r.status === 'pendente')
       .reduce((acc, r) => acc + r.valor, 0);
+  }, [filteredRecebimentos]);
+
+  // Total comissão pendente filtrada
+  const totalComissaoPendenteFiltrada = useMemo(() => {
+    return filteredRecebimentos
+      .filter(r => r.status === 'pendente')
+      .reduce((acc, r) => acc + r.valor_comissao, 0);
   }, [filteredRecebimentos]);
 
   const handleClearFilters = () => {
@@ -129,13 +136,26 @@ export function EmpresaRecebimentos({ sales, loading, onRefresh }: EmpresaRecebi
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
-        <div className="text-right">
-          <span className="text-sm text-muted-foreground uppercase tracking-wide">
-            Valor Pendente a Receber
-          </span>
-          <p className="text-2xl font-bold text-primary">
-            {formatCurrency(totalPendenteFiltrado)}
-          </p>
+        <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
+          {/* Valor do Cliente */}
+          <div className="text-right">
+            <span className="text-sm text-muted-foreground uppercase tracking-wide">
+              Valor Pendente (Cliente)
+            </span>
+            <p className="text-2xl font-bold text-primary">
+              {formatCurrency(totalPendenteFiltrado)}
+            </p>
+          </div>
+          
+          {/* Comissão a Receber */}
+          <div className="text-right">
+            <span className="text-sm text-muted-foreground uppercase tracking-wide">
+              Comissão a Receber
+            </span>
+            <p className="text-2xl font-bold text-success">
+              {formatCurrency(totalComissaoPendenteFiltrada)}
+            </p>
+          </div>
         </div>
       </div>
 
