@@ -37,14 +37,21 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
       <DashboardHeader />
-      <div className="flex">
+      <div className="flex flex-1">
         <SettingsSidebar />
         <main className="flex-1 p-6 overflow-auto">
           {children}
         </main>
       </div>
+      <footer className="border-t border-border py-3 mt-auto">
+        <div className="container mx-auto px-6 text-center">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">
+            Connect Dash © 2026 — Sistema de Gestão de Comissões
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
