@@ -1,11 +1,13 @@
+import { useState, useMemo } from 'react';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { SalesAreaChart } from '@/components/dashboard/SalesAreaChart';
 import { ProductMixChart } from '@/components/dashboard/ProductMixChart';
 import { DateRangeFilter, DateRange } from '@/components/dashboard/DateRangeFilter';
 import { CommandBar } from '@/components/dashboard/CommandBar';
 import { SkeletonDashboard } from '@/components/dashboard/SkeletonDashboard';
+import { AdvancedFilters, ValueFilters } from '@/components/dashboard/AdvancedFilters';
 import { TrendingUp, DollarSign, Percent, HeartPulse } from 'lucide-react';
-import { SaleWithDetails, SalesMetrics } from '@/hooks/useSalesMetrics';
+import { SaleWithDetails, SalesMetrics, useSalesMetrics } from '@/hooks/useSalesMetrics';
 
 interface EmpresaOverviewProps {
   salesWithDetails: SaleWithDetails[];
@@ -17,11 +19,42 @@ interface EmpresaOverviewProps {
 
 export function EmpresaOverview({
   salesWithDetails,
-  metrics,
+  metrics: baseMetrics,
   dateRange,
   onDateRangeChange,
   loading,
 }: EmpresaOverviewProps) {
+  // Value filters state
+  const [valueFilters, setValueFilters] = useState<ValueFilters>({
+    faturamento: [0, Infinity],
+    comissaoEmpresa: [0, Infinity],
+    overLiquido: [0, Infinity],
+    comissaoVendedor: [0, Infinity],
+  });
+
+  // Apply value filters to sales
+  const filteredSales = useMemo(() => {
+    return salesWithDetails.filter(sale => {
+      const faturamento = sale.total_value || 0;
+      const tableValue = sale.table_value || 0;
+      const percentComissao = sale.percentual_comissao || 0;
+      const overLiquido = Math.max(0, sale.over_price_liquido || 0);
+      const comissaoEmpresa = (tableValue * percentComissao / 100) + overLiquido;
+      const comissaoVendedor = sale.commission_calculated || 0;
+
+      // Apply filters
+      if (faturamento < valueFilters.faturamento[0] || faturamento > valueFilters.faturamento[1]) return false;
+      if (comissaoEmpresa < valueFilters.comissaoEmpresa[0] || comissaoEmpresa > valueFilters.comissaoEmpresa[1]) return false;
+      if (overLiquido < valueFilters.overLiquido[0] || overLiquido > valueFilters.overLiquido[1]) return false;
+      if (comissaoVendedor < valueFilters.comissaoVendedor[0] || comissaoVendedor > valueFilters.comissaoVendedor[1]) return false;
+
+      return true;
+    });
+  }, [salesWithDetails, valueFilters]);
+
+  // Recalculate metrics with filtered sales
+  const metrics = useSalesMetrics(filteredSales, { start: dateRange.start, end: dateRange.end });
+
   if (loading) {
     return <SkeletonDashboard />;
   }
@@ -29,9 +62,18 @@ export function EmpresaOverview({
   return (
     <div className="space-y-6">
       {/* Filters Row */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <DateRangeFilter value={dateRange} onChange={onDateRangeChange} />
-        <CommandBar sales={salesWithDetails} />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <DateRangeFilter value={dateRange} onChange={onDateRangeChange} />
+          <CommandBar sales={filteredSales} />
+        </div>
+        
+        {/* Advanced Filters */}
+        <AdvancedFilters
+          sales={salesWithDetails}
+          filters={valueFilters}
+          onFiltersChange={setValueFilters}
+        />
       </div>
 
       {/* KPI Cards */}
@@ -76,8 +118,8 @@ export function EmpresaOverview({
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <SalesAreaChart sales={salesWithDetails} className="lg:col-span-2" />
-        <ProductMixChart sales={salesWithDetails} />
+        <SalesAreaChart sales={filteredSales} className="lg:col-span-2" />
+        <ProductMixChart sales={filteredSales} />
       </div>
     </div>
   );
