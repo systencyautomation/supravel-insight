@@ -400,35 +400,67 @@ serve(async (req) => {
     let paymentMethod: string;
     let valorEntrada = 0;
     let somaBoletos = 0;
-    let entradaCalculada: { total_nf: number; soma_boletos: number; entrada: number } | null = null;
+    let parcelasParaSalvar: BoletoInfo[] = [];
+    let entradaCalculada: { 
+      total_nf: number; 
+      soma_boletos: number; 
+      entrada: number;
+      primeiro_boleto_e_entrada?: boolean;
+      parcelas_count?: number;
+    } | null = null;
 
     if (usarBoletos) {
       // === USAR BOLETOS COMO FONTE DE VERDADE ===
-      console.log(`Usando ${boletosArray.length} boletos do e-mail para calcular parcelas e entrada`);
+      console.log(`Processando ${boletosArray.length} boletos do e-mail`);
       
-      // Calcular soma dos boletos
-      somaBoletos = boletosArray.reduce((sum, b) => sum + (b.valor || 0), 0);
+      const emissionDate = parsedData.nfe.emissao; // YYYY-MM-DD
+      const primeiroBoleto = boletosArray[0];
       
-      // Calcular entrada: Valor Total NF - Soma dos Boletos
-      const totalNf = parsedData.valores.total_nf || 0;
-      valorEntrada = totalNf - somaBoletos;
+      // Verificar se o primeiro boleto é a entrada
+      // Critério: vencimento = data de emissão OU diferença <= 3 dias
+      let primeiroBoletoeEntrada = false;
       
-      // Garantir que entrada não seja negativa
-      if (valorEntrada < 0) {
-        console.warn(`Entrada calculada negativa (${valorEntrada}), ajustando para 0`);
-        valorEntrada = 0;
+      if (primeiroBoleto && primeiroBoleto.vencimento && emissionDate) {
+        const diffDias = Math.abs(
+          (new Date(primeiroBoleto.vencimento).getTime() - new Date(emissionDate).getTime()) 
+          / (1000 * 60 * 60 * 24)
+        );
+        primeiroBoletoeEntrada = diffDias <= 3; // Até 3 dias de diferença = é entrada
+        
+        console.log(`Primeiro boleto: venc=${primeiroBoleto.vencimento}, emissao=${emissionDate}, diff=${diffDias} dias, eEntrada=${primeiroBoletoeEntrada}`);
       }
       
+      if (primeiroBoletoeEntrada) {
+        // CENÁRIO 1: Primeiro boleto é a entrada
+        valorEntrada = primeiroBoleto.valor || 0;
+        parcelasParaSalvar = boletosArray.slice(1); // Remove primeiro (entrada)
+        
+        console.log(`Entrada identificada no boleto[0]: R$ ${valorEntrada}`);
+        console.log(`Parcelas restantes: ${parcelasParaSalvar.length}`);
+      } else {
+        // CENÁRIO 2: Todos os boletos são parcelas
+        const totalNf = parsedData.valores.total_nf || 0;
+        somaBoletos = boletosArray.reduce((sum, b) => sum + (b.valor || 0), 0);
+        valorEntrada = totalNf - somaBoletos;
+        parcelasParaSalvar = boletosArray;
+        
+        if (valorEntrada < 0) valorEntrada = 0;
+        
+        console.log(`Entrada calculada: ${totalNf} - ${somaBoletos} = ${valorEntrada}`);
+      }
+      
+      // Payment method baseado nas parcelas (sem a entrada)
+      paymentMethod = parcelasParaSalvar.length > 1 ? 'parcelado_boleto' : 'a_vista';
+      
       entradaCalculada = {
-        total_nf: totalNf,
-        soma_boletos: somaBoletos,
-        entrada: valorEntrada
+        total_nf: parsedData.valores.total_nf || 0,
+        soma_boletos: boletosArray.reduce((sum, b) => sum + (b.valor || 0), 0),
+        entrada: valorEntrada,
+        primeiro_boleto_e_entrada: primeiroBoletoeEntrada,
+        parcelas_count: parcelasParaSalvar.length
       };
       
       console.log('Entrada calculada:', entradaCalculada);
-      
-      // Payment method baseado nos boletos
-      paymentMethod = boletosArray.length > 1 ? 'parcelado_boleto' : 'a_vista';
     } else {
       // === FALLBACK: USAR DADOS DO XML ===
       console.log('Nenhum boleto enviado, usando duplicatas do XML');
@@ -495,11 +527,11 @@ serve(async (req) => {
     let installmentsInserted = 0;
     
     if (usarBoletos) {
-      // === USAR BOLETOS PARA CRIAR INSTALLMENTS ===
-      const installmentsToInsert = boletosArray.map((boleto, index) => ({
+      // === USAR parcelasParaSalvar (SEM A ENTRADA) ===
+      const installmentsToInsert = parcelasParaSalvar.map((boleto, index) => ({
         organization_id,
         sale_id: sale.id,
-        installment_number: index + 1,
+        installment_number: index + 1,  // Começa em 1
         value: boleto.valor || 0,
         due_date: boleto.vencimento || null,
         status: 'pendente'
@@ -513,7 +545,7 @@ serve(async (req) => {
         console.error('Error inserting installments from boletos:', installmentsError);
       } else {
         installmentsInserted = installmentsToInsert.length;
-        console.log(`Inserted ${installmentsInserted} installments from boletos for sale ${sale.id}`);
+        console.log(`Inserted ${installmentsInserted} installments (sem entrada) for sale ${sale.id}`);
       }
     } else if (parsedData.cobranca.duplicatas.length > 0) {
       // === FALLBACK: USAR DUPLICATAS DO XML ===
