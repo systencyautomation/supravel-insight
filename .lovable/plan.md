@@ -1,109 +1,100 @@
 
-# Correção: Cálculo de ICMS e Persistência das Deduções
+# Plano: Correção de Botões da Calculadora e Padronização do Footer
 
 ## Problemas Identificados
 
-### 1. ICMS Calculado Errado (R$ 2.033,28 em vez de R$ 20,33)
+### 1. Botão Extra na Calculadora
+Atualmente, a calculadora em `SalesApproval.tsx` mostra um botão "Confirmar Cálculos e Prosseguir" **dentro** do componente (quando `showConfirmButton={true}`), além dos botões no rodapé global ("Cancelar" e "Próxima Etapa").
 
-**Causa:** O campo `percentual_icms` está salvo como `4.00` (inteiro), mas o código multiplica diretamente:
-- **Errado:** `508.32 × 4.00 = 2.033,28`
-- **Correto:** `508.32 × 0.04 = 20,33`
+**Solução:** Remover o botão duplicado da calculadora, mantendo apenas os 2 botões do rodapé.
 
-### 2. Deduções Não Persistidas
+### 2. Renomeação de "Connect CRM" para "Connect Dash"
+Referências encontradas:
+- `index.html` (título e meta tags)
+- `src/pages/Index.tsx` (footer)
+- `src/pages/Auth.tsx` (footer)
+- `src/components/Logo.tsx` (alt text)
 
-As colunas `icms`, `pis_cofins` e `ir_csll` na tabela `sales` estão `null`. Esses valores precisam ser salvos durante a aprovação para que apareçam corretamente na visualização posterior.
+### 3. Footer Faltando em Algumas Páginas
+Páginas sem footer:
+- `MasterDashboard.tsx`
+- `SettingsLayout.tsx` (afeta todas as páginas de settings)
+- `SalesApproval.tsx`
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. `src/hooks/useSalesWithCalculations.ts`
+### 1. `src/pages/SalesApproval.tsx`
+- Remover a prop `showConfirmButton` (sempre `false` ou remover)
+- Manter apenas os 2 botões do rodapé global: "Cancelar" e "Próxima Etapa"
+- Adicionar footer padronizado no final da página
 
-**Problema:** Linha 118 usa `sale.percentual_icms` diretamente como multiplicador.
-
-**Solução:** Converter para taxa decimal se o valor for > 1:
-
-```typescript
-// Se percentual_icms é 4, 7, ou 12 (inteiro), converter para 0.04, 0.07, 0.12
-const savedIcmsRate = Number(sale.percentual_icms) || 0;
-const icmsRateCalc = savedIcmsRate > 1 ? savedIcmsRate / 100 : savedIcmsRate;
-deducaoIcms = overPriceBruto * icmsRateCalc;
+**Antes:**
+```tsx
+<CommissionCalculator
+  ...
+  showConfirmButton={!isEditMode && canApprove}
+/>
 ```
 
-### 2. `src/pages/SalesApproval.tsx`
-
-**Problema:** As deduções não estão sendo salvas no `updateData`.
-
-**Solução:** Adicionar os campos de dedução no objeto de atualização:
-
-```typescript
-// No handleApproveWithAssignment e handleEditModeSave:
-const updateData = {
-  // ... campos existentes ...
-  
-  // Adicionar deduções para persistir
-  icms: calcularDeducaoIcms(confirmedCalculation.overPrice, confirmedCalculation.icmsDestino),
-  pis_cofins: confirmedCalculation.overPrice * 0.0925,
-  ir_csll: confirmedCalculation.overPrice * 0.34,
-};
+**Depois:**
+```tsx
+<CommissionCalculator
+  ...
+  showConfirmButton={false}
+/>
 ```
 
-### 3. `src/components/approval/CommissionCalculator.tsx`
+### 2. `src/components/approval/CommissionCalculator.tsx`
+- Remover o bloco do botão "Confirmar Cálculos e Prosseguir" (linhas 740-752)
+- Remover props `onConfirmCalculations` e `showConfirmButton` se não usadas em outro lugar
 
-Adicionar os valores de dedução ao `CalculationData` para que sejam passados corretamente:
+### 3. `index.html`
+- Alterar título de "Connect CRM" para "Connect Dash"
+- Atualizar meta author
 
-```typescript
-export interface CalculationData {
-  // ... campos existentes ...
-  
-  // Deduções para persistência
-  deducaoIcms: number;
-  deducaoPisCofins: number;
-  deducaoIrCsll: number;
-}
-```
+### 4. `src/pages/Index.tsx`
+- Alterar footer de "Connect CRM" para "Connect Dash"
+
+### 5. `src/pages/Auth.tsx`
+- Alterar footer de "Connect CRM" para "Connect Dash"
+
+### 6. `src/components/Logo.tsx`
+- Alterar alt text de "Connect CRM" para "Connect Dash"
+
+### 7. `src/pages/master/MasterDashboard.tsx`
+- Adicionar footer consistente antes do fechamento da div principal
+
+### 8. `src/layouts/SettingsLayout.tsx`
+- Adicionar footer consistente no layout (aparece em todas páginas de settings)
 
 ---
 
-## Fluxo Corrigido
+## Footer Padronizado
 
-```text
-APROVAÇÃO (Etapa 1 ou 2):
-┌─────────────────────────────────────────────────┐
-│ Cálculos calculados (activeCalculation):        │
-│ - deducaoIcms: R$ 20,33                         │
-│ - deducaoPisCofins: R$ 47,02                    │
-│ - deducaoIrCsll: R$ 148,69                      │
-└─────────────────────────────────────────────────┘
-            ↓ Salvar no banco
-┌─────────────────────────────────────────────────┐
-│ UPDATE sales SET                                │
-│   icms = 20.33,                                 │
-│   pis_cofins = 47.02,                           │
-│   ir_csll = 148.69,                             │
-│   ...                                           │
-└─────────────────────────────────────────────────┘
-            ↓ Visualização posterior
-┌─────────────────────────────────────────────────┐
-│ SaleDetailSheet lê diretamente do banco:        │
-│ - ICMS (4%): -R$ 20,33                          │
-│ - PIS/COFINS: -R$ 47,02                         │
-│ - IR/CSLL: -R$ 148,69                           │
-└─────────────────────────────────────────────────┘
+Todas as páginas usarão o mesmo estilo:
+```tsx
+<footer className="border-t border-border py-3 mt-auto">
+  <div className="container mx-auto px-6 text-center">
+    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+      Connect Dash © 2026 — Sistema de Gestão de Comissões
+    </p>
+  </div>
+</footer>
 ```
 
 ---
 
 ## Resumo das Mudanças
 
-| Arquivo | Mudança |
-|---------|---------|
-| `useSalesWithCalculations.ts` | Converter `percentual_icms` para decimal (÷ 100 se > 1) |
-| `SalesApproval.tsx` | Adicionar `icms`, `pis_cofins`, `ir_csll` no updateData |
-| `CommissionCalculator.tsx` | Expor deduções no `CalculationData` para persistência |
-
----
-
-## Sobre "Tem que salvar no banco?"
-
-**Sim!** Para que os valores de dedução apareçam corretamente em visualizações futuras, eles precisam ser persistidos no banco durante a aprovação. Atualmente apenas `over_price` e `over_price_liquido` estão sendo salvos, mas `icms`, `pis_cofins` e `ir_csll` ficam `null`.
+| Arquivo | Tipo | Mudança |
+|---------|------|---------|
+| `src/pages/SalesApproval.tsx` | Modificar | Remover `showConfirmButton`, adicionar footer |
+| `src/components/approval/CommissionCalculator.tsx` | Modificar | Remover botão interno "Confirmar Cálculos" |
+| `index.html` | Modificar | CRM → Dash no título e meta |
+| `src/pages/Index.tsx` | Modificar | CRM → Dash no footer |
+| `src/pages/Auth.tsx` | Modificar | CRM → Dash no footer |
+| `src/components/Logo.tsx` | Modificar | CRM → Dash no alt text |
+| `src/pages/master/MasterDashboard.tsx` | Modificar | Adicionar footer |
+| `src/layouts/SettingsLayout.tsx` | Modificar | Adicionar footer |
