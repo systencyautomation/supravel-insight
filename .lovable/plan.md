@@ -1,65 +1,99 @@
 
-# Plano: Correção do Erro ao Salvar Representante
+# Plano: Correção do Percentual de Comissão na Aba Recebimentos
 
 ## Problema Identificado
 
-O erro **"violates foreign key constraint 'sales_representative_id_fkey'"** ocorre porque:
+Na aba **Recebimentos**, a coluna "% Com" está mostrando valores errados (média de 0.6%) quando deveria mostrar o percentual real da comissão (12.45% no exemplo).
 
-1. A coluna `sales.representative_id` tem uma **foreign key apontando para `auth.users.id`**
-2. Porém, o código está tentando salvar o **ID da tabela `representatives`** (que é diferente)
-3. Como o UUID do representante não existe na tabela `auth.users`, a constraint falha
+### Causa Raiz
 
-### Situação Atual do Banco
+O hook `useRecebimentosData` está calculando o percentual assim:
 
-| Coluna | Foreign Key Atual | Problema |
-|--------|-------------------|----------|
-| `internal_seller_id` | `auth.users.id` | ✅ Correto (vendedores são usuários) |
-| `representative_id` | `auth.users.id` | ❌ **Incorreto** (representantes são empresas externas) |
+```typescript
+// Linha 43-45 - ERRADO
+const percentualComissao = comissaoSalva > 0 && totalValue > 0
+  ? (comissaoSalva / totalValue) * 100
+  : sale.percentualComissaoCalculado || 0;
+```
+
+**O problema:**
+- `commission_calculated` = comissão **do vendedor/representante** (ex: R$ 50)
+- `total_value` = valor total da NF (ex: R$ 9.490)
+- Resultado: R$ 50 / R$ 9.490 = **0.53%** ← Valor errado!
+
+**O correto:**
+- O percentual deveria ser o `percentualComissaoCalculado` que representa a comissão **da empresa** (12.45%)
+- Esse valor já vem calculado corretamente no `useSalesWithCalculations`
 
 ---
 
-## Solução Proposta
+## Solução
 
-### Alterar a Foreign Key no Banco de Dados
+### Arquivo: `src/hooks/useRecebimentosData.ts`
 
-A FK `sales_representative_id_fkey` precisa ser alterada para referenciar a tabela `representatives`:
+**Mudança nas linhas 37-45:**
 
-```sql
--- 1. Remover a constraint existente (que aponta para auth.users)
-ALTER TABLE sales 
-DROP CONSTRAINT IF EXISTS sales_representative_id_fkey;
+Substituir a lógica atual por uso direto do `percentualComissaoCalculado`:
 
--- 2. Adicionar nova constraint apontando para representatives
-ALTER TABLE sales
-ADD CONSTRAINT sales_representative_id_fkey 
-FOREIGN KEY (representative_id) 
-REFERENCES representatives(id) 
-ON DELETE SET NULL;
+```typescript
+// ANTES (errado):
+const comissaoSalva = Number(sale.commission_calculated) || 0;
+const totalValue = Number(sale.total_value) || 0;
+
+const percentualComissao = comissaoSalva > 0 && totalValue > 0
+  ? (comissaoSalva / totalValue) * 100
+  : sale.percentualComissaoCalculado || 0;
+
+// DEPOIS (correto):
+// Usar percentual da comissão da empresa (já calculado corretamente)
+const percentualComissao = sale.percentualComissaoCalculado || 0;
 ```
 
 ---
 
-## Comportamento Esperado Após Correção
+## Comportamento Esperado
 
-| Ação | Antes | Depois |
-|------|-------|--------|
-| Selecionar representante e salvar | ❌ Erro FK | ✅ Salva normalmente |
-| ID armazenado | - | UUID da tabela `representatives` |
+| Campo | Antes | Depois |
+|-------|-------|--------|
+| Entrada R$ 3.796 | 0.53% | **12.45%** |
+| Parcela 1 R$ 1.898 | 0.53% | **12.45%** |
+| Parcela 2 R$ 1.898 | 0.53% | **12.45%** |
+| Parcela 3 R$ 1.898 | 0.53% | **12.45%** |
+
+### Exemplo de Cálculo Correto
+
+| Valor | Percentual | Comissão |
+|-------|------------|----------|
+| Entrada R$ 3.796,00 | 12.45% | R$ 472,60 |
+| Parcela 1 R$ 1.898,00 | 12.45% | R$ 236,30 |
+| Parcela 2 R$ 1.898,00 | 12.45% | R$ 236,30 |
+| Parcela 3 R$ 1.898,00 | 12.45% | R$ 236,30 |
+| **Total** | | **R$ 1.181,50** |
 
 ---
 
-## Impacto
+## Resumo das Alterações
 
-- **Sem impacto no código React** - o código já está correto
-- **Apenas mudança no schema do banco de dados**
-- Dados existentes não serão afetados (nenhum valor válido em `representative_id` atualmente)
+| Arquivo | Linha | Mudança |
+|---------|-------|---------|
+| `useRecebimentosData.ts` | 37-45 | Usar `percentualComissaoCalculado` diretamente em vez de calcular via `commission_calculated / total_value` |
 
 ---
 
-## Resumo Técnico
+## Fluxo de Dados Correto
 
-| Item | Ação |
-|------|------|
-| Migração SQL | Dropar FK antiga, criar FK nova para `representatives.id` |
-| Código React | Nenhuma alteração necessária |
-| RLS | Nenhuma alteração necessária |
+```
+useSalesWithCalculations
+         ↓
+percentualComissaoCalculado = 12.45%
+(calculado: comissãoEmpresa / valorTotal × 100)
+         ↓
+useRecebimentosData
+         ↓
+Cada recebimento usa percentualComissao = 12.45%
+         ↓
+Valor Comissão = valor × 12.45%
+         ↓
+Entrada R$3.796 × 12.45% = R$472,60
+Parcela R$1.898 × 12.45% = R$236,30
+```
