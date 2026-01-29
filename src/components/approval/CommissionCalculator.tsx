@@ -246,7 +246,7 @@ export function CommissionCalculator({
       } else {
         // Sem parcelas além da entrada = à vista
         setTipoPagamento('a_vista');
-        setValorEntrada(0);
+        // Não resetar valorEntrada aqui - será sincronizado via useEffect
         setQtdParcelas(0);
         setValorParcelaReal(0);
       }
@@ -265,7 +265,7 @@ export function CommissionCalculator({
         // Default: à vista quando não há parcelas
         setTipoPagamento('a_vista');
         setQtdParcelas(0);
-        setValorEntrada(0);
+        // Não resetar valorEntrada aqui - será sincronizado via useEffect
         setValorParcelaReal(0);
       }
     }
@@ -282,6 +282,13 @@ export function CommissionCalculator({
       }
     }
   }, [matchedFipeRow, sale?.table_value]);
+
+  // Sincronizar entrada com valorFaturado quando à vista
+  useEffect(() => {
+    if (tipoPagamento === 'a_vista' && !parcelasEditadasManualmente && valorFaturado > 0) {
+      setValorEntrada(valorFaturado);
+    }
+  }, [tipoPagamento, valorFaturado, parcelasEditadasManualmente]);
 
   // Calculate valor da parcela (use real value if available, otherwise calculate)
   const valorParcela = useMemo(() => {
