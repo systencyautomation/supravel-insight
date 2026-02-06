@@ -14,18 +14,18 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     
-    /* Brand Primary - Cyan Vibrante #00C2FF */
-    --primary: 195 100% 50%;
-    --primary-foreground: 222 47% 11%;
+    /* Brand Primary - Azul Kordian #4D73EF */
+    --primary: 226 82% 62%;
+    --primary-foreground: 0 0% 100%;
     
-    /* Brand Secondary - Navy #0A1128 */
-    --secondary: 226 63% 10%;
+    /* Brand Secondary - Azul Profundo #3545AF */
+    --secondary: 232 54% 45%;
     --secondary-foreground: 210 40% 98%;
     
     --muted: 214 32% 91%;
     --muted-foreground: 215 16% 47%;
     
-    --accent: 195 100% 95%;
+    --accent: 226 82% 95%;
     --accent-foreground: 222 47% 11%;
     
     /* Danger - #EF4444 */
@@ -42,11 +42,11 @@
     /* Border - #E2E8F0 */
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 195 100% 50%;
+    --ring: 226 82% 62%;
     
     --radius: 0.75rem;
     
-    /* Modern shadows with Cyan glow */
+    /* Modern shadows with Kordian Blue glow */
     --shadow-2xs: 0 1px 2px 0 hsl(222 47% 11% / 0.02);
     --shadow-xs: 0 1px 3px 0 hsl(222 47% 11% / 0.04), 0 1px 2px -1px hsl(222 47% 11% / 0.04);
     --shadow-sm: 0 2px 4px 0 hsl(222 47% 11% / 0.05), 0 1px 3px -1px hsl(222 47% 11% / 0.05);
@@ -54,22 +54,22 @@
     --shadow-lg: 0 12px 24px -4px hsl(222 47% 11% / 0.08), 0 4px 8px -2px hsl(222 47% 11% / 0.04);
     --shadow-xl: 0 20px 40px -8px hsl(222 47% 11% / 0.1), 0 8px 16px -4px hsl(222 47% 11% / 0.05);
     --shadow-2xl: 0 32px 64px -12px hsl(222 47% 11% / 0.14);
-    --shadow-glow: 0 0 24px hsl(195 100% 50% / 0.2);
+    --shadow-glow: 0 0 24px hsl(226 82% 62% / 0.2);
     
     /* Sidebar Light */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 195 100% 50%;
-    --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 195 100% 95%;
+    --sidebar-primary: 226 82% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 226 82% 95%;
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 195 100% 50%;
+    --sidebar-ring: 226 82% 62%;
     
-    /* Chart colors - Industrial Palette */
-    --chart-1: 195 100% 50%;
+    /* Chart colors - Kordian Palette */
+    --chart-1: 226 82% 62%;
     --chart-2: 160 84% 39%;
-    --chart-3: 226 63% 30%;
+    --chart-3: 232 54% 45%;
     --chart-4: 38 92% 50%;
     --chart-5: 0 84% 60%;
   }
@@ -85,17 +85,17 @@
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 96%;
     
-    /* Cyan mais vibrante no dark */
-    --primary: 195 100% 55%;
+    /* Azul Kordian mais vibrante no dark */
+    --primary: 226 82% 68%;
     --primary-foreground: 222 71% 4%;
     
-    --secondary: 217 33% 17%;
+    --secondary: 232 54% 50%;
     --secondary-foreground: 210 40% 96%;
     
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
     
-    --accent: 195 100% 15%;
+    --accent: 226 60% 18%;
     --accent-foreground: 210 40% 96%;
     
     --destructive: 0 72% 51%;
@@ -110,9 +110,9 @@
     /* Border - #1E293B */
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 195 100% 55%;
+    --ring: 226 82% 68%;
     
-    /* Dark mode shadows with Cyan glow */
+    /* Dark mode shadows with Kordian Blue glow */
     --shadow-2xs: 0 1px 2px 0 hsl(0 0% 0% / 0.1);
     --shadow-xs: 0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
     --shadow-sm: 0 2px 4px 0 hsl(0 0% 0% / 0.2), 0 1px 3px -1px hsl(0 0% 0% / 0.1);
@@ -120,22 +120,22 @@
     --shadow-lg: 0 12px 24px -4px hsl(0 0% 0% / 0.3), 0 4px 8px -2px hsl(0 0% 0% / 0.15);
     --shadow-xl: 0 20px 40px -8px hsl(0 0% 0% / 0.35), 0 8px 16px -4px hsl(0 0% 0% / 0.2);
     --shadow-2xl: 0 32px 64px -12px hsl(0 0% 0% / 0.4);
-    --shadow-glow: 0 0 32px hsl(195 100% 55% / 0.25);
+    --shadow-glow: 0 0 32px hsl(226 82% 68% / 0.25);
     
     /* Sidebar Dark */
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 195 100% 55%;
+    --sidebar-primary: 226 82% 68%;
     --sidebar-primary-foreground: 222 71% 4%;
-    --sidebar-accent: 195 100% 15%;
+    --sidebar-accent: 226 60% 18%;
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 195 100% 55%;
+    --sidebar-ring: 226 82% 68%;
     
     /* Chart colors - Dark mode */
-    --chart-1: 195 100% 55%;
+    --chart-1: 226 82% 68%;
     --chart-2: 160 84% 50%;
-    --chart-3: 226 63% 45%;
+    --chart-3: 232 54% 55%;
     --chart-4: 38 92% 60%;
     --chart-5: 0 72% 55%;
   }
