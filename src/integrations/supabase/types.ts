@@ -438,6 +438,7 @@ export type Database = {
       organizations: {
         Row: {
           active: boolean | null
+          ai_api_key: string | null
           automation_active: boolean | null
           cep: string | null
           cidade: string | null
@@ -462,6 +463,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          ai_api_key?: string | null
           automation_active?: boolean | null
           cep?: string | null
           cidade?: string | null
@@ -486,6 +488,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          ai_api_key?: string | null
           automation_active?: boolean | null
           cep?: string | null
           cidade?: string | null
@@ -660,6 +663,54 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: []
+      }
+      sale_documents: {
+        Row: {
+          created_at: string
+          document_type: string
+          file_size: number | null
+          filename: string
+          id: string
+          organization_id: string
+          sale_id: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          file_size?: number | null
+          filename: string
+          id?: string
+          organization_id: string
+          sale_id: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          file_size?: number | null
+          filename?: string
+          id?: string
+          organization_id?: string
+          sale_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_documents_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales: {
         Row: {

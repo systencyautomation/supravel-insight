@@ -25,6 +25,9 @@ export interface OrganizationSettings {
   // Parametrização de comissões
   comissao_base: 'valor_tabela' | 'comissao_empresa';
   comissao_over_percent: number;
+  
+  // IA
+  ai_api_key: string;
 }
 
 interface UseOrganizationSettingsReturn {
@@ -55,7 +58,7 @@ export function useOrganizationSettings(): UseOrganizationSettingsReturn {
       setLoading(true);
       const { data, error } = await supabase
         .from('organizations')
-        .select('imap_host, imap_port, imap_user, imap_password, automation_active, imap_allowed_emails, cnpj, razao_social, endereco, cidade, estado, cep, telefone, email_contato, comissao_base, comissao_over_percent')
+        .select('imap_host, imap_port, imap_user, imap_password, automation_active, imap_allowed_emails, cnpj, razao_social, endereco, cidade, estado, cep, telefone, email_contato, comissao_base, comissao_over_percent, ai_api_key')
         .eq('id', effectiveOrgId)
         .single();
 
@@ -80,6 +83,8 @@ export function useOrganizationSettings(): UseOrganizationSettingsReturn {
         // Parametrização
         comissao_base: (data.comissao_base as 'valor_tabela' | 'comissao_empresa') || 'valor_tabela',
         comissao_over_percent: data.comissao_over_percent ?? 10,
+        // IA
+        ai_api_key: data.ai_api_key || '',
       });
     } catch (error) {
       console.error('Error fetching organization settings:', error);
