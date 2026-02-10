@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { useRepresentatives, type Representative } from '@/hooks/useRepresentatives';
+import { useRepresentativeCompanies } from '@/hooks/useRepresentativeCompanies';
 import { supabase } from '@/integrations/supabase/client';
 
 interface OrgMember {
@@ -36,7 +36,7 @@ export function CommissionAssignment({
   initialData,
   onChange 
 }: CommissionAssignmentProps) {
-  const { representatives, loading: repsLoading } = useRepresentatives(organizationId);
+  const { companies: representativeCompanies, loading: repsLoading } = useRepresentativeCompanies(organizationId);
   const [sellers, setSellers] = useState<OrgMember[]>([]);
   const [loadingSellers, setLoadingSellers] = useState(true);
 
@@ -131,7 +131,7 @@ export function CommissionAssignment({
     });
   }, [useInternalSeller, internalSellerId, internalSellerPercent, useRepresentative, representativeId, representativePercent, onChange]);
 
-  const activeReps = representatives.filter(r => r.active !== false);
+  const activeReps = representativeCompanies.filter(r => r.active !== false);
 
   return (
     <div className="space-y-4">
@@ -230,7 +230,7 @@ export function CommissionAssignment({
                   ) : (
                     activeReps.map(rep => (
                       <SelectItem key={rep.id} value={rep.id}>
-                        {rep.name} {rep.company ? `(${rep.company})` : ''}
+                        {rep.name} {rep.position ? `(${rep.position})` : ''}
                       </SelectItem>
                     ))
                   )}

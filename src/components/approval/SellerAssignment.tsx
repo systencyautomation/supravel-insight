@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatCurrency } from '@/lib/approvalCalculator';
-import { useRepresentatives } from '@/hooks/useRepresentatives';
+import { useRepresentativeCompanies } from '@/hooks/useRepresentativeCompanies';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { supabase } from '@/integrations/supabase/client';
 import type { PendingSale } from '@/hooks/usePendingSales';
@@ -89,7 +89,7 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
   isEditMode = false,
   onCancel,
 }, ref) => {
-  const { representatives, loading: repsLoading } = useRepresentatives(organizationId);
+  const { companies: representativeCompanies, loading: repsLoading } = useRepresentativeCompanies(organizationId);
   const { settings: orgSettings } = useOrganizationSettings();
   const [sellers, setSellers] = useState<OrgMember[]>([]);
   const [loadingSellers, setLoadingSellers] = useState(true);
@@ -237,7 +237,7 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
     triggerReject: () => setShowRejectInput(true),
   }), [handleApprove]);
 
-  const activeReps = representatives.filter(r => r.active !== false);
+  const activeReps = representativeCompanies.filter(r => r.active !== false);
 
   return (
     <Card className="h-full flex flex-col">
@@ -402,7 +402,7 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
                           ) : (
                             activeReps.map(rep => (
                               <SelectItem key={rep.id} value={rep.id}>
-                                {rep.name} {rep.company ? `(${rep.company})` : ''}
+                                {rep.name} {rep.position ? `(${rep.position})` : ''}
                               </SelectItem>
                             ))
                           )}

@@ -60,19 +60,24 @@ export function useSellerProfiles() {
           }
         }
 
-        // Buscar representantes externos
+        // Buscar representantes externos (representative_companies)
         const { data: reps, error: repsError } = await supabase
-          .from('representatives')
-          .select('id, name, company, email')
+          .from('representative_companies')
+          .select('id, name, cnpj, position, sede')
           .eq('organization_id', effectiveOrgId)
           .eq('active', true);
 
         if (repsError) {
-          console.error('Error fetching representatives:', repsError);
+          console.error('Error fetching representative companies:', repsError);
         } else if (reps) {
           const repsMap = new Map<string, Representative>();
           reps.forEach(r => {
-            repsMap.set(r.id, r);
+            repsMap.set(r.id, {
+              id: r.id,
+              name: r.name,
+              company: r.name, // company name is the entity name
+              email: null,
+            });
           });
           setRepresentatives(repsMap);
         }
