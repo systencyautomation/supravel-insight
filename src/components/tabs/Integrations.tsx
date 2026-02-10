@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Mail, Plug, CheckCircle2, AlertCircle, Info, X, Plus, Users, Pencil } from 'lucide-react';
+import { Loader2, Mail, Plug, CheckCircle2, AlertCircle, Info, X, Plus, Users, Pencil, Brain, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Integrations() {
@@ -19,11 +19,14 @@ export function Integrations() {
     imap_password: '',
     automation_active: false,
     imap_allowed_emails: [],
+    ai_api_key: '',
   });
 
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [newEmail, setNewEmail] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isEditingAi, setIsEditingAi] = useState(false);
 
   const isValidEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toLowerCase().trim());
@@ -94,6 +97,7 @@ export function Integrations() {
       email_contato: '',
       comissao_base: 'valor_tabela',
       comissao_over_percent: 10,
+      ai_api_key: '',
     };
     const success = await testConnection(testSettings);
     setConnectionStatus(success ? 'success' : 'error');
@@ -389,6 +393,100 @@ export function Integrations() {
           </p>
         </CardContent>
       </Card>
+
+      {/* AI Configuration */}
+      <Card className="rounded-none border-border">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Brain className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <CardTitle className="text-base font-medium">Inteligência Artificial</CardTitle>
+                <CardDescription>
+                  Configure sua chave de API para extração automática de boletos
+                </CardDescription>
+              </div>
+            </div>
+            {!isEditingAi && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditingAi(true)}
+                className="h-8 w-8 p-0"
+                title="Editar configuração"
+              >
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="ai_api_key" className="text-sm font-medium">
+              API Key
+            </Label>
+            <div className="relative">
+              <Input
+                id="ai_api_key"
+                type={showApiKey ? 'text' : 'password'}
+                value={formData.ai_api_key || ''}
+                onChange={(e) => handleInputChange('ai_api_key', e.target.value)}
+                placeholder="sk-..."
+                className="rounded-none pr-10"
+                disabled={!isEditingAi}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3"
+                onClick={() => setShowApiKey(!showApiKey)}
+              >
+                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            A chave é usada para extrair automaticamente valores e vencimentos de boletos em PDF. 
+            Modelo utilizado: Google Gemini 2.5 Flash.
+          </p>
+
+          {formData.ai_api_key && !isEditingAi && (
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>API Key configurada</span>
+            </div>
+          )}
+
+          {isEditingAi && (
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsEditingAi(false);
+                  if (settings) setFormData(prev => ({ ...prev, ai_api_key: settings.ai_api_key }));
+                }}
+                className="rounded-none"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  const success = await updateSettings({ ai_api_key: formData.ai_api_key || '' });
+                  if (success) setIsEditingAi(false);
+                }}
+                disabled={saving}
+                className="rounded-none gap-2"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="rounded-none border-border bg-muted/30">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">

@@ -344,7 +344,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { xml_content, organization_id, email_from, email_subject, filename, boletos } = body;
+    const { xml_content, organization_id, email_from, email_subject, filename, boletos, danfe_base64, boleto_base64 } = body;
 
     if (!xml_content || typeof xml_content !== 'string') {
       return new Response(
@@ -523,6 +523,53 @@ serve(async (req) => {
 
     console.log('Sale inserted successfully:', sale.id);
 
+    // === SAVE DOCUMENTS TO STORAGE ===
+    const saveDocument = async (content: string, docType: 'xml' | 'danfe' | 'boleto', docFilename: string, isBase64: boolean) => {
+      try {
+        const storagePath = `${organization_id}/${sale.id}/${docFilename}`;
+        const fileData = isBase64 ? Uint8Array.from(atob(content), c => c.charCodeAt(0)) : new TextEncoder().encode(content);
+        const contentType = docType === 'xml' ? 'application/xml' : 'application/pdf';
+        
+        const { error: uploadError } = await supabase.storage
+          .from('sale-documents')
+          .upload(storagePath, fileData, { contentType, upsert: true });
+
+        if (uploadError) {
+          console.error(`Error uploading ${docType}:`, uploadError);
+          return;
+        }
+
+        await supabase.from('sale_documents').insert({
+          organization_id,
+          sale_id: sale.id,
+          document_type: docType,
+          filename: docFilename,
+          storage_path: storagePath,
+          file_size: fileData.length,
+        });
+
+        console.log(`Saved ${docType} document: ${storagePath}`);
+      } catch (e) {
+        console.error(`Error saving ${docType} document:`, e);
+      }
+    };
+
+    // Save XML
+    if (xml_content) {
+      const xmlFilename = filename || `nfe_${parsedData.nfe.numero || 'unknown'}.xml`;
+      await saveDocument(xml_content, 'xml', xmlFilename, false);
+    }
+
+    // Save DANFE PDF
+    if (danfe_base64) {
+      await saveDocument(danfe_base64, 'danfe', `danfe_${parsedData.nfe.numero || 'unknown'}.pdf`, true);
+    }
+
+    // Save Boleto PDF
+    if (boleto_base64) {
+      await saveDocument(boleto_base64, 'boleto', `boleto_${parsedData.nfe.numero || 'unknown'}.pdf`, true);
+    }
+
     // Insert installments - usar boletos ou duplicatas do XML
     let installmentsInserted = 0;
     
@@ -567,6 +614,39 @@ serve(async (req) => {
       } else {
         installmentsInserted = installmentsToInsert.length;
         console.log(`Inserted ${installmentsInserted} installments from XML for sale ${sale.id}`);
+      }
+    }
+
+    // === IF BOLETO PDF WAS SENT AND NO BOLETOS ARRAY, USE AI EXTRACTION ===
+    if (boleto_base64 && !usarBoletos) {
+      console.log('Boleto PDF received without boletos array, calling extract-boleto-pdf...');
+      try {
+        const extractResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/extract-boleto-pdf`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              boleto_base64,
+              organization_id,
+              sale_id: sale.id,
+              emission_date: parsedData.nfe.emissao,
+            }),
+          }
+        );
+
+        const extractResult = await extractResponse.json();
+        console.log('Boleto extraction result:', JSON.stringify(extractResult, null, 2));
+        
+        if (extractResult.success && extractResult.installments_inserted > 0) {
+          installmentsInserted = extractResult.installments_inserted;
+          valorEntrada = extractResult.valor_entrada || valorEntrada;
+        }
+      } catch (extractError) {
+        console.error('Error calling extract-boleto-pdf:', extractError);
       }
     }
 

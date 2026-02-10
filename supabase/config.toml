@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.parse-nfe-xml]
 verify_jwt = false
+
+[functions.extract-boleto-pdf]
+verify_jwt = false
