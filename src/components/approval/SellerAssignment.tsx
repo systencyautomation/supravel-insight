@@ -6,13 +6,14 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatCurrency } from '@/lib/approvalCalculator';
 import { useRepresentativeCompanies } from '@/hooks/useRepresentativeCompanies';
 import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { supabase } from '@/integrations/supabase/client';
 import type { PendingSale } from '@/hooks/usePendingSales';
+import { SearchableCombobox, type ComboboxOption } from './SearchableCombobox';
+import { AddRepresentativeInline } from './AddRepresentativeInline';
 
 interface OrgMember {
   id: string;
@@ -89,7 +90,7 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
   isEditMode = false,
   onCancel,
 }, ref) => {
-  const { companies: representativeCompanies, loading: repsLoading } = useRepresentativeCompanies(organizationId);
+  const { companies: representativeCompanies, loading: repsLoading, createCompany, refetch: refetchReps } = useRepresentativeCompanies(organizationId);
   const { settings: orgSettings } = useOrganizationSettings();
   const [sellers, setSellers] = useState<OrgMember[]>([]);
   const [loadingSellers, setLoadingSellers] = useState(true);
@@ -103,6 +104,9 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
   
   const [representativeId, setRepresentativeId] = useState<string | null>(null);
   const [representativePercent, setRepresentativePercent] = useState(0);
+
+  // Add representative inline dialog
+  const [showAddRepDialog, setShowAddRepDialog] = useState(false);
 
   // Rejection state
   const [showRejectInput, setShowRejectInput] = useState(false);
@@ -239,8 +243,23 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
 
   const activeReps = representativeCompanies.filter(r => r.active !== false);
 
+  const sellerOptions: ComboboxOption[] = useMemo(() =>
+    sellers.map(s => ({ value: s.id, label: s.full_name, subtitle: s.email })),
+    [sellers]
+  );
+
+  const repOptions: ComboboxOption[] = useMemo(() =>
+    activeReps.map(r => ({
+      value: r.id,
+      label: r.name,
+      subtitle: r.position === 'indicador' ? 'Indicador' : 'Representante',
+    })),
+    [activeReps]
+  );
+
   return (
-    <Card className="h-full flex flex-col">
+    <>
+      <Card className="h-full flex flex-col">
       <CardHeader className="flex-shrink-0 pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -310,27 +329,15 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Selecionar</Label>
-                      <Select 
-                        value={internalSellerId || ''} 
+                      <SearchableCombobox
+                        options={sellerOptions}
+                        value={internalSellerId}
                         onValueChange={setInternalSellerId}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {loadingSellers ? (
-                            <SelectItem value="loading" disabled>Carregando...</SelectItem>
-                          ) : sellers.length === 0 ? (
-                            <SelectItem value="empty" disabled>Nenhum vendedor</SelectItem>
-                          ) : (
-                            sellers.map(seller => (
-                              <SelectItem key={seller.id} value={seller.id}>
-                                {seller.full_name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Buscar vendedor..."
+                        searchPlaceholder="Buscar por nome..."
+                        emptyMessage="Nenhum vendedor encontrado."
+                        loading={loadingSellers}
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">% sobre {commissionBreakdown.baseLabel}</Label>
@@ -387,27 +394,18 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Selecionar</Label>
-                      <Select 
-                        value={representativeId || ''} 
+                      <SearchableCombobox
+                        options={repOptions}
+                        value={representativeId}
                         onValueChange={setRepresentativeId}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {repsLoading ? (
-                            <SelectItem value="loading" disabled>Carregando...</SelectItem>
-                          ) : activeReps.length === 0 ? (
-                            <SelectItem value="empty" disabled>Nenhum representante</SelectItem>
-                          ) : (
-                            activeReps.map(rep => (
-                              <SelectItem key={rep.id} value={rep.id}>
-                                {rep.name} {rep.position ? `(${rep.position})` : ''}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Buscar representante..."
+                        searchPlaceholder="Buscar por nome..."
+                        emptyMessage="Nenhum representante encontrado."
+                        loading={repsLoading}
+                        showAddButton
+                        addButtonLabel="Cadastrar novo representante"
+                        onAddClick={() => setShowAddRepDialog(true)}
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">% sobre {commissionBreakdown.baseLabel}</Label>
@@ -518,7 +516,18 @@ export const SellerAssignment = forwardRef<SellerAssignmentHandle, SellerAssignm
           </div>
         </ScrollArea>
       </CardContent>
-    </Card>
+      </Card>
+
+      <AddRepresentativeInline
+        open={showAddRepDialog}
+        onOpenChange={setShowAddRepDialog}
+        onAdd={createCompany}
+        onCreated={(rep) => {
+          setRepresentativeId(rep.id);
+          refetchReps();
+        }}
+      />
+    </>
   );
 });
 
