@@ -886,9 +886,11 @@ serve(async (req) => {
     // Step 2: Execute tool calls (supports multiple rounds)
     let updatedMessages = [...conversationMessages, assistantMessage];
     let maxRounds = 5;
+    let didToolCalls = false;
 
     while (assistantMessage.tool_calls?.length > 0 && maxRounds > 0) {
       maxRounds--;
+      didToolCalls = true;
       console.log(`Executing ${assistantMessage.tool_calls.length} tool call(s), rounds left: ${maxRounds}`);
 
       const toolResults = await Promise.all(
@@ -919,7 +921,30 @@ serve(async (req) => {
       updatedMessages.push(assistantMessage);
     }
 
-    // Step 3: Final streaming response
+    // Step 3: If the last assistant message already has content (final answer from tool loop),
+    // stream it directly instead of making another API call that loses tool context
+    if (assistantMessage?.content && !assistantMessage.tool_calls?.length) {
+      // Convert the existing text answer into an SSE stream
+      const textContent = assistantMessage.content;
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          // Send as a single SSE chunk
+          const chunk = JSON.stringify({
+            choices: [{ delta: { content: textContent }, index: 0, finish_reason: "stop" }],
+          });
+          controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
+    // No tool calls and no content yet — stream from scratch
     const finalResponse = await fetch(apiUrl, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
