@@ -33,6 +33,9 @@ export interface EditableSale {
   emitente_uf: string | null;
   icms_tabela: number | null;
   ai_pre_calculated: boolean | null;
+  valor_presente: number | null;
+  entrada_calculada: number | null;
+  analise_ia_status: string | null;
 }
 
 export interface EditableSaleInstallment {
