@@ -1,99 +1,148 @@
 
-# Pre-Calculo Automatico pela IA no Processamento da Venda
 
-## Resumo
+# Estruturar Base para o Modulo "Analista de IA"
 
-Atualmente, quando uma venda chega via n8n, ela entra na lista de pendencias com status "pendente" mas sem calculos financeiros preenchidos. O usuario precisa abrir a calculadora e preencher manualmente valores de tabela, comissao, etc.
+## Analise do Estado Atual vs. Solicitado
 
-A proposta e mover essa inteligencia para o backend: ao processar o XML e os boletos, o sistema tambem consulta a tabela FIPE da organizacao, faz o match do produto, calcula Over Price, deducoes fiscais e comissao -- tudo automaticamente. A venda chega na lista de pendencias ja com todos os campos financeiros pre-preenchidos.
+Antes de propor mudancas, e importante mapear o que ja existe para nao duplicar colunas ou quebrar funcionalidades.
 
-O usuario continua sendo obrigatorio no fluxo: ele revisa os valores, ajusta se necessario, atribui o vendedor e aprova.
+### 1. Tabela Organizations -- Campos de Configuracao
 
-## Fluxo Atualizado
+| Campo Solicitado | Ja Existe? | Nome Atual | Observacao |
+|---|---|---|---|
+| `commission_model` (enum: total_value, company_margin) | SIM | `comissao_base` (text, default 'valor_tabela') | Armazena 'valor_tabela' ou 'comissao_empresa'. Mesmo conceito, nomes diferentes. |
+| `default_company_rate` (float) | SIM | `comissao_over_percent` (numeric, default 10) | Percentual do Over que vendedor recebe. Ja configuravel na UI. |
+| `api_key_llm` (password/text) | SIM | `ai_api_key` (text) | Chave da API de IA. Ja usada no `parse-nfe-xml`. |
 
-```text
-n8n --> parse-nfe-xml (edge function)
-          |
-          +--> 1. Parseia XML (ja existe)
-          +--> 2. Salva documentos no Storage (ja existe)
-          +--> 3. Extrai boletos do PDF via IA (ja existe)
-          +--> 4. [NOVO] Busca tabela FIPE da organizacao
-          +--> 5. [NOVO] Match do produto (codigo FIPE)
-          +--> 6. [NOVO] Calcula: valor tabela, ICMS, Over Price, deducoes, comissao
-          +--> 7. Insere venda com campos financeiros pre-preenchidos
-          +--> Status: "pendente" (aguarda aprovacao humana)
+**Conclusao**: Os tres campos ja existem com nomes ligeiramente diferentes. Estao integrados em:
+- `useOrganizationSettings.ts` (hook)
+- `CommissionParametersForm.tsx` (UI de configuracao)
+- `parse-nfe-xml` edge function (uso da chave IA)
+- `CommissionCalculator.tsx` (calculo de comissao)
 
-Humano --> Lista de Pendencias --> Abre Aprovacao
-          +--> Ve valores ja preenchidos pela IA
-          +--> Ajusta se necessario
-          +--> Atribui vendedor
-          +--> Aprova --> Dashboard
+**Acao recomendada**: Nao renomear (evita refactor massivo). Manter os nomes atuais que ja estao em producao.
+
+---
+
+### 2. Tabela Sales -- Colunas de Produto e Calculo
+
+| Campo Solicitado | Ja Existe? | Nome Atual | Observacao |
+|---|---|---|---|
+| `produto_marca` | SIM | `produto_marca` (text) | Identico |
+| `produto_modelo` | SIM | `produto_modelo` (text) | Identico -- usado como codigo FIPE |
+| `produto_numero_serie` | SIM | `produto_numero_serie` (text) | Identico |
+| `entrada_calculada` | NAO | `valor_entrada` existe mas e a entrada do boleto, nao a calculada | **PRECISA ADICIONAR** |
+| `valor_presente` | NAO | Calculado em runtime mas nunca persistido | **PRECISA ADICIONAR** |
+| `analise_ia_status` | PARCIAL | `ai_pre_calculated` (boolean) existe | Precisa de status mais rico (enum) |
+
+**Acoes necessarias**:
+1. Adicionar `valor_presente` (numeric) -- persiste o VP calculado
+2. Adicionar `entrada_calculada` (numeric) -- persiste a entrada detectada/calculada pela IA
+3. Adicionar `analise_ia_status` (text) -- substitui/complementa o boolean `ai_pre_calculated` com estados mais granulares
+
+---
+
+### 3. RBAC (Cargos e Permissoes) -- Totalmente Implementado
+
+O sistema de RBAC ja esta **100% operacional** com:
+
+**Cargos (enum `app_role`)**:
+- `admin` = Gerente (controle total)
+- `manager` = Analista (quase tudo, exceto remover membros e configuracoes)
+- `seller` = Vendedor (ve apenas suas proprias vendas e comissoes + representantes linkados)
+- `representative` = Representante (apenas comissoes proprias)
+- `super_admin` = Master do sistema
+- `saas_admin` = Admin SaaS
+
+**Infraestrutura existente**:
+- Tabela `user_roles` com RLS
+- Tabela `user_permissions` para overrides individuais
+- Tabela `role_permissions` para templates por cargo
+- Funcoes SQL: `has_role()`, `has_permission()`, `can_view_all_sales()`, `get_user_org_id()`
+- `usePermissions` hook com 11 permissoes granulares
+- RLS policies na tabela `sales` que filtram por cargo (Vendedor ve so o seu, Admin ve tudo)
+- `RolePermissionsManager` UI para configurar permissoes por cargo
+- `EditRoleDialog` para alterar cargos com validacao hierarquica
+- Template padrao via `create_default_role_permissions()`
+
+**Conclusao**: Nenhuma mudanca necessaria no RBAC.
+
+---
+
+## Plano de Implementacao
+
+### Etapa 1: Migration SQL -- Novas colunas na tabela `sales`
+
+Adicionar as 3 colunas que faltam:
+
+```sql
+-- Valor Presente calculado (VP das parcelas com taxa de juros)
+ALTER TABLE public.sales 
+ADD COLUMN valor_presente numeric;
+
+-- Entrada calculada pela IA (diferente de valor_entrada que vem do boleto)
+ALTER TABLE public.sales 
+ADD COLUMN entrada_calculada numeric;
+
+-- Status granular da analise de IA 
+-- Valores: 'pendente', 'processando', 'concluido', 'falha', 'revisado'
+ALTER TABLE public.sales 
+ADD COLUMN analise_ia_status text DEFAULT 'pendente';
 ```
 
-## Mudancas Tecnicas
+Os valores de `analise_ia_status`:
+- `pendente` -- aguardando analise (venda acabou de chegar)
+- `processando` -- IA esta analisando
+- `concluido` -- IA finalizou com sucesso (match FIPE + calculos)
+- `falha` -- IA tentou mas falhou (sem match FIPE, erro, etc.)
+- `revisado` -- humano revisou e aprovou os calculos da IA
 
-### 1. Edge Function `parse-nfe-xml` -- Adicionar Pre-Calculo
+### Etapa 2: Atualizar Edge Function `parse-nfe-xml`
 
-Apos inserir a venda e processar boletos, adicionar logica para:
+Quando a funcao faz o pre-calculo automatico (logica adicionada na implementacao anterior), gravar tambem:
+- `valor_presente` com o VP calculado
+- `entrada_calculada` com o valor da entrada detectada
+- `analise_ia_status = 'concluido'` em vez de apenas `ai_pre_calculated = true`
+- Se falhar o match FIPE: `analise_ia_status = 'falha'`
 
-a) **Buscar tabela FIPE** da organizacao no banco (`fipe_documents`)
-b) **Match do produto** usando `produto_modelo` ou `produto_codigo` (mesma logica que ja existe no `CommissionCalculator.tsx` -- busca por "Cod. Interno" no header da planilha)
-c) **Extrair valores**: `valorTabela`, `icmsTabela` (detectar qual coluna 4%/7%/12% tem valor), `percentualComissao`
-d) **Calcular ICMS destino** a partir da UF do destinatario
-e) **Calcular Valor Real** (VP) usando entrada + parcelas com taxa de 2.2%
-f) **Calcular Over Price** = Valor Real - Valor Tabela Ajustado
-g) **Calcular deducoes em cascata**: ICMS, PIS/COFINS, IR/CSLL
-h) **Calcular comissao** = Comissao Pedido + Over Liquido
-i) **Atualizar a venda** com todos esses campos pre-preenchidos
+### Etapa 3: Atualizar hooks e componentes
 
-### 2. Novo campo `ai_pre_calculated` na tabela `sales`
+- `usePendingSales.ts` -- incluir `valor_presente`, `entrada_calculada`, `analise_ia_status` no select
+- `useEditableSale.ts` -- incluir os novos campos
+- `Pendencias.tsx` -- usar `analise_ia_status` para mostrar badges mais informativos (Calculado, Falha, Revisado)
+- `CommissionCalculator.tsx` -- persistir `valor_presente` ao salvar
+- `SalesApproval.tsx` -- ao aprovar, atualizar `analise_ia_status` para 'revisado'
 
-Adicionar uma coluna booleana `ai_pre_calculated` (default false) para indicar que os calculos foram feitos automaticamente pela IA/sistema. Isso permite:
-- Mostrar um selo visual na lista de pendencias ("Calculado automaticamente")
-- O frontend saber que os valores ja estao preenchidos
-- Diferenciar vendas que foram calculadas automaticamente vs manualmente
+### Etapa 4: Atualizar tipo TypeScript (automatico)
 
-### 3. UI -- Indicador visual na lista de pendencias
+O arquivo `types.ts` sera regenerado automaticamente apos a migration.
 
-Na pagina `/pendencias`, vendas com `ai_pre_calculated = true` mostram um badge indicando que os calculos ja foram feitos. O usuario sabe que pode revisar e aprovar rapidamente.
+---
 
-### 4. UI -- Calculadora em modo "revisao"
+## Resumo das Mudancas
 
-Quando a venda tem `ai_pre_calculated = true`, a calculadora abre com todos os campos ja preenchidos. O usuario pode:
-- Revisar os valores (tudo editavel como antes)
-- Ir direto para a Etapa 2 (atribuicao de vendedor) se os valores estiverem corretos
-- Ajustar qualquer valor se necessario
+| Categoria | O que muda | O que ja existe (sem alteracao) |
+|---|---|---|
+| Organizations | Nada -- campos ja existem | `comissao_base`, `comissao_over_percent`, `ai_api_key` |
+| Sales (schema) | +3 colunas: `valor_presente`, `entrada_calculada`, `analise_ia_status` | `produto_marca`, `produto_modelo`, `produto_numero_serie`, `ai_pre_calculated` |
+| RBAC | Nada -- sistema completo | 4 cargos, 11 permissoes, RLS, funcoes SQL, UI |
+| Edge Function | Gravar novos campos no pre-calculo | Logica de match FIPE e calculo |
+| Frontend | Badges mais ricos + persistencia do VP | Calculadora, lista de pendencias, aprovacao |
 
-## Arquivos Afetados
+---
 
-1. **Migration SQL** -- adicionar coluna `ai_pre_calculated` na tabela `sales`
-2. **`supabase/functions/parse-nfe-xml/index.ts`** -- adicionar logica de busca FIPE + calculo de comissao apos inserir a venda
-3. **`src/pages/Pendencias.tsx`** -- mostrar badge "Calculado" em vendas pre-calculadas
-4. **`src/components/approval/CommissionCalculator.tsx`** -- pequenos ajustes para indicar visualmente que valores vieram do sistema
+## Secao Tecnica
 
-## Logica de Match FIPE no Backend
+### Arquivos afetados:
+1. **Migration SQL** -- adicionar 3 colunas em `sales`
+2. **`supabase/functions/parse-nfe-xml/index.ts`** -- gravar `valor_presente`, `entrada_calculada`, `analise_ia_status`
+3. **`src/hooks/usePendingSales.ts`** -- incluir novos campos no select
+4. **`src/hooks/useEditableSale.ts`** -- incluir novos campos
+5. **`src/pages/Pendencias.tsx`** -- badges baseados em `analise_ia_status`
+6. **`src/components/approval/CommissionCalculator.tsx`** -- persistir `valor_presente`
+7. **`src/pages/SalesApproval.tsx`** -- atualizar `analise_ia_status = 'revisado'` ao aprovar
 
-A logica sera portada do `CommissionCalculator.tsx` (linhas 99-217) para o backend. Resumo:
+### Compatibilidade:
+- A coluna `ai_pre_calculated` (boolean) sera mantida para nao quebrar nada existente. O `analise_ia_status` e um complemento mais rico.
+- Vendas existentes receberao `analise_ia_status = 'pendente'` por default, sem impacto.
 
-1. Buscar `fipe_documents.rows` da organizacao
-2. Encontrar header row com "Cod. Interno"
-3. Encontrar colunas de valor (12%, 7%, 4%) e comissao
-4. Buscar o `produto_modelo` ou `produto_codigo` nas linhas
-5. Extrair valor da coluna com ICMS disponivel (prioridade: 4% > 7% > 12%)
-6. Retornar `valorTabela`, `icmsTabela`, `percentualComissao`
-
-## Logica de Calculo no Backend
-
-Portar a logica de `approvalCalculator.ts` para o backend:
-
-1. `calcularValorReal()` -- VP das parcelas
-2. `calculateApprovalCommission()` -- Over Price + deducoes + comissao
-3. Gravar `table_value`, `percentual_comissao`, `icms_tabela`, `percentual_icms`, `over_price`, `over_price_liquido`, `icms`, `pis_cofins`, `ir_csll`, `commission_calculated`, `ai_pre_calculated` na venda
-
-## Consideracoes
-
-- Se a organizacao nao tiver tabela FIPE cadastrada, os calculos nao sao feitos e a venda entra sem pre-calculo (comportamento atual)
-- Se o produto nao for encontrado na tabela, os calculos tambem nao sao feitos
-- O campo `ai_pre_calculated` so e marcado como true quando TODOS os calculos foram realizados com sucesso
-- O usuario SEMPRE precisa aprovar -- nenhuma venda vai direto para o dashboard
-- Vendas sem pre-calculo continuam funcionando normalmente (preenchimento manual)
