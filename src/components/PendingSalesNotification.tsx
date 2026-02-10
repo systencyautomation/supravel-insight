@@ -44,11 +44,9 @@ export function PendingSalesNotification() {
       );
       if (!res.ok) throw new Error('fail');
       await minDelay;
-      toast.success('Sincronização iniciada com sucesso');
       setCooldown(true);
     } catch {
       await minDelay;
-      toast.error('Falha ao iniciar sincronização');
     } finally {
       setSyncing(false);
     }
