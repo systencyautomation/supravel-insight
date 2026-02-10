@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.parse-nfe-ai]
 verify_jwt = false
+
+[functions.chat-sale-analyst]
+verify_jwt = false

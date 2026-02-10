@@ -31,6 +31,10 @@ export interface PendingSale {
   valor_entrada: number | null;
   observacoes: string | null;
   emitente_uf: string | null;
+  emitente_nome: string | null;
+  emitente_cnpj: string | null;
+  total_produtos: number | null;
+  total_ipi: number | null;
   icms_tabela: number | null;
   ai_pre_calculated: boolean | null;
   valor_presente: number | null;
