@@ -1,39 +1,65 @@
 
+# Considerar Over Price Negativo na Comissao
 
-# Correção: Comissão de Representante usando percentual errado
+## Mudanca de regra
 
-## Problema identificado
+Quando o valor faturado e menor que o valor de tabela, o over price negativo passa a reduzir a comissao da empresa. Exemplo do usuario:
 
-O componente `RepresentativeCommissions.tsx` usa `sale.percentual_comissao` (percentual da empresa, ex: 10%) para calcular a comissão do representante, quando deveria usar `sale.representative_percent` (percentual individual, ex: 2%).
-
-Isso infla o valor exibido. No caso do Alex Severo com a COOPERATIVA TAQUARI JACUI:
-- Exibido: R$ 75.451,44 x 10% = R$ 7.545,14 (errado)
-- Correto: R$ 75.451,44 x 2% = R$ 1.509,03
-
-## Correção
-
-### Arquivo: `src/components/tabs/RepresentativeCommissions.tsx`
-
-Substituir todas as ocorrencias de:
-```typescript
-const percentualRep = Number(sale.percentual_comissao) || 3;
+```text
+Tabela:   R$ 20.991,67
+Faturado: R$ 20.600,00
+Over:     -R$ 391,67
+Comissao: R$ 1.287,66 (6,25%)
 ```
 
-Por:
-```typescript
-const percentualRep = Number(sale.representative_percent) || 3;
-```
+A comissao da empresa sera: base sobre tabela + over liquido (que sera negativo), resultando num valor menor. (caso seja over positivo mantem a logica de comissao sobre o valor da table + comissao do over)
 
-Essa linha aparece 3 vezes no arquivo:
-1. Linha 115 - calculo do `totalComissao` por representante
-2. Linha ~130 - calculo da `comissaoPaga`
-3. Linha ~240 - calculo individual por venda na tabela
+## Arquivos a alterar
 
-Nenhuma outra alteracao e necessaria. O campo `representative_percent` ja esta salvo corretamente no banco (valor 2 para esta venda).
+### 1. `src/lib/approvalCalculator.ts` (linhas 143-160)
+
+Remover a condicao que zera o over negativo. Quando o over e negativo, nao ha deducoes fiscais (ICMS, PIS/COFINS, IR/CSLL ficam zeradas) -- os impostos so incidem sobre margem positiva. O over liquido assume o valor bruto negativo diretamente.
+
+Logica nova:
+- Over > 0: aplica deducoes em cascata (como hoje)
+- Over < 0: deducoes = 0, overLiquido = overPrice (negativo, penaliza a comissao)
+
+### 2. `src/hooks/useSalesWithCalculations.ts` (linha 104)
+
+Ajustar a verificacao `hasOverPriceSaved` que hoje so detecta valores positivos (`> 0`). Mudar para considerar qualquer valor diferente de null/undefined, pois over negativo tambem e valido e deve ser preservado do banco.
+
+### 3. `src/components/approval/CommissionCalculator.tsx` (linhas 765-771)
+
+Remover o texto "(desconsiderado)" e exibir o valor negativo normalmente em vermelho, para que o usuario veja claramente o impacto na comissao.
 
 ## Secao Tecnica
 
-- O campo `percentual_comissao` na tabela `sales` armazena o percentual base da empresa (usado para calculo da comissao da empresa sobre o valor de tabela)
-- O campo `representative_percent` armazena o percentual individual atribuido ao representante na aprovacao
-- O mesmo padrao ja funciona corretamente para vendedores internos no `InternalSellerCommissions`, que usa `sale.internal_seller_percent`
+**approvalCalculator.ts** - Bloco `if (overPrice > 0)` nas linhas 143-160:
+```typescript
+// ANTES: over negativo era zerado
+// DEPOIS:
+if (overPrice > 0) {
+  // deducoes em cascata (sem mudanca)
+} else {
+  // Over negativo: sem deducoes fiscais, over liquido = over bruto
+  deducaoIcms = 0;
+  deducaoPisCofins = 0;
+  deducaoIrCsll = 0;
+  overLiquido = overPrice; // valor negativo reduz a comissao
+}
+```
 
+**useSalesWithCalculations.ts** - Linha 104:
+```typescript
+// ANTES: const hasOverPriceSaved = Number(sale.over_price) > 0 || Number(sale.over_price_liquido) > 0;
+// DEPOIS:
+const hasOverPriceSaved = sale.over_price !== null && sale.over_price !== undefined;
+```
+
+**CommissionCalculator.tsx** - Linhas 765-771:
+```typescript
+// Remover condicional de "desconsiderado", exibir valor real (positivo ou negativo)
+<span className={activeCalculation.overPrice < 0 ? "text-red-500" : ""}>
+  {formatCurrency(activeCalculation.overLiquido)}
+</span>
+```
