@@ -1,39 +1,39 @@
 
-# Deletar Venda do TIAGO ZANELLA (NF 7826)
 
-## Dados a Deletar
+# Correção: Comissão de Representante usando percentual errado
 
-| Tabela | ID | Descrição |
-|--------|-----|-----------|
-| `installments` | 10 registros | Parcelas da venda |
-| `sales` | `a7543f55-baf3-40b8-8b65-410e039c5abb` | Venda NF 7826 |
+## Problema identificado
 
-## Comandos SQL
+O componente `RepresentativeCommissions.tsx` usa `sale.percentual_comissao` (percentual da empresa, ex: 10%) para calcular a comissão do representante, quando deveria usar `sale.representative_percent` (percentual individual, ex: 2%).
 
-```sql
--- Deletar parcelas primeiro (por causa da referência)
-DELETE FROM installments 
-WHERE sale_id = 'a7543f55-baf3-40b8-8b65-410e039c5abb';
+Isso infla o valor exibido. No caso do Alex Severo com a COOPERATIVA TAQUARI JACUI:
+- Exibido: R$ 75.451,44 x 10% = R$ 7.545,14 (errado)
+- Correto: R$ 75.451,44 x 2% = R$ 1.509,03
 
--- Deletar a venda
-DELETE FROM sales 
-WHERE id = 'a7543f55-baf3-40b8-8b65-410e039c5abb';
+## Correção
+
+### Arquivo: `src/components/tabs/RepresentativeCommissions.tsx`
+
+Substituir todas as ocorrencias de:
+```typescript
+const percentualRep = Number(sale.percentual_comissao) || 3;
 ```
 
-## Após Deletar
-
-Você poderá reenviar o e-mail da NF 7826 e o sistema irá:
-
-1. **Processar o XML** - Extrair dados da nota
-2. **Processar os boletos** - Com a nova lógica corrigida:
-   - Identificar primeiro boleto (R$ 50k) como **ENTRADA** (não parcela)
-   - Criar 10 parcelas de R$ 8.000 cada
-3. **Criar a venda** com dados corretos
-
-## Resultado Esperado
-
+Por:
+```typescript
+const percentualRep = Number(sale.representative_percent) || 3;
 ```
-sales.valor_entrada = R$ 50.000
-installments = 10 × R$ 8.000 = R$ 80.000
-Total = R$ 130.000 ✓
-```
+
+Essa linha aparece 3 vezes no arquivo:
+1. Linha 115 - calculo do `totalComissao` por representante
+2. Linha ~130 - calculo da `comissaoPaga`
+3. Linha ~240 - calculo individual por venda na tabela
+
+Nenhuma outra alteracao e necessaria. O campo `representative_percent` ja esta salvo corretamente no banco (valor 2 para esta venda).
+
+## Secao Tecnica
+
+- O campo `percentual_comissao` na tabela `sales` armazena o percentual base da empresa (usado para calculo da comissao da empresa sobre o valor de tabela)
+- O campo `representative_percent` armazena o percentual individual atribuido ao representante na aprovacao
+- O mesmo padrao ja funciona corretamente para vendedores internos no `InternalSellerCommissions`, que usa `sale.internal_seller_percent`
+
