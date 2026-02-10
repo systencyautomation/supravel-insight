@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Moon, Sun, Settings, User, Building2, Users, LogOut, Plug, RefreshCw } from 'lucide-react';
+import { Moon, Sun, Settings, User, Building2, Users, LogOut, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,48 +12,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { PendingSalesNotification } from '@/components/PendingSalesNotification';
 import { Logo } from '@/components/Logo';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 export function DashboardHeader() {
   const { theme, toggleTheme } = useTheme();
-  const { signOut, effectiveOrgId } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
-  const [syncing, setSyncing] = useState(false);
-  const [cooldown, setCooldown] = useState(false);
-
-  const handleSync = useCallback(async () => {
-    if (syncing || cooldown) return;
-    setSyncing(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trigger-nfe-sync`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session?.access_token}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ organization_id: effectiveOrgId }),
-        }
-      );
-      if (!res.ok) throw new Error('fail');
-      toast.success('Sincronização iniciada com sucesso');
-      setCooldown(true);
-    } catch {
-      toast.error('Falha ao iniciar sincronização');
-    } finally {
-      setSyncing(false);
-    }
-  }, [syncing, cooldown, effectiveOrgId]);
-
-  useEffect(() => {
-    if (!cooldown) return;
-    const timer = setTimeout(() => setCooldown(false), 30000);
-    return () => clearTimeout(timer);
-  }, [cooldown]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -73,19 +35,6 @@ export function DashboardHeader() {
         
         <div className="flex items-center gap-2">
           <PendingSalesNotification />
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSync}
-            disabled={syncing || cooldown}
-            className="rounded-xl hover:bg-accent/80 gap-1.5 text-xs"
-          >
-            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">
-              {syncing ? 'Sincronizando...' : 'Sincronizar agora'}
-            </span>
-          </Button>
 
           <Button 
             variant="ghost" 
