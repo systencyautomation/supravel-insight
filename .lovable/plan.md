@@ -1,113 +1,99 @@
 
-
-# Sistema de Documentos e Extração Inteligente de Boletos
+# Pre-Calculo Automatico pela IA no Processamento da Venda
 
 ## Resumo
 
-O n8n passa a enviar apenas os **arquivos brutos** (XML como texto, PDFs como base64). O sistema assume toda a inteligência:
+Atualmente, quando uma venda chega via n8n, ela entra na lista de pendencias com status "pendente" mas sem calculos financeiros preenchidos. O usuario precisa abrir a calculadora e preencher manualmente valores de tabela, comissao, etc.
 
-1. **Armazena** os documentos (XML, DANFE, Boleto) em storage vinculados a cada venda
-2. **Parseia** o XML (ja existe)
-3. **Extrai boletos do PDF** usando IA -- cada organizacao configura sua propria API key
-4. Documentos ficam disponiveis para consulta no sistema
+A proposta e mover essa inteligencia para o backend: ao processar o XML e os boletos, o sistema tambem consulta a tabela FIPE da organizacao, faz o match do produto, calcula Over Price, deducoes fiscais e comissao -- tudo automaticamente. A venda chega na lista de pendencias ja com todos os campos financeiros pre-preenchidos.
 
-## Arquitetura do Fluxo
+O usuario continua sendo obrigatorio no fluxo: ele revisa os valores, ajusta se necessario, atribui o vendedor e aprova.
+
+## Fluxo Atualizado
 
 ```text
-n8n (email) --> parse-nfe-xml (edge function)
-                  |
-                  +--> 1. Parseia XML (ja existe)
-                  +--> 2. Salva documentos no Storage (novo)
-                  +--> 3. Insere venda no banco (ja existe)
-                  +--> 4. Chama extract-boleto-pdf (novo) se tiver PDF
-                            |
-                            +--> Usa AI API key da org
-                            +--> Extrai valores/vencimentos
-                            +--> Insere installments
+n8n --> parse-nfe-xml (edge function)
+          |
+          +--> 1. Parseia XML (ja existe)
+          +--> 2. Salva documentos no Storage (ja existe)
+          +--> 3. Extrai boletos do PDF via IA (ja existe)
+          +--> 4. [NOVO] Busca tabela FIPE da organizacao
+          +--> 5. [NOVO] Match do produto (codigo FIPE)
+          +--> 6. [NOVO] Calcula: valor tabela, ICMS, Over Price, deducoes, comissao
+          +--> 7. Insere venda com campos financeiros pre-preenchidos
+          +--> Status: "pendente" (aguarda aprovacao humana)
+
+Humano --> Lista de Pendencias --> Abre Aprovacao
+          +--> Ve valores ja preenchidos pela IA
+          +--> Ajusta se necessario
+          +--> Atribui vendedor
+          +--> Aprova --> Dashboard
 ```
 
-## Mudancas
+## Mudancas Tecnicas
 
-### 1. Banco de Dados
+### 1. Edge Function `parse-nfe-xml` -- Adicionar Pre-Calculo
 
-**Tabela `sale_documents`** (nova) -- vincula arquivos a vendas:
-- `id` (uuid, PK)
-- `organization_id` (uuid, FK organizations)
-- `sale_id` (uuid, FK sales)
-- `document_type` (text: 'xml', 'danfe', 'boleto')
-- `filename` (text)
-- `storage_path` (text) -- caminho no bucket
-- `file_size` (integer)
-- `created_at` (timestamptz)
+Apos inserir a venda e processar boletos, adicionar logica para:
 
-**Coluna `ai_api_key`** na tabela `organizations` (text, nullable) -- cada org configura sua chave de IA.
+a) **Buscar tabela FIPE** da organizacao no banco (`fipe_documents`)
+b) **Match do produto** usando `produto_modelo` ou `produto_codigo` (mesma logica que ja existe no `CommissionCalculator.tsx` -- busca por "Cod. Interno" no header da planilha)
+c) **Extrair valores**: `valorTabela`, `icmsTabela` (detectar qual coluna 4%/7%/12% tem valor), `percentualComissao`
+d) **Calcular ICMS destino** a partir da UF do destinatario
+e) **Calcular Valor Real** (VP) usando entrada + parcelas com taxa de 2.2%
+f) **Calcular Over Price** = Valor Real - Valor Tabela Ajustado
+g) **Calcular deducoes em cascata**: ICMS, PIS/COFINS, IR/CSLL
+h) **Calcular comissao** = Comissao Pedido + Over Liquido
+i) **Atualizar a venda** com todos esses campos pre-preenchidos
 
-**Storage bucket** `sale-documents` (privado) -- armazena os arquivos.
+### 2. Novo campo `ai_pre_calculated` na tabela `sales`
 
-### 2. Edge Function `extract-boleto-pdf` (nova)
+Adicionar uma coluna booleana `ai_pre_calculated` (default false) para indicar que os calculos foram feitos automaticamente pela IA/sistema. Isso permite:
+- Mostrar um selo visual na lista de pendencias ("Calculado automaticamente")
+- O frontend saber que os valores ja estao preenchidos
+- Diferenciar vendas que foram calculadas automaticamente vs manualmente
 
-Recebe o PDF do boleto (base64), o `organization_id` e o `sale_id`. Busca a `ai_api_key` da organizacao. Envia o PDF para o modelo de IA (Lovable AI como fallback se a org nao tiver chave propria, ou retorna erro pedindo configuracao). O modelo extrai: valor de cada boleto, data de vencimento, numero do boleto. Insere os installments na tabela e calcula a entrada.
+### 3. UI -- Indicador visual na lista de pendencias
 
-Usa a mesma logica de reconciliacao que ja existe no `parse-nfe-xml` (primeiro boleto com vencimento proximo da emissao = entrada).
+Na pagina `/pendencias`, vendas com `ai_pre_calculated = true` mostram um badge indicando que os calculos ja foram feitos. O usuario sabe que pode revisar e aprovar rapidamente.
 
-### 3. Edge Function `parse-nfe-xml` (ajustes)
+### 4. UI -- Calculadora em modo "revisao"
 
-Passa a aceitar campos adicionais no body:
-- `danfe_base64` (string, opcional) -- PDF do DANFE
-- `boleto_base64` (string, opcional) -- PDF do boleto
+Quando a venda tem `ai_pre_calculated = true`, a calculadora abre com todos os campos ja preenchidos. O usuario pode:
+- Revisar os valores (tudo editavel como antes)
+- Ir direto para a Etapa 2 (atribuicao de vendedor) se os valores estiverem corretos
+- Ajustar qualquer valor se necessario
 
-Apos inserir a venda:
-1. Salva os documentos no storage bucket `sale-documents`
-2. Registra na tabela `sale_documents`
-3. Se `boleto_base64` estiver presente, chama `extract-boleto-pdf` internamente
+## Arquivos Afetados
 
-Se nao houver boleto PDF, continua usando o fallback das duplicatas do XML (comportamento atual).
+1. **Migration SQL** -- adicionar coluna `ai_pre_calculated` na tabela `sales`
+2. **`supabase/functions/parse-nfe-xml/index.ts`** -- adicionar logica de busca FIPE + calculo de comissao apos inserir a venda
+3. **`src/pages/Pendencias.tsx`** -- mostrar badge "Calculado" em vendas pre-calculadas
+4. **`src/components/approval/CommissionCalculator.tsx`** -- pequenos ajustes para indicar visualmente que valores vieram do sistema
 
-### 4. UI -- Configuracao da API Key de IA
+## Logica de Match FIPE no Backend
 
-Na pagina de Integracoes (`src/components/tabs/Integrations.tsx`), adicionar um novo Card:
+A logica sera portada do `CommissionCalculator.tsx` (linhas 99-217) para o backend. Resumo:
 
-- Titulo: "Inteligencia Artificial"
-- Descricao: "Configure sua chave de API para extração automatica de boletos"
-- Campo: API Key (password input)
-- Informacao: "A chave é usada para extrair automaticamente valores e vencimentos de boletos em PDF"
+1. Buscar `fipe_documents.rows` da organizacao
+2. Encontrar header row com "Cod. Interno"
+3. Encontrar colunas de valor (12%, 7%, 4%) e comissao
+4. Buscar o `produto_modelo` ou `produto_codigo` nas linhas
+5. Extrair valor da coluna com ICMS disponivel (prioridade: 4% > 7% > 12%)
+6. Retornar `valorTabela`, `icmsTabela`, `percentualComissao`
 
-### 5. UI -- Visualizacao de Documentos na Venda
+## Logica de Calculo no Backend
 
-No `CommissionCalculator.tsx` ou na pagina de detalhes da venda, adicionar uma secao "Documentos" que lista os arquivos vinculados (XML, DANFE, Boleto) com opcao de download/visualizacao.
+Portar a logica de `approvalCalculator.ts` para o backend:
 
-### 6. Hook `useOrganizationSettings`
-
-Adicionar `ai_api_key` ao tipo `OrganizationSettings` e ao select/update do hook.
-
-## Arquivos afetados
-
-1. **Migration SQL** -- criar tabela `sale_documents`, coluna `ai_api_key`, bucket `sale-documents`
-2. **`supabase/functions/extract-boleto-pdf/index.ts`** (novo) -- extrai dados do boleto via IA
-3. **`supabase/functions/parse-nfe-xml/index.ts`** -- aceitar PDFs base64, salvar no storage, chamar extract-boleto
-4. **`supabase/config.toml`** -- registrar nova function
-5. **`src/components/tabs/Integrations.tsx`** -- card de configuracao da API key de IA
-6. **`src/hooks/useOrganizationSettings.ts`** -- incluir `ai_api_key`
-7. **`src/components/approval/CommissionCalculator.tsx`** -- secao de documentos vinculados (download/view)
-
-## Prompt de IA para Extracao de Boleto
-
-O prompt enviado ao modelo sera algo como:
-
-> "Analise este PDF de boleto bancario. Extraia TODOS os boletos encontrados no documento. Para cada boleto retorne: valor (numerico), data de vencimento (formato YYYY-MM-DD), e numero do boleto se visivel. Use a tool `extract_boletos` para retornar os dados."
-
-Usando tool calling para garantir resposta estruturada (como recomendado pela documentacao do Lovable AI).
-
-## Modelo de IA
-
-- Se a organizacao tiver `ai_api_key` configurada, usa a chave dela com o Lovable AI Gateway
-- Se nao tiver, retorna erro indicando que precisa configurar a chave
-- Modelo padrao: `google/gemini-2.5-flash` (bom custo-beneficio para analise de PDF)
+1. `calcularValorReal()` -- VP das parcelas
+2. `calculateApprovalCommission()` -- Over Price + deducoes + comissao
+3. Gravar `table_value`, `percentual_comissao`, `icms_tabela`, `percentual_icms`, `over_price`, `over_price_liquido`, `icms`, `pis_cofins`, `ir_csll`, `commission_calculated`, `ai_pre_calculated` na venda
 
 ## Consideracoes
 
-- Os PDFs sao enviados como base64 no JSON (opcao mais simples para integracao com n8n)
-- Limite pratico de ~10MB por PDF (suficiente para boletos)
-- Storage com RLS: apenas membros da organizacao podem acessar os documentos
-- A chave de IA fica armazenada no banco (coluna `ai_api_key` na organizations), protegida por RLS
-
+- Se a organizacao nao tiver tabela FIPE cadastrada, os calculos nao sao feitos e a venda entra sem pre-calculo (comportamento atual)
+- Se o produto nao for encontrado na tabela, os calculos tambem nao sao feitos
+- O campo `ai_pre_calculated` so e marcado como true quando TODOS os calculos foram realizados com sucesso
+- O usuario SEMPRE precisa aprovar -- nenhuma venda vai direto para o dashboard
+- Vendas sem pre-calculo continuam funcionando normalmente (preenchimento manual)
