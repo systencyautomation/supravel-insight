@@ -10,10 +10,11 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const SUGGESTIONS = [
   "Quem é o cliente da NF 817?",
-  "Qual o total de vendas este mês?",
-  "Parcelas vencidas",
+  "Parcelas vencidas este mês",
   "Resumo do estoque atual",
-  "Qual a comissão total do mês?",
+  "Simule comissão: NF R$200k, tabela R$150k, SP, 6x",
+  "Qual representante atende o cliente Vilson Borges?",
+  "Listar equipe e cargos",
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat-assistant`;
