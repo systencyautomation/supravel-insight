@@ -32,6 +32,7 @@ export interface PendingSale {
   observacoes: string | null;
   emitente_uf: string | null;
   icms_tabela: number | null;
+  ai_pre_calculated: boolean | null;
 }
 
 export function usePendingSales() {

@@ -714,6 +714,7 @@ export type Database = {
       }
       sales: {
         Row: {
+          ai_pre_calculated: boolean
           aprovado_em: string | null
           aprovado_por: string | null
           client_cnpj: string | null
@@ -762,6 +763,7 @@ export type Database = {
           valor_entrada: number | null
         }
         Insert: {
+          ai_pre_calculated?: boolean
           aprovado_em?: string | null
           aprovado_por?: string | null
           client_cnpj?: string | null
@@ -810,6 +812,7 @@ export type Database = {
           valor_entrada?: number | null
         }
         Update: {
+          ai_pre_calculated?: boolean
           aprovado_em?: string | null
           aprovado_por?: string | null
           client_cnpj?: string | null

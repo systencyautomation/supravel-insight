@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bell, FileText } from 'lucide-react';
+import { ArrowLeft, Bell, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +67,12 @@ export default function Pendencias() {
                     </div>
 
                     <div className="flex items-center gap-6 flex-shrink-0">
+                      {sale.ai_pre_calculated && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          Calculado
+                        </Badge>
+                      )}
                       {sale.uf_destiny && (
                         <Badge variant="outline" className="text-xs">
                           {sale.uf_destiny}
