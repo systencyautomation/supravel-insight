@@ -1,96 +1,69 @@
 
+# Nova Pagina de Pendencias + Ajustes no Fluxo
 
-# Melhorias na Aprovacao de Vendas (4 itens)
+## Resumo
 
-## 1. Pendencias em formato de lista (sem anterior/proximo)
+1. Criar uma nova pagina `/pendencias` que exibe todas as vendas pendentes em lista completa
+2. Ajustar o dropdown de notificacoes (icone Bell) para mostrar ate 5 vendas, cada uma linkando direto para `/aprovacao?saleId=XXX`
+3. O botao "Ver todas" no dropdown leva para `/pendencias`
+4. Na pagina `/aprovacao`, remover a aba "Lista" do painel esquerdo, deixando apenas a Tabela (SpreadsheetViewer) ocupando o painel inteiro
+5. Apos aprovar/rejeitar uma venda em `/aprovacao`, redirecionar de volta para `/pendencias`
 
-Substituir a navegacao "Anterior / Proximo" por uma lista lateral de vendas pendentes. O usuario clica na venda desejada e ela carrega na calculadora.
+## Arquivos afetados
 
-### Implementacao
+### 1. `src/pages/Pendencias.tsx` (novo)
 
-- Criar um componente `PendingSalesList` que exibe todas as vendas pendentes em formato de lista compacta (NF, Cliente, Valor)
-- No `SalesApproval.tsx`, substituir a navegacao anterior/proximo por esta lista no painel esquerdo (ou como sidebar)
-- A lista destaca a venda selecionada e permite clicar em qualquer outra
-- Remover os botoes `ChevronLeft`/`ChevronRight` e o texto "X de Y"
-- Manter o contador de pendencias no header
+Nova pagina com lista completa de vendas pendentes. Layout simples com DashboardHeader, titulo "Vendas Pendentes" e uma lista/tabela com todas as vendas. Cada item e clicavel e navega para `/aprovacao?saleId={id}`. Exibe NF-e, Cliente, Valor, UF e data.
 
-Layout proposto: dividir a area em 3 paineis - Lista de Pendencias (estreito) | Tabela/Planilha | Calculadora. Ou alternativamente, colocar a lista como um dropdown/sidebar colapsavel no header.
+### 2. `src/App.tsx`
 
-**Abordagem escolhida**: Substituir o painel da Tabela (esquerdo) por um layout com tabs "Lista" e "Tabela", permitindo alternar entre ver a lista de pendencias e a planilha FIPE. A venda ativa fica destacada na lista.
+Adicionar rota `/pendencias` apontando para o novo componente.
 
-## 2. Bug: cliente muda ao receber notificacao na calculadora
+### 3. `src/components/PendingSalesNotification.tsx`
 
-### Causa raiz
+- Manter badge com contagem (max "9+")
+- Cada item do dropdown navega para `/aprovacao?saleId={sale.id}` (direto para a calculadora daquela venda)
+- "Ver todas" navega para `/pendencias`
 
-O `usePendingSales` tem `refetchInterval: 30000` (30s). Quando o refetch ocorre e uma venda e aprovada/removida da lista, o array `pendingSales` muda mas o `currentIndex` permanece o mesmo, fazendo o componente apontar para outra venda.
+### 4. `src/pages/SalesApproval.tsx`
 
-### Correcao
+- Remover o componente `PendingSalesList` e a logica de Tabs ("Lista" / "Tabela") do painel esquerdo
+- O painel esquerdo volta a exibir apenas a Tabela/SpreadsheetViewer por inteiro (como era antes)
+- Manter a logica de `selectedSaleId` via URL param para estabilidade
+- Apos aprovar ou rejeitar uma venda, redirecionar para `/pendencias` ao inves de ficar na mesma pagina
 
-- Guardar o `currentSale.id` em um estado separado (`selectedSaleId`) ao inves de depender do `currentIndex`
-- Quando `pendingSales` atualiza, buscar a venda pelo ID salvo ao inves de pelo indice
-- Se a venda selecionada nao existir mais na lista (foi aprovada por outro usuario), mostrar uma notificacao e selecionar a primeira disponivel
+### 5. `src/components/approval/PendingSalesList.tsx`
 
-## 3. ICMS default de 12% para 4%
-
-### Correcao
-
-- Alterar o `useState(12)` na linha 79 do `CommissionCalculator.tsx` para `useState(4)`:
-  ```
-  const [icmsTabela, setIcmsTabela] = useState(4);
-  ```
-- Garantir que o `useEffect` (linhas 220-244) nao sobrescreva o valor quando o usuario altera manualmente o tipo de pagamento. Adicionar uma flag `icmsEditadoManualmente` para proteger edicoes do usuario.
-- Revisar a funcao `getIcmsRate` no `approvalCalculator.ts` para que o fallback default seja 0.04 (4%) ao inves de 0.12 (12%).
-
-## 4. Esconder campos de parcela quando "a vista"
-
-### Correcao
-
-- Envolver os campos "Numero de Parcelas" e "Valor da Parcela" em uma condicao `tipoPagamento !== 'a_vista'`
-- O campo "Entrada" continua visivel (exibe o valor faturado quando a vista)
-- Garantir que mudar para "a vista" apenas sete `qtdParcelas = 0` e `valorParcelaReal = 0`, sem alterar ICMS, valor tabela, ou percentual de comissao
-- Isolar o `useEffect` da linha 309-314 (sync entrada) para nao disparar side effects em outros campos
-
----
+Remover este arquivo (nao sera mais usado na pagina de aprovacao; a nova pagina de pendencias tera sua propria lista inline).
 
 ## Secao Tecnica
 
-### Arquivos afetados
-
-1. **`src/components/approval/PendingSalesList.tsx`** (novo) - Componente de lista de vendas pendentes
-2. **`src/pages/SalesApproval.tsx`** - Substituir navegacao por lista; trocar `currentIndex` por `selectedSaleId`
-3. **`src/components/approval/CommissionCalculator.tsx`** - Default ICMS 4%; esconder campos parcela; proteger ICMS de reset
-4. **`src/lib/approvalCalculator.ts`** - Fallback `getIcmsRate` de 0.12 para 0.04
-
-### Detalhes do PendingSalesList
+### Pagina Pendencias
 
 ```text
-+-----------------------------+
-| Vendas Pendentes (5)        |
-+-----------------------------+
-| [ativo] NFe 123 - R$ 20.600|
-|   Cliente XPTO              |
-+-----------------------------+
-| NFe 456 - R$ 15.300         |
-|   Cliente ABC               |
-+-----------------------------+
-| NFe 789 - R$ 42.100         |
-|   Cliente DEF               |
-+-----------------------------+
+/pendencias
++----------------------------------+
+| DashboardHeader                  |
++----------------------------------+
+| <- Voltar    Vendas Pendentes (N)|
++----------------------------------+
+| NFe 123 | Cliente X | R$ 20.600 |
+| NFe 456 | Cliente Y | R$ 15.300 |
+| NFe 789 | Cliente Z | R$ 42.100 |
+| ...                              |
++----------------------------------+
 ```
 
-### Detalhes do fix de estabilidade (bug cliente muda)
+Cada linha e um botao/link que faz `navigate('/aprovacao?saleId=XXX')`.
 
-No `SalesApproval.tsx`:
-- Trocar `const [currentIndex, setCurrentIndex] = useState(0)` por `const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null)`
-- `currentSale` passa a ser: `pendingSales.find(s => s.id === selectedSaleId) || pendingSales[0]`
-- Quando `selectedSaleId` nao esta na lista, selecionar automaticamente a primeira venda disponivel
-- Remover funcoes `goToPrevious` e `goToNext`
+### Fluxo apos aprovar/rejeitar em `/aprovacao`
 
-### Detalhes do ICMS e campos de parcela
+No `handleApproveWithAssignment` e `handleReject`, substituir a logica de "selecionar proxima venda" por `navigate('/pendencias')`.
 
-No `CommissionCalculator.tsx`:
-- Linha 79: `useState(12)` para `useState(4)`
-- Linhas 613-646: envolver colunas 2 e 3 do grid (parcelas e valor parcela) em `{tipoPagamento !== 'a_vista' && (...)}`
-- Adicionar estado `icmsManual` para evitar que useEffects sobreescrevam valor definido pelo usuario
-- O `onValueChange` do RadioGroup de pagamento nao deve tocar em `icmsTabela` nem `icmsDestino`
+### Dropdown de notificacoes
 
+Cada `DropdownMenuItem` passa a navegar para `/aprovacao?saleId={sale.id}` ao inves de apenas `/aprovacao`. O "Ver todas" navega para `/pendencias`.
+
+### SalesApproval - painel esquerdo simplificado
+
+Remover as Tabs e o PendingSalesList. O painel esquerdo fica apenas com o Card contendo o SpreadsheetViewer (ou mensagem "Nenhuma planilha importada").
