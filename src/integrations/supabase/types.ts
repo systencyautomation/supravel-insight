@@ -727,6 +727,7 @@ export type Database = {
           emitente_nome: string | null
           emitente_uf: string | null
           entrada_calculada: number | null
+          ia_commentary: string | null
           icms: number | null
           icms_tabela: number | null
           id: string
@@ -779,6 +780,7 @@ export type Database = {
           emitente_nome?: string | null
           emitente_uf?: string | null
           entrada_calculada?: number | null
+          ia_commentary?: string | null
           icms?: number | null
           icms_tabela?: number | null
           id?: string
@@ -831,6 +833,7 @@ export type Database = {
           emitente_nome?: string | null
           emitente_uf?: string | null
           entrada_calculada?: number | null
+          ia_commentary?: string | null
           icms?: number | null
           icms_tabela?: number | null
           id?: string
