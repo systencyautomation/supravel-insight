@@ -27,6 +27,7 @@ export function PendingSalesNotification() {
     e.stopPropagation();
     if (syncing || cooldown) return;
     setSyncing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 4000));
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
@@ -42,9 +43,11 @@ export function PendingSalesNotification() {
         }
       );
       if (!res.ok) throw new Error('fail');
+      await minDelay;
       toast.success('Sincronização iniciada com sucesso');
       setCooldown(true);
     } catch {
+      await minDelay;
       toast.error('Falha ao iniciar sincronização');
     } finally {
       setSyncing(false);
