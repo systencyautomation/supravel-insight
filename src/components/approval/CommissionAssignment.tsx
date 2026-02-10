@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Users } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useRepresentativeCompanies } from '@/hooks/useRepresentativeCompanies';
 import { supabase } from '@/integrations/supabase/client';
+import { SearchableCombobox, type ComboboxOption } from './SearchableCombobox';
+import { AddRepresentativeInline } from './AddRepresentativeInline';
 
 interface OrgMember {
   id: string;
@@ -18,11 +19,11 @@ interface OrgMember {
 
 export interface CommissionAssignmentData {
   internalSellerId: string | null;
-  internalSellerPercent: number; // Percentual sobre valor tabela
+  internalSellerPercent: number;
   representativeId: string | null;
-  representativePercent: number; // Percentual sobre valor tabela
-  overSplitInternal: number; // Fixo 10% do over líquido
-  overSplitRepresentative: number; // Fixo 10% do over líquido
+  representativePercent: number;
+  overSplitInternal: number;
+  overSplitRepresentative: number;
 }
 
 interface CommissionAssignmentProps {
@@ -36,11 +37,10 @@ export function CommissionAssignment({
   initialData,
   onChange 
 }: CommissionAssignmentProps) {
-  const { companies: representativeCompanies, loading: repsLoading } = useRepresentativeCompanies(organizationId);
+  const { companies: representativeCompanies, loading: repsLoading, createCompany, refetch: refetchReps } = useRepresentativeCompanies(organizationId);
   const [sellers, setSellers] = useState<OrgMember[]>([]);
   const [loadingSellers, setLoadingSellers] = useState(true);
 
-  // Selection state
   const [useInternalSeller, setUseInternalSeller] = useState(false);
   const [useRepresentative, setUseRepresentative] = useState(false);
   
@@ -49,6 +49,8 @@ export function CommissionAssignment({
   
   const [representativeId, setRepresentativeId] = useState<string | null>(null);
   const [representativePercent, setRepresentativePercent] = useState(0);
+
+  const [showAddRepDialog, setShowAddRepDialog] = useState(false);
 
   // Fetch organization members (sellers)
   useEffect(() => {
@@ -59,7 +61,6 @@ export function CommissionAssignment({
       }
 
       try {
-        // Get user_roles for this org
         const { data: roles, error: rolesError } = await supabase
           .from('user_roles')
           .select('user_id, role')
@@ -71,7 +72,6 @@ export function CommissionAssignment({
         if (roles && roles.length > 0) {
           const userIds = roles.map(r => r.user_id);
           
-          // Get profiles for these users
           const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
             .select('id, full_name, email')
@@ -125,7 +125,6 @@ export function CommissionAssignment({
       internalSellerPercent: useInternalSeller ? internalSellerPercent : 0,
       representativeId: useRepresentative ? representativeId : null,
       representativePercent: useRepresentative ? representativePercent : 0,
-      // Over split is fixed at 10% each when enabled
       overSplitInternal: useInternalSeller ? 10 : 0,
       overSplitRepresentative: useRepresentative ? 10 : 0,
     });
@@ -133,133 +132,138 @@ export function CommissionAssignment({
 
   const activeReps = representativeCompanies.filter(r => r.active !== false);
 
+  const sellerOptions: ComboboxOption[] = useMemo(() =>
+    sellers.map(s => ({ value: s.id, label: s.full_name, subtitle: s.email })),
+    [sellers]
+  );
+
+  const repOptions: ComboboxOption[] = useMemo(() =>
+    activeReps.map(r => ({
+      value: r.id,
+      label: r.name,
+      subtitle: r.position === 'indicador' ? 'Indicador' : 'Representante',
+    })),
+    [activeReps]
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Users className="h-4 w-4 text-muted-foreground" />
-        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-          Atribuição de Comissão
-        </h3>
-      </div>
-
-      {/* Vendedor Interno */}
-      <div className="space-y-3 p-3 rounded-lg border bg-card">
+    <>
+      <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <Checkbox 
-            id="useInternalSeller" 
-            checked={useInternalSeller}
-            onCheckedChange={(checked) => setUseInternalSeller(!!checked)}
-          />
-          <Label htmlFor="useInternalSeller" className="text-sm font-medium">
-            Vendedor Interno
-          </Label>
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+            Atribuição de Comissão
+          </h3>
         </div>
-        
-        {useInternalSeller && (
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Selecionar</Label>
-              <Select 
-                value={internalSellerId || ''} 
-                onValueChange={setInternalSellerId}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {loadingSellers ? (
-                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
-                  ) : sellers.length === 0 ? (
-                    <SelectItem value="empty" disabled>Nenhum vendedor</SelectItem>
-                  ) : (
-                    sellers.map(seller => (
-                      <SelectItem key={seller.id} value={seller.id}>
-                        {seller.full_name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+
+        {/* Vendedor Interno */}
+        <div className="space-y-3 p-3 rounded-lg border bg-card">
+          <div className="flex items-center gap-2">
+            <Checkbox 
+              id="useInternalSeller" 
+              checked={useInternalSeller}
+              onCheckedChange={(checked) => setUseInternalSeller(!!checked)}
+            />
+            <Label htmlFor="useInternalSeller" className="text-sm font-medium">
+              Vendedor Interno
+            </Label>
+          </div>
+          
+          {useInternalSeller && (
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Selecionar</Label>
+                <SearchableCombobox
+                  options={sellerOptions}
+                  value={internalSellerId}
+                  onValueChange={setInternalSellerId}
+                  placeholder="Buscar vendedor..."
+                  searchPlaceholder="Buscar por nome..."
+                  emptyMessage="Nenhum vendedor encontrado."
+                  loading={loadingSellers}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">% s/ Tabela</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="100"
+                  value={internalSellerPercent}
+                  onChange={(e) => setInternalSellerPercent(parseFloat(e.target.value) || 0)}
+                  className="h-9"
+                  placeholder="Ex: 5"
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">% s/ Tabela</Label>
-              <Input
-                type="number"
-                step="0.5"
-                min="0"
-                max="100"
-                value={internalSellerPercent}
-                onChange={(e) => setInternalSellerPercent(parseFloat(e.target.value) || 0)}
-                className="h-9"
-                placeholder="Ex: 5"
-              />
+          )}
+        </div>
+
+        {/* Representante */}
+        <div className="space-y-3 p-3 rounded-lg border bg-card">
+          <div className="flex items-center gap-2">
+            <Checkbox 
+              id="useRepresentative" 
+              checked={useRepresentative}
+              onCheckedChange={(checked) => setUseRepresentative(!!checked)}
+            />
+            <Label htmlFor="useRepresentative" className="text-sm font-medium">
+              Representante
+            </Label>
+          </div>
+          
+          {useRepresentative && (
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Selecionar</Label>
+                <SearchableCombobox
+                  options={repOptions}
+                  value={representativeId}
+                  onValueChange={setRepresentativeId}
+                  placeholder="Buscar representante..."
+                  searchPlaceholder="Buscar por nome..."
+                  emptyMessage="Nenhum representante encontrado."
+                  loading={repsLoading}
+                  showAddButton
+                  addButtonLabel="Cadastrar novo representante"
+                  onAddClick={() => setShowAddRepDialog(true)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">% s/ Tabela</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="100"
+                  value={representativePercent}
+                  onChange={(e) => setRepresentativePercent(parseFloat(e.target.value) || 0)}
+                  className="h-9"
+                  placeholder="Ex: 3"
+                />
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Info sobre Over */}
+        {(useInternalSeller || useRepresentative) && (
+          <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+            <strong>Over:</strong> Cada participante recebe 10% do Over Líquido quando selecionado.
           </div>
         )}
       </div>
 
-      {/* Representante */}
-      <div className="space-y-3 p-3 rounded-lg border bg-card">
-        <div className="flex items-center gap-2">
-          <Checkbox 
-            id="useRepresentative" 
-            checked={useRepresentative}
-            onCheckedChange={(checked) => setUseRepresentative(!!checked)}
-          />
-          <Label htmlFor="useRepresentative" className="text-sm font-medium">
-            Representante
-          </Label>
-        </div>
-        
-        {useRepresentative && (
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Selecionar</Label>
-              <Select 
-                value={representativeId || ''} 
-                onValueChange={setRepresentativeId}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {repsLoading ? (
-                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
-                  ) : activeReps.length === 0 ? (
-                    <SelectItem value="empty" disabled>Nenhum representante</SelectItem>
-                  ) : (
-                    activeReps.map(rep => (
-                      <SelectItem key={rep.id} value={rep.id}>
-                        {rep.name} {rep.position ? `(${rep.position})` : ''}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">% s/ Tabela</Label>
-              <Input
-                type="number"
-                step="0.5"
-                min="0"
-                max="100"
-                value={representativePercent}
-                onChange={(e) => setRepresentativePercent(parseFloat(e.target.value) || 0)}
-                className="h-9"
-                placeholder="Ex: 3"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Info sobre Over */}
-      {(useInternalSeller || useRepresentative) && (
-        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-          <strong>Over:</strong> Cada participante recebe 10% do Over Líquido quando selecionado.
-        </div>
-      )}
-    </div>
+      <AddRepresentativeInline
+        open={showAddRepDialog}
+        onOpenChange={setShowAddRepDialog}
+        onAdd={createCompany}
+        onCreated={(rep) => {
+          setRepresentativeId(rep.id);
+          refetchReps();
+        }}
+      />
+    </>
   );
 }
