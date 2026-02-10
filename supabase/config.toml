@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.chat-sale-analyst]
 verify_jwt = false
+
+[functions.trigger-nfe-sync]
+verify_jwt = false
