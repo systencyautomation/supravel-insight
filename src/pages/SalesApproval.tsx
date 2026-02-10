@@ -16,8 +16,6 @@ import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaleInfoHeader } from '@/components/approval/SaleInfoHeader';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PendingSalesList } from '@/components/approval/PendingSalesList';
 import { toast as sonnerToast } from 'sonner';
 
 export default function SalesApproval() {
@@ -324,7 +322,7 @@ export default function SalesApproval() {
       await refetchPending();
       setStep(1);
       setConfirmedCalculation(null);
-      // selectedSaleId will auto-adjust via the useEffect when pendingSales updates
+      navigate('/pendencias');
     }
   };
 
@@ -401,6 +399,7 @@ export default function SalesApproval() {
     await refetchPending();
     setStep(1);
     setConfirmedCalculation(null);
+    navigate('/pendencias');
   };
 
   const handleBackToStep1 = () => {
@@ -508,37 +507,23 @@ export default function SalesApproval() {
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="h-full p-4">
               <Card className="h-full flex flex-col">
-                <Tabs defaultValue="lista" className="h-full flex flex-col">
-                  <CardHeader className="flex-shrink-0 pb-3">
-                    <TabsList className="w-full">
-                      <TabsTrigger value="lista" className="flex-1">Lista ({pendingCount})</TabsTrigger>
-                      <TabsTrigger value="tabela" className="flex-1">Tabela</TabsTrigger>
-                    </TabsList>
-                  </CardHeader>
-                  <CardContent className="flex-1 overflow-hidden p-0">
-                    <TabsContent value="lista" className="h-full m-0">
-                      <PendingSalesList
-                        sales={pendingSales}
-                        selectedSaleId={selectedSaleId}
-                        onSelectSale={setSelectedSaleId}
-                      />
-                    </TabsContent>
-                    <TabsContent value="tabela" className="h-full m-0">
-                      {fipeDocument ? (
-                        <SpreadsheetViewer
-                          gridData={fipeDocument.gridData}
-                          colCount={fipeDocument.colCount}
-                          rowCount={fipeDocument.rowCount}
-                          fileName={fipeDocument.fileName}
-                        />
-                      ) : (
-                        <div className="flex-1 flex items-center justify-center h-full">
-                          <p className="text-muted-foreground">Nenhuma planilha importada</p>
-                        </div>
-                      )}
-                    </TabsContent>
-                  </CardContent>
-                </Tabs>
+                <CardHeader className="flex-shrink-0 pb-3">
+                  <CardTitle className="text-sm">Tabela</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden p-0">
+                  {fipeDocument ? (
+                    <SpreadsheetViewer
+                      gridData={fipeDocument.gridData}
+                      colCount={fipeDocument.colCount}
+                      rowCount={fipeDocument.rowCount}
+                      fileName={fipeDocument.fileName}
+                    />
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">Nenhuma planilha importada</p>
+                    </div>
+                  )}
+                </CardContent>
               </Card>
             </div>
           </ResizablePanel>
