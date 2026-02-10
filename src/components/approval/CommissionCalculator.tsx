@@ -76,12 +76,12 @@ export function CommissionCalculator({
   
   // Dados da Tabela
   const [valorTabela, setValorTabela] = useState(0);
-  const [icmsTabela, setIcmsTabela] = useState(12);
+  const [icmsTabela, setIcmsTabela] = useState(4);
   const [percentualComissao, setPercentualComissao] = useState(0);
 
   // Dados da Nota Fiscal
   const [valorFaturado, setValorFaturado] = useState(0);
-  const [icmsDestino, setIcmsDestino] = useState(12);
+  const [icmsDestino, setIcmsDestino] = useState(4);
 
   // Parcelamento
   const [tipoPagamento, setTipoPagamento] = useState('a_vista');
@@ -610,7 +610,7 @@ export function CommissionCalculator({
                 </p>
               )}
               
-              <div className="grid grid-cols-3 gap-3 mt-3">
+              <div className={`grid ${tipoPagamento !== 'a_vista' ? 'grid-cols-3' : 'grid-cols-1'} gap-3 mt-3`}>
                 <div className="space-y-1.5">
                   <Label htmlFor="valorEntrada" className="text-xs">Entrada R$</Label>
                   <CurrencyInput
@@ -623,26 +623,30 @@ export function CommissionCalculator({
                     className="font-mono h-9"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="qtdParcelas" className="text-xs">Número de Parcelas</Label>
-                  <Input
-                    id="qtdParcelas"
-                    type="number"
-                    min="0"
-                    value={qtdParcelas}
-                    onChange={(e) => {
-                      setQtdParcelas(parseInt(e.target.value, 10) || 0);
-                      setParcelasEditadasManualmente(true);
-                    }}
-                    className="h-9"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Valor da Parcela</Label>
-                  <div className="h-9 px-3 flex items-center bg-muted rounded-md font-mono text-sm">
-                    {formatCurrency(valorParcela)}
-                  </div>
-                </div>
+                {tipoPagamento !== 'a_vista' && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="qtdParcelas" className="text-xs">Número de Parcelas</Label>
+                      <Input
+                        id="qtdParcelas"
+                        type="number"
+                        min="0"
+                        value={qtdParcelas}
+                        onChange={(e) => {
+                          setQtdParcelas(parseInt(e.target.value, 10) || 0);
+                          setParcelasEditadasManualmente(true);
+                        }}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Valor da Parcela</Label>
+                      <div className="h-9 px-3 flex items-center bg-muted rounded-md font-mono text-sm">
+                        {formatCurrency(valorParcela)}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

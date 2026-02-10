@@ -41,7 +41,7 @@ export interface ApprovalCalculationResult {
 }
 
 export function getIcmsRate(uf: string): number {
-  return ICMS_RATES[uf?.toUpperCase()] ?? 0.12;
+  return ICMS_RATES[uf?.toUpperCase()] ?? 0.04;
 }
 
 export function formatCurrency(value: number): string {

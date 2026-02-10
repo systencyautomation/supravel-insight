@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Bell, ArrowLeft, Pencil } from 'lucide-react';
+import { Bell, ArrowLeft, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useToast } from '@/hooks/use-toast';
@@ -10,13 +10,15 @@ import { usePendingSales } from '@/hooks/usePendingSales';
 import { useEditableSale } from '@/hooks/useEditableSale';
 import { CommissionCalculator, CalculationData, type Installment } from '@/components/approval/CommissionCalculator';
 import { SellerAssignment, type ConfirmedCalculationData, type SellerAssignmentResult, type SellerAssignmentHandle } from '@/components/approval/SellerAssignment';
-import { ApprovalActions } from '@/components/approval/ApprovalActions';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { SpreadsheetViewer } from '@/components/stock/SpreadsheetViewer';
 import { useFipeDocument, type FipeDocument } from '@/hooks/useFipeDocument';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaleInfoHeader } from '@/components/approval/SaleInfoHeader';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PendingSalesList } from '@/components/approval/PendingSalesList';
+import { toast as sonnerToast } from 'sonner';
 
 export default function SalesApproval() {
   const navigate = useNavigate();
@@ -32,7 +34,8 @@ export default function SalesApproval() {
   const { pendingSales, count: pendingCount, loading: pendingLoading, refetch: refetchPending } = usePendingSales();
   const { sale: editableSale, installments: editableInstallments, loading: editableLoading, refetch: refetchEditable } = useEditableSale(editSaleId);
   
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Use selectedSaleId instead of currentIndex to avoid bug when list refreshes
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [calculationData, setCalculationData] = useState<CalculationData | null>(null);
   const [fipeDocument, setFipeDocument] = useState<FipeDocument | null>(null);
   const [documentLoading, setDocumentLoading] = useState(true);
@@ -51,13 +54,45 @@ export default function SalesApproval() {
     return userRoles.some(role => role.role === 'admin' || role.role === 'manager');
   }, [isSuperAdmin, userRoles]);
 
-  // Current sale - either from edit mode or pending queue
+  // Auto-select first sale or keep selected sale stable across refetches
+  useEffect(() => {
+    if (isEditMode) return;
+    if (pendingSales.length === 0) {
+      setSelectedSaleId(null);
+      return;
+    }
+    
+    // If selected sale still exists in list, keep it
+    if (selectedSaleId && pendingSales.find(s => s.id === selectedSaleId)) {
+      return;
+    }
+    
+    // Selected sale was removed (approved by someone else) or first load
+    if (selectedSaleId && !pendingSales.find(s => s.id === selectedSaleId)) {
+      sonnerToast.info('A venda selecionada foi processada. Selecionando a próxima.');
+    }
+    setSelectedSaleId(pendingSales[0]?.id || null);
+  }, [pendingSales, isEditMode, selectedSaleId]);
+
+  // Navigate to specific sale from URL param
+  useEffect(() => {
+    if (isEditMode) return;
+    const saleId = searchParams.get('saleId');
+    if (saleId && pendingSales.length > 0) {
+      const found = pendingSales.find(s => s.id === saleId);
+      if (found) {
+        setSelectedSaleId(saleId);
+      }
+    }
+  }, [searchParams, pendingSales, isEditMode]);
+
+  // Current sale - either from edit mode or pending queue (by ID)
   const currentSale = useMemo(() => {
     if (isEditMode && editableSale) {
       return editableSale;
     }
-    return pendingSales[currentIndex] || null;
-  }, [isEditMode, editableSale, pendingSales, currentIndex]);
+    return pendingSales.find(s => s.id === selectedSaleId) || pendingSales[0] || null;
+  }, [isEditMode, editableSale, pendingSales, selectedSaleId]);
 
   // Total count for navigation
   const count = isEditMode ? 1 : pendingCount;
@@ -78,7 +113,6 @@ export default function SalesApproval() {
       const subtotalAposPisCofins = subtotalAposIcms - deducaoPisCofins;
       const deducaoIrCsll = subtotalAposPisCofins * 0.34;
       
-      // Build confirmedCalculation from existing sale data
       setConfirmedCalculation({
         valorTabela: editableSale.table_value || 0,
         percentualComissao: editableSale.percentual_comissao || 0,
@@ -95,11 +129,9 @@ export default function SalesApproval() {
         valorReal: editableSale.total_value || 0,
         jurosEmbutidos: 0,
         taxaJuros: 0,
-        // Deduções calculadas em cascata
         deducaoIcms: editableSale.icms || deducaoIcms,
         deducaoPisCofins: editableSale.pis_cofins || deducaoPisCofins,
         deducaoIrCsll: editableSale.ir_csll || deducaoIrCsll,
-        // No edit mode step 2 direct, use existing installments (will be loaded separately)
         parcelasGeradas: [],
       });
       setStep(2);
@@ -166,19 +198,6 @@ export default function SalesApproval() {
     }
   }, [currentSale?.id, isEditMode, editableInstallments]);
 
-  // Navigate to specific sale from URL param (only for pending mode)
-  useEffect(() => {
-    if (isEditMode) return;
-    
-    const saleId = searchParams.get('saleId');
-    if (saleId && pendingSales.length > 0) {
-      const index = pendingSales.findIndex(s => s.id === saleId);
-      if (index >= 0) {
-        setCurrentIndex(index);
-      }
-    }
-  }, [searchParams, pendingSales, isEditMode]);
-
   const handleCalculationChange = useCallback((data: CalculationData) => {
     setCalculationData(data);
   }, []);
@@ -203,11 +222,9 @@ export default function SalesApproval() {
       valorReal: calculationData.valorReal,
       jurosEmbutidos: calculationData.jurosEmbutidos,
       taxaJuros: calculationData.taxaJuros,
-      // Preservar deduções calculadas pela calculadora (cascata)
       deducaoIcms: calculationData.deducaoIcms,
       deducaoPisCofins: calculationData.deducaoPisCofins,
       deducaoIrCsll: calculationData.deducaoIrCsll,
-      // Parcelas geradas para sincronizar
       parcelasGeradas: calculationData.parcelasGeradas || [],
     });
     setStep(2);
@@ -217,7 +234,6 @@ export default function SalesApproval() {
   const syncInstallments = async (saleId: string, parcelas: { installment_number: number; value: number; due_date: string }[]) => {
     if (!effectiveOrgId) return;
     
-    // 1. Deletar parcelas existentes
     const { error: deleteError } = await supabase
       .from('installments')
       .delete()
@@ -228,7 +244,6 @@ export default function SalesApproval() {
       throw deleteError;
     }
     
-    // 2. Inserir novas parcelas (se houver)
     if (parcelas.length > 0) {
       const installmentsToInsert = parcelas.map(p => ({
         organization_id: effectiveOrgId,
@@ -264,25 +279,21 @@ export default function SalesApproval() {
       over_price_liquido: confirmedCalculation.overPriceLiquido,
       commission_calculated: assignmentData.comissaoTotalAtribuida || confirmedCalculation.comissaoTotal,
       valor_entrada: confirmedCalculation.valorEntrada,
-      // Usar deduções já calculadas pela calculadora (cascata)
       icms: confirmedCalculation.deducaoIcms,
       pis_cofins: confirmedCalculation.deducaoPisCofins,
       ir_csll: confirmedCalculation.deducaoIrCsll,
       aprovado_por: user.id,
       aprovado_em: new Date().toISOString(),
-      // Atribuição de comissão
       internal_seller_id: assignmentData.internalSellerId,
       internal_seller_percent: assignmentData.internalSellerPercent || null,
       representative_id: assignmentData.representativeId,
       representative_percent: assignmentData.representativePercent || null,
     };
 
-    // Only update status if NOT in edit mode
     if (!isEditMode) {
       updateData.status = 'aprovado';
     }
 
-    // Sincronizar parcelas
     await syncInstallments(currentSale.id, confirmedCalculation.parcelasGeradas || []);
 
     const { error } = await supabase
@@ -308,15 +319,12 @@ export default function SalesApproval() {
 
     if (isEditMode) {
       await refetchEditable();
-      navigate(-1); // Go back to previous page
+      navigate(-1);
     } else {
       await refetchPending();
       setStep(1);
       setConfirmedCalculation(null);
-      // Go to next or stay at same index (which will show next item)
-      if (currentIndex >= pendingSales.length - 1) {
-        setCurrentIndex(Math.max(0, pendingSales.length - 2));
-      }
+      // selectedSaleId will auto-adjust via the useEffect when pendingSales updates
     }
   };
 
@@ -334,7 +342,6 @@ export default function SalesApproval() {
       over_price_liquido: calculationData.overPriceLiquido,
       commission_calculated: calculationData.comissaoTotal,
       valor_entrada: calculationData.valorEntrada,
-      // Usar deduções da calculadora (cascata)
       icms: calculationData.deducaoIcms,
       pis_cofins: calculationData.deducaoPisCofins,
       ir_csll: calculationData.deducaoIrCsll,
@@ -394,22 +401,10 @@ export default function SalesApproval() {
     await refetchPending();
     setStep(1);
     setConfirmedCalculation(null);
-    
-    if (currentIndex >= pendingSales.length - 1) {
-      setCurrentIndex(Math.max(0, pendingSales.length - 2));
-    }
   };
 
   const handleBackToStep1 = () => {
     setStep(1);
-  };
-
-  const goToPrevious = () => {
-    setCurrentIndex(prev => Math.max(0, prev - 1));
-  };
-
-  const goToNext = () => {
-    setCurrentIndex(prev => Math.min(pendingSales.length - 1, prev + 1));
   };
 
   if (loading || documentLoading) {
@@ -471,7 +466,7 @@ export default function SalesApproval() {
     <div className="min-h-screen bg-background flex flex-col">
       <DashboardHeader />
       
-      {/* Header with navigation */}
+      {/* Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -494,7 +489,6 @@ export default function SalesApproval() {
                   <span className="bg-warning/20 text-warning-foreground px-2 py-0.5 rounded-full text-sm font-medium">
                     {pendingCount}
                   </span>
-                  {/* Step indicator */}
                   <Badge variant="outline" className="ml-2">
                     Etapa {step} de 2
                   </Badge>
@@ -502,32 +496,6 @@ export default function SalesApproval() {
               )}
             </div>
           </div>
-          
-          {!isEditMode && step === 1 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPrevious}
-                disabled={currentIndex === 0}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Anterior
-              </Button>
-              <span className="text-sm text-muted-foreground px-2">
-                {currentIndex + 1} de {pendingCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNext}
-                disabled={currentIndex >= pendingCount - 1}
-              >
-                Próximo
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -540,23 +508,37 @@ export default function SalesApproval() {
           <ResizablePanel defaultSize={50} minSize={30}>
             <div className="h-full p-4">
               <Card className="h-full flex flex-col">
-                <CardHeader className="flex-shrink-0 pb-3">
-                  <CardTitle className="text-lg">Tabela</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-hidden p-0">
-                  {fipeDocument ? (
-                    <SpreadsheetViewer
-                      gridData={fipeDocument.gridData}
-                      colCount={fipeDocument.colCount}
-                      rowCount={fipeDocument.rowCount}
-                      fileName={fipeDocument.fileName}
-                    />
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">Nenhuma planilha importada</p>
-                    </div>
-                  )}
-                </CardContent>
+                <Tabs defaultValue="lista" className="h-full flex flex-col">
+                  <CardHeader className="flex-shrink-0 pb-3">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="lista" className="flex-1">Lista ({pendingCount})</TabsTrigger>
+                      <TabsTrigger value="tabela" className="flex-1">Tabela</TabsTrigger>
+                    </TabsList>
+                  </CardHeader>
+                  <CardContent className="flex-1 overflow-hidden p-0">
+                    <TabsContent value="lista" className="h-full m-0">
+                      <PendingSalesList
+                        sales={pendingSales}
+                        selectedSaleId={selectedSaleId}
+                        onSelectSale={setSelectedSaleId}
+                      />
+                    </TabsContent>
+                    <TabsContent value="tabela" className="h-full m-0">
+                      {fipeDocument ? (
+                        <SpreadsheetViewer
+                          gridData={fipeDocument.gridData}
+                          colCount={fipeDocument.colCount}
+                          rowCount={fipeDocument.rowCount}
+                          fileName={fipeDocument.fileName}
+                        />
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center h-full">
+                          <p className="text-muted-foreground">Nenhuma planilha importada</p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </CardContent>
+                </Tabs>
               </Card>
             </div>
           </ResizablePanel>
