@@ -587,7 +587,15 @@ export function CommissionCalculator({
               </h3>
               <RadioGroup 
                 value={tipoPagamento} 
-                onValueChange={setTipoPagamento}
+                onValueChange={(val) => {
+                  setTipoPagamento(val);
+                  setParcelasEditadasManualmente(true);
+                  if (val === 'a_vista') {
+                    setQtdParcelas(0);
+                    setValorParcelaReal(0);
+                    setValorEntrada(valorFaturado);
+                  }
+                }}
                 className="flex gap-4"
               >
                 <div className="flex items-center space-x-2">
