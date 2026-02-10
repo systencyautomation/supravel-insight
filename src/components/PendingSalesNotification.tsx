@@ -54,7 +54,7 @@ export function PendingSalesNotification() {
             {displayedSales.map((sale) => (
               <DropdownMenuItem 
                 key={sale.id}
-                onClick={() => navigate('/aprovacao')}
+                onClick={() => navigate(`/aprovacao?saleId=${sale.id}`)}
                 className="cursor-pointer p-3"
               >
                 <div className="flex flex-col gap-1 w-full">
@@ -82,7 +82,7 @@ export function PendingSalesNotification() {
             
             <DropdownMenuSeparator />
             <DropdownMenuItem 
-              onClick={() => navigate('/aprovacao')}
+              onClick={() => navigate('/pendencias')}
               className="cursor-pointer justify-center text-primary font-medium"
             >
               Ver todas →
