@@ -54,15 +54,8 @@ export function useSalesWithCalculations() {
       const totalValue = Number(sale.total_value) || 0;
       const tableValue = Number(sale.table_value) || 0;
       
-      // 3. Filtrar parcelas reais (excluindo a entrada se estiver nas installments)
-      // A entrada pode estar salva como installment_number = 1
-      const parcelasReais = saleInstallments.filter((inst) => {
-        // Se o valor da parcela é igual ao valor_entrada, é a entrada
-        if (valorEntradaSalvo > 0 && Math.abs(Number(inst.value) - valorEntradaSalvo) < 0.01) {
-          return false; // Excluir - é a entrada
-        }
-        return true;
-      });
+      // 3. Usar todas as parcelas diretamente (sem filtro)
+      const parcelasReais = saleInstallments;
       
       const somaParcelas = parcelasReais.reduce((acc, i) => acc + Number(i.value || 0), 0);
       const qtdParcelas = parcelasReais.length;
