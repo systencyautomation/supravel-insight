@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bell, FileText, Sparkles } from 'lucide-react';
+import { ArrowLeft, Bell, FileText, Sparkles, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,10 +67,28 @@ export default function Pendencias() {
                     </div>
 
                     <div className="flex items-center gap-6 flex-shrink-0">
-                      {sale.ai_pre_calculated && (
+                      {(sale.analise_ia_status === 'concluido' || (sale.ai_pre_calculated && !sale.analise_ia_status)) && (
                         <Badge variant="secondary" className="text-xs gap-1">
                           <Sparkles className="h-3 w-3" />
                           Calculado
+                        </Badge>
+                      )}
+                      {sale.analise_ia_status === 'processando' && (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Processando
+                        </Badge>
+                      )}
+                      {sale.analise_ia_status === 'falha' && (
+                        <Badge variant="destructive" className="text-xs gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Falha IA
+                        </Badge>
+                      )}
+                      {sale.analise_ia_status === 'revisado' && (
+                        <Badge className="text-xs gap-1 bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Revisado
                         </Badge>
                       )}
                       {sale.uf_destiny && (

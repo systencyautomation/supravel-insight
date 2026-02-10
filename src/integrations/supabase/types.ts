@@ -715,6 +715,7 @@ export type Database = {
       sales: {
         Row: {
           ai_pre_calculated: boolean
+          analise_ia_status: string | null
           aprovado_em: string | null
           aprovado_por: string | null
           client_cnpj: string | null
@@ -725,6 +726,7 @@ export type Database = {
           emitente_cnpj: string | null
           emitente_nome: string | null
           emitente_uf: string | null
+          entrada_calculada: number | null
           icms: number | null
           icms_tabela: number | null
           id: string
@@ -761,9 +763,11 @@ export type Database = {
           total_value: number | null
           uf_destiny: string | null
           valor_entrada: number | null
+          valor_presente: number | null
         }
         Insert: {
           ai_pre_calculated?: boolean
+          analise_ia_status?: string | null
           aprovado_em?: string | null
           aprovado_por?: string | null
           client_cnpj?: string | null
@@ -774,6 +778,7 @@ export type Database = {
           emitente_cnpj?: string | null
           emitente_nome?: string | null
           emitente_uf?: string | null
+          entrada_calculada?: number | null
           icms?: number | null
           icms_tabela?: number | null
           id?: string
@@ -810,9 +815,11 @@ export type Database = {
           total_value?: number | null
           uf_destiny?: string | null
           valor_entrada?: number | null
+          valor_presente?: number | null
         }
         Update: {
           ai_pre_calculated?: boolean
+          analise_ia_status?: string | null
           aprovado_em?: string | null
           aprovado_por?: string | null
           client_cnpj?: string | null
@@ -823,6 +830,7 @@ export type Database = {
           emitente_cnpj?: string | null
           emitente_nome?: string | null
           emitente_uf?: string | null
+          entrada_calculada?: number | null
           icms?: number | null
           icms_tabela?: number | null
           id?: string
@@ -859,6 +867,7 @@ export type Database = {
           total_value?: number | null
           uf_destiny?: string | null
           valor_entrada?: number | null
+          valor_presente?: number | null
         }
         Relationships: [
           {

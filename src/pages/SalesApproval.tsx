@@ -292,6 +292,11 @@ export default function SalesApproval() {
       updateData.status = 'aprovado';
     }
 
+    // Persistir valor_presente e atualizar status da análise IA
+    updateData.valor_presente = confirmedCalculation.valorReal;
+    updateData.entrada_calculada = confirmedCalculation.valorEntrada;
+    updateData.analise_ia_status = 'revisado';
+
     await syncInstallments(currentSale.id, confirmedCalculation.parcelasGeradas || []);
 
     const { error } = await supabase
