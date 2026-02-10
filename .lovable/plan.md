@@ -1,148 +1,160 @@
 
 
-# Estruturar Base para o Modulo "Analista de IA"
+# Nova Edge Function: `parse-nfe-ai`
 
-## Analise do Estado Atual vs. Solicitado
+## Objetivo
 
-Antes de propor mudancas, e importante mapear o que ja existe para nao duplicar colunas ou quebrar funcionalidades.
+Criar uma edge function dedicada que usa IA multimodal para fazer a analise completa de uma venda em uma unica chamada: extrair dados do XML, ler visualmente os boletos PDF, conciliar os valores e retornar todos os campos da calculadora preenchidos com um comentario explicativo da IA.
 
-### 1. Tabela Organizations -- Campos de Configuracao
+## Diferenca em relacao ao fluxo atual
 
-| Campo Solicitado | Ja Existe? | Nome Atual | Observacao |
-|---|---|---|---|
-| `commission_model` (enum: total_value, company_margin) | SIM | `comissao_base` (text, default 'valor_tabela') | Armazena 'valor_tabela' ou 'comissao_empresa'. Mesmo conceito, nomes diferentes. |
-| `default_company_rate` (float) | SIM | `comissao_over_percent` (numeric, default 10) | Percentual do Over que vendedor recebe. Ja configuravel na UI. |
-| `api_key_llm` (password/text) | SIM | `ai_api_key` (text) | Chave da API de IA. Ja usada no `parse-nfe-xml`. |
+Hoje o processamento e fragmentado:
+- `parse-nfe-xml` faz parsing deterministico do XML (regex) e insere a venda
+- `extract-boleto-pdf` usa IA separadamente so para ler PDFs de boleto
+- O pre-calculo FIPE e feito depois, no mesmo `parse-nfe-xml`
 
-**Conclusao**: Os tres campos ja existem com nomes ligeiramente diferentes. Estao integrados em:
-- `useOrganizationSettings.ts` (hook)
-- `CommissionParametersForm.tsx` (UI de configuracao)
-- `parse-nfe-xml` edge function (uso da chave IA)
-- `CommissionCalculator.tsx` (calculo de comissao)
+A nova `parse-nfe-ai` consolida tudo em **uma unica chamada de IA multimodal** que recebe XML + PDFs juntos e retorna os campos da calculadora prontos, sem inserir nada no banco (funcao pura de analise).
 
-**Acao recomendada**: Nao renomear (evita refactor massivo). Manter os nomes atuais que ja estao em producao.
+## Input esperado
 
----
+```text
+POST /functions/v1/parse-nfe-ai
 
-### 2. Tabela Sales -- Colunas de Produto e Calculo
-
-| Campo Solicitado | Ja Existe? | Nome Atual | Observacao |
-|---|---|---|---|
-| `produto_marca` | SIM | `produto_marca` (text) | Identico |
-| `produto_modelo` | SIM | `produto_modelo` (text) | Identico -- usado como codigo FIPE |
-| `produto_numero_serie` | SIM | `produto_numero_serie` (text) | Identico |
-| `entrada_calculada` | NAO | `valor_entrada` existe mas e a entrada do boleto, nao a calculada | **PRECISA ADICIONAR** |
-| `valor_presente` | NAO | Calculado em runtime mas nunca persistido | **PRECISA ADICIONAR** |
-| `analise_ia_status` | PARCIAL | `ai_pre_calculated` (boolean) existe | Precisa de status mais rico (enum) |
-
-**Acoes necessarias**:
-1. Adicionar `valor_presente` (numeric) -- persiste o VP calculado
-2. Adicionar `entrada_calculada` (numeric) -- persiste a entrada detectada/calculada pela IA
-3. Adicionar `analise_ia_status` (text) -- substitui/complementa o boolean `ai_pre_calculated` com estados mais granulares
-
----
-
-### 3. RBAC (Cargos e Permissoes) -- Totalmente Implementado
-
-O sistema de RBAC ja esta **100% operacional** com:
-
-**Cargos (enum `app_role`)**:
-- `admin` = Gerente (controle total)
-- `manager` = Analista (quase tudo, exceto remover membros e configuracoes)
-- `seller` = Vendedor (ve apenas suas proprias vendas e comissoes + representantes linkados)
-- `representative` = Representante (apenas comissoes proprias)
-- `super_admin` = Master do sistema
-- `saas_admin` = Admin SaaS
-
-**Infraestrutura existente**:
-- Tabela `user_roles` com RLS
-- Tabela `user_permissions` para overrides individuais
-- Tabela `role_permissions` para templates por cargo
-- Funcoes SQL: `has_role()`, `has_permission()`, `can_view_all_sales()`, `get_user_org_id()`
-- `usePermissions` hook com 11 permissoes granulares
-- RLS policies na tabela `sales` que filtram por cargo (Vendedor ve so o seu, Admin ve tudo)
-- `RolePermissionsManager` UI para configurar permissoes por cargo
-- `EditRoleDialog` para alterar cargos com validacao hierarquica
-- Template padrao via `create_default_role_permissions()`
-
-**Conclusao**: Nenhuma mudanca necessaria no RBAC.
-
----
-
-## Plano de Implementacao
-
-### Etapa 1: Migration SQL -- Novas colunas na tabela `sales`
-
-Adicionar as 3 colunas que faltam:
-
-```sql
--- Valor Presente calculado (VP das parcelas com taxa de juros)
-ALTER TABLE public.sales 
-ADD COLUMN valor_presente numeric;
-
--- Entrada calculada pela IA (diferente de valor_entrada que vem do boleto)
-ALTER TABLE public.sales 
-ADD COLUMN entrada_calculada numeric;
-
--- Status granular da analise de IA 
--- Valores: 'pendente', 'processando', 'concluido', 'falha', 'revisado'
-ALTER TABLE public.sales 
-ADD COLUMN analise_ia_status text DEFAULT 'pendente';
+Body (JSON):
+{
+  "xml_content": "string (conteudo completo do XML da NF-e)",
+  "pdfs": ["base64string1", "base64string2", ...],
+  "organization_id": "uuid"
+}
 ```
 
-Os valores de `analise_ia_status`:
-- `pendente` -- aguardando analise (venda acabou de chegar)
-- `processando` -- IA esta analisando
-- `concluido` -- IA finalizou com sucesso (match FIPE + calculos)
-- `falha` -- IA tentou mas falhou (sem match FIPE, erro, etc.)
-- `revisado` -- humano revisou e aprovou os calculos da IA
+- `xml_content`: XML da NF-e (obrigatorio)
+- `pdfs`: Array de PDFs em Base64 (opcional, pode ser vazio)
+- `organization_id`: UUID da organizacao (obrigatorio, para buscar tabela FIPE e chave IA)
 
-### Etapa 2: Atualizar Edge Function `parse-nfe-xml`
+## Logica interna
 
-Quando a funcao faz o pre-calculo automatico (logica adicionada na implementacao anterior), gravar tambem:
-- `valor_presente` com o VP calculado
-- `entrada_calculada` com o valor da entrada detectada
-- `analise_ia_status = 'concluido'` em vez de apenas `ai_pre_calculated = true`
-- Se falhar o match FIPE: `analise_ia_status = 'falha'`
+### Passo 1: Parsing deterministico do XML
+Reutilizar as funcoes `parseNfeXml()` e `extractInfAdProd()` ja existentes no `parse-nfe-xml` para extrair:
+- Dados da NF-e (numero, chave, emissao, valores)
+- Produto (marca, modelo, numero de serie via `<infAdProd>`)
+- Emitente/Destinatario (CNPJ, nome, UF)
+- Valores (total NF, total produtos, IPI)
 
-### Etapa 3: Atualizar hooks e componentes
+### Passo 2: Buscar tabela FIPE da organizacao
+Consultar `fipe_documents` para encontrar o `valor_tabela` e `percentual_comissao` baseado no `produto_modelo` extraido do XML.
 
-- `usePendingSales.ts` -- incluir `valor_presente`, `entrada_calculada`, `analise_ia_status` no select
-- `useEditableSale.ts` -- incluir os novos campos
-- `Pendencias.tsx` -- usar `analise_ia_status` para mostrar badges mais informativos (Calculado, Falha, Revisado)
-- `CommissionCalculator.tsx` -- persistir `valor_presente` ao salvar
-- `SalesApproval.tsx` -- ao aprovar, atualizar `analise_ia_status` para 'revisado'
+### Passo 3: Chamar IA multimodal (se houver PDFs)
+Enviar os PDFs para o modelo `google/gemini-2.5-flash` via Lovable AI Gateway usando tool calling para extrair parcelas estruturadas:
+- Valor de cada boleto
+- Data de vencimento de cada boleto
+- Numero do boleto (se visivel)
 
-### Etapa 4: Atualizar tipo TypeScript (automatico)
+A chave da API sera buscada da coluna `ai_api_key` da organizacao (mesmo padrao do `extract-boleto-pdf`).
 
-O arquivo `types.ts` sera regenerado automaticamente apos a migration.
+### Passo 4: Conciliacao (Entrada Reversa)
+- Somar todos os boletos extraidos
+- `entrada_calculada = total_nf - soma_boletos`
+- Se a entrada for negativa, assumir 0
 
----
+### Passo 5: Calcular todos os campos da calculadora
+Usando a mesma logica do `approvalCalculator.ts`:
+- Ajuste de ICMS na tabela (se ICMS origem diferente do destino)
+- Over Price = Valor Real (VP) - Valor Tabela Ajustado
+- Deducoes em cascata: ICMS, PIS/COFINS (9.25%), IR/CSLL (34%)
+- Over Liquido
+- Comissao do pedido + Over Liquido = Comissao Total
+- Percentual final sobre valor faturado
 
-## Resumo das Mudancas
+### Passo 6: Gerar `ia_commentary`
+Montar uma string explicativa com os resultados, por exemplo:
+- "Dados 100% batendo, entrada de R$ 27.996,50 detectada via entrada reversa (NF - Boletos). Match FIPE encontrado: modelo CDD12J, tabela R$ 180.000,00. Comissao calculada: R$ 8.432,10 (4.2%)"
+- Ou se falhar: "Match FIPE nao encontrado para codigo XYZ. Boletos extraidos com sucesso (3 parcelas). Calculo parcial sem valor tabela."
 
-| Categoria | O que muda | O que ja existe (sem alteracao) |
-|---|---|---|
-| Organizations | Nada -- campos ja existem | `comissao_base`, `comissao_over_percent`, `ai_api_key` |
-| Sales (schema) | +3 colunas: `valor_presente`, `entrada_calculada`, `analise_ia_status` | `produto_marca`, `produto_modelo`, `produto_numero_serie`, `ai_pre_calculated` |
-| RBAC | Nada -- sistema completo | 4 cargos, 11 permissoes, RLS, funcoes SQL, UI |
-| Edge Function | Gravar novos campos no pre-calculo | Logica de match FIPE e calculo |
-| Frontend | Badges mais ricos + persistencia do VP | Calculadora, lista de pendencias, aprovacao |
+## Output (JSON)
 
----
+```text
+{
+  "success": true,
+  "ia_commentary": "string explicando a analise",
+  
+  // Dados extraidos do XML
+  "nfe": { chave, numero, serie, emissao },
+  "produto": { marca, modelo, numero_serie, descricao },
+  "emitente": { cnpj, nome, uf },
+  "destinatario": { cnpj, nome, uf },
+  "total_nf": number,
+  
+  // Boletos extraidos dos PDFs
+  "boletos": [{ valor, vencimento, numero }],
+  
+  // Campos da calculadora (todos preenchidos)
+  "calculadora": {
+    "valor_tabela": number,
+    "percentual_comissao": number,
+    "icms_tabela": number,        // % detectado da FIPE (4, 7 ou 12)
+    "icms_destino": number,       // % baseado na UF destino
+    "valor_faturado": number,     // Total NF
+    "valor_entrada": number,      // Entrada reversa calculada
+    "qtd_parcelas": number,
+    "valor_parcela": number,
+    "valor_presente": number,     // VP com taxa 2.2% a.m.
+    "over_price_bruto": number,
+    "deducao_icms": number,
+    "deducao_pis_cofins": number,
+    "deducao_ir_csll": number,
+    "over_price_liquido": number,
+    "comissao_pedido": number,
+    "comissao_total": number,
+    "percentual_final": number
+  },
+  
+  // Status da analise
+  "analise_ia_status": "concluido" | "falha",
+  "fipe_match": boolean
+}
+```
 
 ## Secao Tecnica
 
-### Arquivos afetados:
-1. **Migration SQL** -- adicionar 3 colunas em `sales`
-2. **`supabase/functions/parse-nfe-xml/index.ts`** -- gravar `valor_presente`, `entrada_calculada`, `analise_ia_status`
-3. **`src/hooks/usePendingSales.ts`** -- incluir novos campos no select
-4. **`src/hooks/useEditableSale.ts`** -- incluir novos campos
-5. **`src/pages/Pendencias.tsx`** -- badges baseados em `analise_ia_status`
-6. **`src/components/approval/CommissionCalculator.tsx`** -- persistir `valor_presente`
-7. **`src/pages/SalesApproval.tsx`** -- atualizar `analise_ia_status = 'revisado'` ao aprovar
+### Arquivo a criar
+- `supabase/functions/parse-nfe-ai/index.ts`
 
-### Compatibilidade:
-- A coluna `ai_pre_calculated` (boolean) sera mantida para nao quebrar nada existente. O `analise_ia_status` e um complemento mais rico.
-- Vendas existentes receberao `analise_ia_status = 'pendente'` por default, sem impacto.
+### Configuracao necessaria
+- Adicionar entrada no `supabase/config.toml`:
+```text
+[functions.parse-nfe-ai]
+verify_jwt = false
+```
+
+### Dependencias reutilizadas (copiadas do parse-nfe-xml)
+- Funcoes de parsing XML: `extractTag`, `extractNumber`, `extractInfAdProd`, `parseNfeXml`, `extractDuplicatas`, `extractPagamento`
+- Tabela ICMS por UF
+- Constantes fiscais: PIS/COFINS 9.25%, IR/CSLL 34%, Taxa boleto 2.2%
+
+### Fluxo de dados
+```text
+Input (xml + pdfs + org_id)
+  |
+  +-> Parse XML (deterministico)
+  +-> Buscar FIPE (Supabase query)
+  +-> Enviar PDFs para IA (Lovable AI Gateway)
+  |
+  +-> Conciliar: entrada = total_nf - soma_boletos
+  +-> Calcular VP, Over Price, deducoes, comissao
+  +-> Montar ia_commentary
+  |
+  +-> Retornar JSON completo (SEM inserir no banco)
+```
+
+### Importante
+- Esta funcao **nao insere nada no banco**. E uma funcao pura de analise que retorna os dados calculados.
+- A insercao continua sendo responsabilidade do `parse-nfe-xml` (ou de quem chamar esta funcao).
+- Isso permite que no futuro o `parse-nfe-xml` chame o `parse-nfe-ai` internamente, ou que o frontend chame diretamente para pre-visualizacao.
+
+### Tratamento de erros
+- Sem `ai_api_key` configurada e PDFs enviados: retorna analise parcial (so XML + FIPE, sem boletos)
+- Sem match FIPE: retorna `fipe_match: false` e campos de tabela zerados, com `ia_commentary` explicando
+- Falha na IA (429/402): retorna erro com codigo especifico
+- XML invalido: retorna erro 400
 
