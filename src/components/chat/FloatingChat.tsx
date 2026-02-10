@@ -1,27 +1,30 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Sparkles, Loader2 } from "lucide-react";
+import { MessageSquare, X, Send, Sparkles, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const SUGGESTIONS = [
+  "Quem é o cliente da NF 817?",
   "Qual o total de vendas este mês?",
-  "Quais parcelas estão vencidas?",
+  "Parcelas vencidas",
   "Resumo do estoque atual",
   "Qual a comissão total do mês?",
 ];
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-data-assistant`;
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat-assistant`;
 
 export function FloatingChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
+  const [apiKeyInvalid, setApiKeyInvalid] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -31,8 +34,16 @@ export function FloatingChat() {
     }
   }, [messages]);
 
+  const getAuthToken = async (): Promise<string | null> => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
+    setApiKeyMissing(false);
+    setApiKeyInvalid(false);
+
     const userMsg: Msg = { role: "user", content: text.trim() };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
@@ -52,18 +63,39 @@ export function FloatingChat() {
     };
 
     try {
+      const token = await getAuthToken();
+      if (!token) {
+        upsertAssistant("⚠️ Sessão expirada. Faça login novamente.");
+        setIsLoading(false);
+        return;
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ messages: allMessages }),
       });
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
-        upsertAssistant(`⚠️ ${err.error || "Erro ao processar sua mensagem."}`);
+
+        if (err.error === "API_KEY_MISSING") {
+          setApiKeyMissing(true);
+          setMessages((prev) => prev.filter((m) => m !== userMsg));
+          setIsLoading(false);
+          return;
+        }
+        if (err.error === "API_KEY_INVALID") {
+          setApiKeyInvalid(true);
+          setMessages((prev) => prev.filter((m) => m !== userMsg));
+          setIsLoading(false);
+          return;
+        }
+
+        upsertAssistant(`⚠️ ${err.message || err.error || "Erro ao processar sua mensagem."}`);
         setIsLoading(false);
         return;
       }
@@ -164,9 +196,21 @@ export function FloatingChat() {
             </Button>
           </div>
 
+          {/* API Key Warning */}
+          {(apiKeyMissing || apiKeyInvalid) && (
+            <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <p className="text-xs text-destructive">
+                {apiKeyMissing
+                  ? "Por favor, configure sua chave de IA nas configurações do Gerente."
+                  : "A chave de IA configurada é inválida. Verifique nas configurações."}
+              </p>
+            </div>
+          )}
+
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-            {messages.length === 0 && (
+            {messages.length === 0 && !apiKeyMissing && !apiKeyInvalid && (
               <div className="flex flex-col items-center gap-4 pt-8">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                   <MessageSquare className="h-6 w-6 text-primary" />
