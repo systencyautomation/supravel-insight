@@ -99,9 +99,9 @@ export default function PreApprovalInbox() {
 
     // If already analyzed, try to rebuild from persisted data
     if (selectedSale.analise_ia_status === 'concluido' || selectedSale.analise_ia_status === 'revisado') {
-      // Use persisted values
+      // Use persisted values including ia_commentary from DB
       setAnalysisResult({
-        ia_commentary: '',
+        ia_commentary: (selectedSale as any).ia_commentary || '',
         boletos: [],
         calculadora: {
           valor_tabela: selectedSale.table_value || 0,

@@ -843,6 +843,85 @@ serve(async (req) => {
       console.error('Pre-calculation error (non-fatal):', preCalcError);
     }
 
+    // === STEP: CALL parse-nfe-ai FOR FULL MULTIMODAL ANALYSIS ===
+    let aiAnalysisResult: Record<string, any> | null = null;
+    try {
+      // Extract PDF base64 contents from the body (n8n sends pdfs as array of objects with content_base64)
+      const pdfContents: string[] = [];
+      const bodyPdfs = body.pdfs;
+      if (bodyPdfs) {
+        const pdfsArray = typeof bodyPdfs === 'string' ? JSON.parse(bodyPdfs) : bodyPdfs;
+        if (Array.isArray(pdfsArray)) {
+          for (const pdf of pdfsArray) {
+            if (pdf.content_base64) pdfContents.push(pdf.content_base64);
+          }
+        }
+      }
+      // Also include single boleto_base64 if no pdfs array
+      if (pdfContents.length === 0 && boleto_base64) {
+        pdfContents.push(boleto_base64);
+      }
+
+      console.log(`Calling parse-nfe-ai with ${pdfContents.length} PDFs for sale ${sale.id}`);
+
+      const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+      const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+      const aiResponse = await fetch(
+        `${SUPABASE_URL}/functions/v1/parse-nfe-ai`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            xml_content,
+            pdfs: pdfContents,
+            organization_id,
+          }),
+        }
+      );
+
+      if (aiResponse.ok) {
+        const aiResult = await aiResponse.json();
+        if (aiResult.success && aiResult.calculadora) {
+          aiAnalysisResult = aiResult;
+          console.log('parse-nfe-ai succeeded, updating sale with AI results');
+
+          const { error: aiUpdateError } = await supabase
+            .from('sales')
+            .update({
+              valor_presente: aiResult.calculadora.valor_presente,
+              entrada_calculada: aiResult.calculadora.valor_entrada,
+              analise_ia_status: aiResult.analise_ia_status || 'concluido',
+              ia_commentary: aiResult.ia_commentary || null,
+              // Overwrite with more precise AI values
+              over_price: aiResult.calculadora.over_price_bruto,
+              over_price_liquido: aiResult.calculadora.over_price_liquido,
+              icms: aiResult.calculadora.deducao_icms,
+              pis_cofins: aiResult.calculadora.deducao_pis_cofins,
+              ir_csll: aiResult.calculadora.deducao_ir_csll,
+              commission_calculated: aiResult.calculadora.comissao_total,
+            })
+            .eq('id', sale.id);
+
+          if (aiUpdateError) {
+            console.error('Error updating sale with AI results:', aiUpdateError);
+          } else {
+            console.log('Sale updated with AI analysis results successfully');
+          }
+        } else {
+          console.log('parse-nfe-ai returned no calculadora or success=false:', JSON.stringify(aiResult).substring(0, 500));
+        }
+      } else {
+        const errorText = await aiResponse.text();
+        console.error(`parse-nfe-ai failed with status ${aiResponse.status}:`, errorText.substring(0, 500));
+      }
+    } catch (aiError) {
+      console.error('parse-nfe-ai call error (non-fatal):', aiError);
+    }
+
     // Resposta com informações sobre a fonte dos dados
     const response: Record<string, unknown> = { 
       success: true, 
@@ -852,6 +931,7 @@ serve(async (req) => {
       installments_count: installmentsInserted,
       boletos_source: usarBoletos,
       ai_pre_calculated: aiPreCalculated,
+      ai_analysis: aiAnalysisResult ? true : false,
     };
 
     // Adicionar detalhes do cálculo se boletos foram usados
