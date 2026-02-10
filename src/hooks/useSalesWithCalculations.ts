@@ -101,7 +101,7 @@ export function useSalesWithCalculations() {
       let deducaoIrCsll: number;
       
       // Verificar se temos over_price salvo no banco
-      const hasOverPriceSaved = Number(sale.over_price) > 0 || Number(sale.over_price_liquido) > 0;
+      const hasOverPriceSaved = sale.over_price !== null && sale.over_price !== undefined;
       
       if (hasOverPriceSaved) {
         // Usar valores salvos do banco

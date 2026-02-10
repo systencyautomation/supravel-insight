@@ -154,9 +154,9 @@ export function calculateApprovalCommission(
     
     console.log('[approvalCalculator] Deduções:', { deducaoIcms, deducaoPisCofins, deducaoIrCsll, overLiquido });
   } else {
-    // Se over negativo, desconsiderar (tratar como 0)
-    overLiquido = 0;
-    console.log('[approvalCalculator] Over negativo, desconsiderando:', overPrice, '→ 0');
+    // Over negativo: sem deduções fiscais, over líquido = over bruto (penaliza a comissão)
+    overLiquido = overPrice;
+    console.log('[approvalCalculator] Over negativo, penalizando comissão:', overPrice);
   }
 
   // Comissão do pedido (% sobre valor tabela ORIGINAL, não ajustado)
