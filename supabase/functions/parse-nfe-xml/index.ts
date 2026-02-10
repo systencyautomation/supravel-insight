@@ -650,6 +650,199 @@ serve(async (req) => {
       }
     }
 
+    // === PRE-CALCULATION: FIPE MATCH + COMMISSION CALCULATION ===
+    let aiPreCalculated = false;
+    try {
+      console.log('Starting pre-calculation for sale', sale.id);
+
+      // 1. Fetch FIPE documents for the organization
+      const { data: fipeDocs } = await supabase
+        .from('fipe_documents')
+        .select('rows, headers')
+        .eq('organization_id', organization_id)
+        .order('uploaded_at', { ascending: false })
+        .limit(1);
+
+      if (fipeDocs && fipeDocs.length > 0) {
+        const fipeDoc = fipeDocs[0];
+        const gridData = fipeDoc.rows as any[][];
+
+        const codigoParaBusca = parsedData.produto.modelo || parsedData.produto.codigo;
+        console.log('FIPE lookup code:', codigoParaBusca);
+
+        if (codigoParaBusca && gridData && gridData.length >= 4) {
+          // Find header row with "Cod. Interno"
+          let headerRowIndex = -1;
+          let codIndex = -1;
+
+          for (let i = 0; i < Math.min(5, gridData.length); i++) {
+            const row = gridData[i];
+            if (!row) continue;
+            const idx = row.findIndex((cell: any) => {
+              const value = String(cell?.value || cell || '').toLowerCase();
+              return value.includes('cód') && value.includes('interno');
+            });
+            if (idx >= 0) { headerRowIndex = i; codIndex = idx; break; }
+          }
+
+          if (headerRowIndex >= 0 && codIndex >= 0) {
+            const headerRow = gridData[headerRowIndex];
+
+            // Find column indices
+            const findColIndex = (keywords: string[]) => headerRow?.findIndex((cell: any) => {
+              const v = String(cell?.value || cell || '').toLowerCase();
+              return keywords.every(k => v.includes(k));
+            }) ?? -1;
+
+            const valor12Index = findColIndex(['valor', '12%']);
+            const valor7Index = findColIndex(['valor', '7%']);
+            const valor4Index = findColIndex(['valor', '4%']);
+            const comissaoIndex = headerRow?.findIndex((cell: any) => {
+              const v = String(cell?.value || cell || '').toLowerCase();
+              return v.includes('comiss');
+            }) ?? -1;
+
+            // Extract prefix for flexible matching
+            const productCode = String(codigoParaBusca).trim();
+            const prefixMatch = productCode.match(/^([A-Za-z0-9]+)/);
+            const codePrefix = prefixMatch ? prefixMatch[1] : productCode;
+
+            const parseValue = (row: any[], idx: number) => {
+              if (idx < 0) return 0;
+              return parseFloat(String(row[idx]?.value || row[idx] || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            };
+
+            // Search for matching product
+            let matchData: { valorTabela: number; icmsTabela: number; comissao: number } | null = null;
+
+            for (let i = headerRowIndex + 1; i < gridData.length; i++) {
+              const row = gridData[i];
+              if (!row) continue;
+              const cellValue = String(row[codIndex]?.value || row[codIndex] || '').trim();
+              if (!cellValue) continue;
+
+              const isMatch = cellValue === productCode
+                || cellValue === codePrefix
+                || cellValue.toUpperCase().startsWith(codePrefix.toUpperCase())
+                || productCode.toUpperCase().startsWith(cellValue.toUpperCase());
+
+              if (isMatch) {
+                const v4 = parseValue(row, valor4Index);
+                const v7 = parseValue(row, valor7Index);
+                const v12 = parseValue(row, valor12Index);
+                const com = parseValue(row, comissaoIndex);
+
+                if (v4 > 0) matchData = { valorTabela: v4, icmsTabela: 4, comissao: com };
+                else if (v7 > 0) matchData = { valorTabela: v7, icmsTabela: 7, comissao: com };
+                else if (v12 > 0) matchData = { valorTabela: v12, icmsTabela: 12, comissao: com };
+
+                if (cellValue === productCode) break; // exact match, stop
+                if (matchData) break;
+              }
+            }
+
+            if (matchData && matchData.valorTabela > 0) {
+              console.log('FIPE match found:', matchData);
+
+              // 2. Calculate ICMS rates
+              const ICMS_RATES: Record<string, number> = {
+                AC:0.07,AL:0.07,AM:0.07,AP:0.07,BA:0.07,CE:0.07,DF:0.07,ES:0.07,
+                GO:0.07,MA:0.07,MT:0.07,MS:0.07,PA:0.07,PB:0.07,PE:0.07,PI:0.07,
+                RN:0.07,RO:0.07,RR:0.07,SE:0.07,TO:0.07,
+                MG:0.12,PR:0.12,RJ:0.12,RS:0.12,SC:0.12,SP:0.12,
+                IMPORTADO:0.04,
+              };
+              const ufDest = parsedData.destinatario.uf?.toUpperCase() || '';
+              const icmsDestino = ICMS_RATES[ufDest] ?? 0.04;
+              const icmsOrigem = matchData.icmsTabela / 100;
+
+              // 3. Calculate Valor Real (VP) from installments
+              const TAXA_BOLETO = 0.022;
+              const totalNf = parsedData.valores.total_nf || 0;
+              let calculatedValorReal = totalNf;
+
+              // Get installments that were just inserted
+              const { data: savedInstallments } = await supabase
+                .from('installments')
+                .select('value, installment_number')
+                .eq('sale_id', sale.id)
+                .order('installment_number', { ascending: true });
+
+              if (savedInstallments && savedInstallments.length > 0 && paymentMethod !== 'a_vista') {
+                const vpParcela = savedInstallments[0]?.value || 0;
+                const nParcelas = savedInstallments.length;
+                if (nParcelas > 0 && TAXA_BOLETO > 0) {
+                  const fatorVP = (1 - Math.pow(1 + TAXA_BOLETO, -nParcelas)) / TAXA_BOLETO;
+                  calculatedValorReal = valorEntrada + (vpParcela * fatorVP);
+                }
+              }
+
+              // 4. Calculate commission (cascade deductions)
+              let valorTabelaAjustado = matchData.valorTabela;
+              if (Math.abs(icmsOrigem - icmsDestino) > 0.001 && icmsOrigem > 0) {
+                valorTabelaAjustado = matchData.valorTabela / (1 - icmsOrigem) * (1 - icmsDestino);
+              }
+
+              const overPrice = calculatedValorReal - valorTabelaAjustado;
+              let deducaoIcms = 0, deducaoPisCofins = 0, deducaoIrCsll = 0, overLiquido = 0;
+
+              if (overPrice > 0) {
+                deducaoIcms = overPrice * icmsDestino;
+                const sub1 = overPrice - deducaoIcms;
+                deducaoPisCofins = sub1 * 0.0925;
+                const sub2 = sub1 - deducaoPisCofins;
+                deducaoIrCsll = sub2 * 0.34;
+                overLiquido = sub2 - deducaoIrCsll;
+              } else {
+                overLiquido = overPrice;
+              }
+
+              const comissaoPedido = (matchData.comissao / 100) * matchData.valorTabela;
+              const comissaoTotal = comissaoPedido + overLiquido;
+              const percentualFinal = totalNf > 0 ? (comissaoTotal / totalNf) * 100 : 0;
+
+              console.log('Pre-calc result:', { overPrice, overLiquido, comissaoTotal, percentualFinal });
+
+              // 5. Update sale with pre-calculated values
+              const { error: updateError } = await supabase
+                .from('sales')
+                .update({
+                  table_value: matchData.valorTabela,
+                  percentual_comissao: matchData.comissao,
+                  icms_tabela: matchData.icmsTabela,
+                  percentual_icms: icmsDestino * 100,
+                  over_price: overPrice,
+                  over_price_liquido: overLiquido,
+                  icms: deducaoIcms,
+                  pis_cofins: deducaoPisCofins,
+                  ir_csll: deducaoIrCsll,
+                  commission_calculated: comissaoTotal,
+                  ai_pre_calculated: true,
+                })
+                .eq('id', sale.id);
+
+              if (updateError) {
+                console.error('Error updating sale with pre-calc:', updateError);
+              } else {
+                aiPreCalculated = true;
+                console.log('Sale pre-calculated successfully');
+              }
+            } else {
+              console.log('No FIPE match found for code:', codigoParaBusca);
+            }
+          } else {
+            console.log('FIPE header row not found');
+          }
+        } else {
+          console.log('No product code available for FIPE lookup');
+        }
+      } else {
+        console.log('No FIPE document found for organization');
+      }
+    } catch (preCalcError) {
+      console.error('Pre-calculation error (non-fatal):', preCalcError);
+    }
+
     // Resposta com informações sobre a fonte dos dados
     const response: Record<string, unknown> = { 
       success: true, 
@@ -657,7 +850,8 @@ serve(async (req) => {
       parsed: parsedData,
       inserted: true,
       installments_count: installmentsInserted,
-      boletos_source: usarBoletos
+      boletos_source: usarBoletos,
+      ai_pre_calculated: aiPreCalculated,
     };
 
     // Adicionar detalhes do cálculo se boletos foram usados
