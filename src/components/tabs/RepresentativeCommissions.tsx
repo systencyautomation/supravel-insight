@@ -112,7 +112,7 @@ export function RepresentativeCommissions() {
         const overLiquido = sale.overPriceLiquido || 0;
         
         const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-        const percentualRep = Number(sale.percentual_comissao) || 3;
+        const percentualRep = Number(sale.representative_percent) || 3;
         
         const comissaoBaseVal = baseCalculo * (percentualRep / 100);
         const comissaoOver = overLiquido * (overPercent / 100);
@@ -128,7 +128,7 @@ export function RepresentativeCommissions() {
         const comissaoEmpresa = sale.valorComissaoCalculado || 0;
         const overLiquido = sale.overPriceLiquido || 0;
         const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-        const percentualRep = Number(sale.percentual_comissao) || 3;
+        const percentualRep = Number(sale.representative_percent) || 3;
         const comissaoBaseVal = baseCalculo * (percentualRep / 100);
         const comissaoOver = overLiquido * (overPercent / 100);
         return acc + comissaoBaseVal + comissaoOver;
@@ -290,7 +290,7 @@ export function RepresentativeCommissions() {
                   const comissaoEmpresa = sale.valorComissaoCalculado || 0;
                   const overLiquido = sale.overPriceLiquido || 0;
                   const baseCalculo = comissaoBase === 'valor_tabela' ? valorTabela : comissaoEmpresa;
-                  const percentualRep = Number(sale.percentual_comissao) || 3;
+                  const percentualRep = Number(sale.representative_percent) || 3;
                   const comissaoBaseVal = baseCalculo * (percentualRep / 100);
                   const comissaoOver = overLiquido * (overPercent / 100);
                   const comissaoTotal = comissaoBaseVal + comissaoOver;
