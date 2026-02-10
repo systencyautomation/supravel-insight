@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.chat-data-assistant]
 verify_jwt = false
+
+[functions.ai-chat-assistant]
+verify_jwt = false
