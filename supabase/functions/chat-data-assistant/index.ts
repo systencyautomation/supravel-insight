@@ -80,8 +80,8 @@ serve(async (req) => {
         .order("model_name")
         .limit(50),
       serviceClient
-        .from("representatives")
-        .select("name, company, email, position, active")
+        .from("representative_companies")
+        .select("name, cnpj, position, active, sede")
         .eq("organization_id", orgId)
         .eq("active", true)
         .limit(30),
@@ -100,8 +100,8 @@ serve(async (req) => {
       `- ${i.model_name} | Marca: ${i.marca || "N/A"} | Preço: R$${i.base_price?.toFixed(2) || "0"} | Qtd: ${i.quantity || 0} | Tipo: ${i.classe_tipo || "N/A"} | Capacidade: ${i.capacidade || "N/A"}`
     ).join("\n");
 
-    const repsCtx = (repsResult.data || []).map((r) =>
-      `- ${r.name} | Empresa: ${r.company || "N/A"} | Cargo: ${r.position || "N/A"}`
+    const repsCtx = (repsResult.data || []).map((r: Record<string, unknown>) =>
+      `- ${r.name} | Sede: ${r.sede || "N/A"} | Cargo: ${r.position || "N/A"}`
     ).join("\n");
 
     const systemPrompt = `Você é um assistente de dados de negócios. Responda em português brasileiro de forma clara e objetiva.

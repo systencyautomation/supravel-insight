@@ -891,7 +891,7 @@ export type Database = {
             foreignKeyName: "sales_representative_id_fkey"
             columns: ["representative_id"]
             isOneToOne: false
-            referencedRelation: "representatives"
+            referencedRelation: "representative_companies"
             referencedColumns: ["id"]
           },
         ]
